@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { parseUrl, parseUploadedFile } from "@/lib/parser";
+import { parseUrl, parseUploadedFile, type ParseResult } from "@/lib/parser";
 import { classifyAndExtract } from "@/lib/ai/classifier";
 import { convertToPractice } from "@/lib/ai/practiceConverter";
 import { findSimilarEntries } from "@/lib/ai/deduplication";
+import { ReActAgent } from "@/lib/ai/agent";
+import { getAgentConfig } from "@/lib/ai/agent/get-config";
 import { readFile, unlink } from "fs/promises";
 import { join } from "path";
 import type { SourceType } from "@prisma/client";
@@ -137,6 +139,32 @@ async function asyncProcess(entryId: string) {
         practiceValue: aiResult.practiceValue,
       },
     });
+
+    // Step 2.5: ReAct Agent processing
+    try {
+      const agentConfig = await getAgentConfig();
+      const agent = new ReActAgent(agentConfig);
+      const parseInput: ParseResult = {
+        title: entry.title || title || '',
+        content: content,
+        sourceType: entry.sourceType,
+      };
+      const trace = await agent.process(entryId, parseInput);
+
+      // Merge agent tags with existing AI tags
+      const agentTags = trace.finalResult?.tags || [];
+      if (agentTags.length > 0) {
+        const currentEntry = await prisma.entry.findUnique({ where: { id: entryId } });
+        const mergedTags = [...(currentEntry?.aiTags || []), ...agentTags];
+        await prisma.entry.update({
+          where: { id: entryId },
+          data: { aiTags: [...new Set(mergedTags)] },
+        });
+      }
+    } catch (agentError) {
+      console.error('Agent processing error:', agentError);
+      // Continue with L3 even if agent fails
+    }
 
     // Step 3: Practice conversion (L3) - only for ACTIONABLE
     if (aiResult.practiceValue === "ACTIONABLE") {

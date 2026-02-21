@@ -3,6 +3,7 @@ import { toolsRegistry } from './tools';
 import type { AgentContext } from './types';
 import { getGeminiModel } from '@/lib/gemini';
 import { findSimilarEntries } from '@/lib/ai/deduplication';
+import { DEFAULT_EVALUATION_DIMENSIONS } from './config';
 
 // evaluate_dimension tool
 toolsRegistry.register({
@@ -13,15 +14,39 @@ toolsRegistry.register({
     content: z.string(),
     source: z.string().optional(),
   }),
-  handler: async (params, context) => {
+  handler: async (params, context: AgentContext) => {
     const model = getGeminiModel();
-    const prompt = `评估以下内容的${params.dimensionId}维度：\n\n${params.content}\n\n请返回评估结果和理由。`;
+
+    // 从配置获取维度信息
+    const dimension = DEFAULT_EVALUATION_DIMENSIONS.find(d => d.id === params.dimensionId);
+
+    if (!dimension) {
+      return { success: false, error: `Dimension ${params.dimensionId} not found` };
+    }
+
+    // 构建 prompt
+    let prompt = dimension.prompt;
+    if (params.source) {
+      prompt = prompt.replace('{{source}}', params.source);
+    }
+    // 对于 content 类型，需要截断避免超出 token 限制
+    const truncatedContent = params.content.slice(0, 2000);
+    prompt = prompt.replace('{{content}}', truncatedContent);
+
     const result = await model.generateContent(prompt);
     const evaluation = result.response.text();
 
+    // 保存评估结果
     context.evaluations[params.dimensionId] = evaluation;
 
-    return { success: true, data: { dimension: params.dimensionId, evaluation } };
+    return {
+      success: true,
+      data: {
+        dimension: params.dimensionId,
+        dimensionName: dimension.name,
+        evaluation
+      }
+    };
   },
 });
 
