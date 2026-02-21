@@ -6,6 +6,7 @@ import { isGitHubUrl, parseGitHub } from "./github";
 import { parseWebpage, isWeChatUrl, isTwitterUrl } from "./webpage";
 import { parseFile } from "./pdf";
 import { TextStrategy } from "./text";
+import { PdfTextStrategy } from "./pdf-text";
 import type { SourceType } from "@prisma/client";
 import type { ParseInput, ParseResult as StrategyParseResult, ParseStrategy } from "./strategy";
 import { ParserRegistry, parserRegistry } from "./registry";
@@ -97,6 +98,11 @@ const pdfStrategy: ParseStrategy = {
 function initializeRegistry() {
   parserRegistry.register(githubStrategy);
   parserRegistry.register(webpageStrategy);
+
+  // PDF strategies: PdfTextStrategy first (for text-based PDFs), then fallback to pdfStrategy (multimodal)
+  const pdfTextStrategy = new PdfTextStrategy();
+  pdfTextStrategy.setFallback(pdfStrategy);
+  parserRegistry.register(pdfTextStrategy);
   parserRegistry.register(pdfStrategy);
 
   const textStrategy = new TextStrategy();
