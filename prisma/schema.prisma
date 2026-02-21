@@ -48,10 +48,33 @@ model Entry {
   // Parse logs (1:many)
   parseLogs ParseLog[]
 
+  // Reasoning traces (1:many)
+  reasoningTraces ReasoningTrace[]
+
   @@index([processStatus])
   @@index([contentType])
   @@index([techDomain])
   @@index([createdAt])
+}
+
+// Reasoning trace for ReAct agent
+model ReasoningTrace {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  entryId   String
+  entry     Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  // Steps stored as JSON
+  steps        String @db.Text
+
+  // Final result from the agent
+  finalResult  String @db.Text
+
+  // Metadata about the trace
+  metadata     String @db.Text
+
+  @@index([entryId])
 }
 
 model ParseLog {

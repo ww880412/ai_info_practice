@@ -4,8 +4,7 @@ import './builtin-tools';
 export { toolsRegistry } from './tools';
 export { ToolsRegistry, type Tool, type ToolResult } from './tools';
 
-// ReActAgent will be implemented in future tasks
-// export { ReActAgent } from './engine';
+export { ReActAgent } from './engine';
 
 export * from './config';
 export * from './types';
