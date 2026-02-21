@@ -7,6 +7,8 @@ import { parseWebpage, isWeChatUrl, isTwitterUrl } from "./webpage";
 import { parseFile } from "./pdf";
 import { TextStrategy } from "./text";
 import { PdfTextStrategy } from "./pdf-text";
+import { OcrStrategy } from "./ocr";
+import { ImageMultimodalStrategy } from "./image-multimodal";
 import type { SourceType } from "@prisma/client";
 import type { ParseInput, ParseResult as StrategyParseResult, ParseStrategy } from "./strategy";
 import { ParserRegistry, parserRegistry } from "./registry";
@@ -98,6 +100,14 @@ const pdfStrategy: ParseStrategy = {
 function initializeRegistry() {
   parserRegistry.register(githubStrategy);
   parserRegistry.register(webpageStrategy);
+
+  // Image strategies: OCR first (for small images), then multimodal fallback
+  // Must register before PDF strategy since pdfStrategy also handles IMAGE
+  const imageMultimodalStrategy = new ImageMultimodalStrategy();
+  const ocrStrategy = new OcrStrategy();
+  ocrStrategy.setFallback(imageMultimodalStrategy);
+  parserRegistry.register(ocrStrategy);
+  parserRegistry.register(imageMultimodalStrategy);
 
   // PDF strategies: PdfTextStrategy first (for text-based PDFs), then fallback to pdfStrategy (multimodal)
   const pdfTextStrategy = new PdfTextStrategy();
