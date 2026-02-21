@@ -154,3 +154,6 @@ export async function parseUploadedFile(
 // Re-export utility functions
 export { isGitHubUrl } from "./github";
 export { isWeChatUrl, isTwitterUrl } from "./webpage";
+
+// Re-export parseWithLogging
+export { parseWithLogging } from "./parse-with-log";

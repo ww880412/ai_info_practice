@@ -45,10 +45,27 @@ model Entry {
   // L3 practice (1:1)
   practiceTask  PracticeTask?
 
+  // Parse logs (1:many)
+  parseLogs ParseLog[]
+
   @@index([processStatus])
   @@index([contentType])
   @@index([techDomain])
   @@index([createdAt])
+}
+
+model ParseLog {
+  id            String   @id @default(cuid())
+  entryId       String
+  strategy      String
+  inputSize     Int
+  outputSize    Int
+  processingTime Int
+  success       Boolean
+  error         String?
+  createdAt    DateTime @default(now())
+
+  entry         Entry   @relation(fields: [entryId], references: [id])
 }
 
 model PracticeTask {
