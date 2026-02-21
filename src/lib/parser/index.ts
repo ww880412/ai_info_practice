@@ -5,6 +5,7 @@
 import { isGitHubUrl, parseGitHub } from "./github";
 import { parseWebpage, isWeChatUrl, isTwitterUrl } from "./webpage";
 import { parseFile } from "./pdf";
+import { TextStrategy } from "./text";
 import type { SourceType } from "@prisma/client";
 import type { ParseInput, ParseResult as StrategyParseResult, ParseStrategy } from "./strategy";
 import { ParserRegistry, parserRegistry } from "./registry";
@@ -97,6 +98,9 @@ function initializeRegistry() {
   parserRegistry.register(githubStrategy);
   parserRegistry.register(webpageStrategy);
   parserRegistry.register(pdfStrategy);
+
+  const textStrategy = new TextStrategy();
+  parserRegistry.register(textStrategy);
 }
 
 // Initialize on module load
