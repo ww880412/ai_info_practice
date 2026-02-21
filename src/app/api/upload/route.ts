@@ -29,11 +29,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (20MB max for Gemini inline)
-    const MAX_SIZE = 20 * 1024 * 1024;
+    // Validate file size (100MB max for local storage)
+    const MAX_SIZE = 100 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
       return NextResponse.json(
-        { error: "File too large. Maximum 20MB." },
+        { error: "File too large. Maximum 100MB." },
         { status: 400 }
       );
     }
