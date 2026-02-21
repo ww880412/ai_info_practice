@@ -6,6 +6,7 @@ import { convertToPractice } from "@/lib/ai/practiceConverter";
 import { findSimilarEntries } from "@/lib/ai/deduplication";
 import { ReActAgent } from "@/lib/ai/agent";
 import { getAgentConfig } from "@/lib/ai/agent/get-config";
+import { setServerConfig } from "@/lib/gemini";
 import { readFile, unlink } from "fs/promises";
 import { join } from "path";
 import type { SourceType } from "@prisma/client";
@@ -13,7 +14,12 @@ import type { SourceType } from "@prisma/client";
 /**
  * Async processing pipeline - runs after response is sent.
  */
-async function asyncProcess(entryId: string) {
+async function asyncProcess(entryId: string, config: { geminiApiKey?: string; geminiModel?: string } = {}) {
+  // Set server config for Gemini
+  if (config.geminiApiKey || config.geminiModel) {
+    setServerConfig(config);
+  }
+
   try {
     const entry = await prisma.entry.findUnique({ where: { id: entryId } });
     if (!entry) return;
@@ -265,8 +271,11 @@ export async function POST(request: NextRequest) {
       similarEntries = await findSimilarEntries(text, 0.5);
     }
 
-    // Trigger async processing (fire and forget)
-    void asyncProcess(entry.id);
+    // Extract config from request body
+    const config = body.config || {};
+
+    // Trigger async processing (fire and forget) with config
+    void asyncProcess(entry.id, config);
 
     return NextResponse.json({
       entryId: entry.id,

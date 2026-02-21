@@ -1,7 +1,18 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Store config globally for server-side usage
+let serverConfig: { apiKey?: string; model?: string } = {};
+
+export function setServerConfig(config: { apiKey?: string; model?: string }) {
+  serverConfig = config;
+}
+
 function getApiKey(): string {
-  // First check localStorage (user configured)
+  // First check server config (for API routes)
+  if (serverConfig.apiKey) {
+    return serverConfig.apiKey;
+  }
+  // Then check localStorage (for client)
   if (typeof window !== "undefined") {
     const saved = localStorage.getItem("ai-practice-config");
     if (saved) {
@@ -20,6 +31,11 @@ function getApiKey(): string {
 }
 
 function getModel(): string {
+  // First check server config (for API routes)
+  if (serverConfig.model) {
+    return serverConfig.model;
+  }
+  // Then check localStorage (for client)
   if (typeof window !== "undefined") {
     const saved = localStorage.getItem("ai-practice-config");
     if (saved) {
@@ -33,7 +49,7 @@ function getModel(): string {
       }
     }
   }
-  return process.env.GEMINI_MODEL || "gemini-2.0-flash-exp";
+  return process.env.GEMINI_MODEL || "gemini-2.0-flash";
 }
 
 let genAI: GoogleGenerativeAI | null = null;
