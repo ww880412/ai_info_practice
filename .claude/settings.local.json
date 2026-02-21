@@ -8,7 +8,8 @@
       "Bash(docker:*)",
       "Bash(docker compose:*)",
       "Bash(npx prisma:*)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "WebFetch(domain:ai.google.dev)"
     ]
   }
 }
