@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(*)",
+      "Edit(*)",
+      "Write(*)",
+      "Bash(docker:*)",
+      "Bash(docker compose:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npx next:*)"
+    ]
+  }
+}

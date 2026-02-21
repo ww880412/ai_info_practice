@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────── Core Entity ───────────────
+
+model Entry {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Raw input
+  inputType   InputType
+  rawUrl      String?
+  rawText     String?          @db.Text
+  sourceType  SourceType
+  title       String?
+  originalContent String?      @db.Text
+
+  // AI processing status
+  processStatus ProcessStatus  @default(PENDING)
+  processError  String?
+
+  // L1 classification
+  contentType   ContentType?
+  techDomain    TechDomain?
+  aiTags        String[]
+  userTags      String[]
+
+  // L2 extraction
+  coreSummary   String?
+  keyPoints     String[]
+  practiceValue PracticeValue?
+
+  // Smart summary (V2 Task 2)
+  smartSummary  String? @db.Text
+  keyInsights   String[]
+  tldr          String?
+
+  // L3 practice (1:1)
+  practiceTask  PracticeTask?
+
+  @@index([processStatus])
+  @@index([contentType])
+  @@index([techDomain])
+  @@index([createdAt])
+}
+
+model PracticeTask {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entryId String @unique
+  entry   Entry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  title         String
+  summary       String         @db.Text
+  status        PracticeStatus @default(QUEUED)
+  prerequisites String[]
+  difficulty    Difficulty
+  estimatedTime String
+
+  steps PracticeStep[]
+
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  @@index([status])
+}
+
+model PracticeStep {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  practiceTaskId String
+  practiceTask   PracticeTask @relation(fields: [practiceTaskId], references: [id], onDelete: Cascade)
+
+  order       Int
+  title       String
+  description String     @db.Text
+  status      StepStatus @default(PENDING)
+  note        String?
+
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  @@index([practiceTaskId, order])
+}
+
+// ─────────────── Enums ───────────────
+
+enum InputType {
+  LINK
+  PDF
+  TEXT
+}
+
+enum SourceType {
+  GITHUB
+  WECHAT
+  TWITTER
+  WEBPAGE
+  PDF
+  TEXT
+}
+
+enum ProcessStatus {
+  PENDING
+  PARSING
+  AI_PROCESSING
+  DONE
+  FAILED
+  PARTIAL
+}
+
+enum ContentType {
+  TUTORIAL
+  TOOL_RECOMMENDATION
+  TECH_PRINCIPLE
+  CASE_STUDY
+  OPINION
+}
+
+enum TechDomain {
+  PROMPT_ENGINEERING
+  AGENT
+  RAG
+  FINE_TUNING
+  DEPLOYMENT
+  OTHER
+}
+
+enum PracticeValue {
+  KNOWLEDGE
+  ACTIONABLE
+}
+
+enum PracticeStatus {
+  QUEUED
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum StepStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
