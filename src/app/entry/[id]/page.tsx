@@ -420,33 +420,33 @@ export default function EntryDetailPage() {
             )}
           </div>
         </div>
+      )}
 
-        {/* Reasoning Trace */}
-        {entry.processStatus === "DONE" && (
-          <div className="border border-border rounded-lg p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Brain size={16} className="text-primary" />
-              <h3 className="text-sm font-semibold">AI Processing Trace</h3>
-            </div>
-
-            {traceLoading && (
-              <div className="flex items-center gap-2 text-sm text-secondary">
-                <Loader2 size={14} className="animate-spin" />
-                Loading reasoning trace...
-              </div>
-            )}
-
-            {traceData?.steps && traceData.steps.length > 0 ? (
-              <ReasoningTraceView steps={traceData.steps} />
-            ) : (
-              !traceLoading && (
-                <p className="text-xs text-secondary">
-                  No reasoning trace available yet.
-                </p>
-              )}
-            )}
+      {/* Reasoning Trace */}
+      {entry.processStatus === "DONE" && (
+        <div className="border border-border rounded-lg p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Brain size={16} className="text-primary" />
+            <h3 className="text-sm font-semibold">AI Processing Trace</h3>
           </div>
-        )}
+
+          {traceLoading && (
+            <div className="flex items-center gap-2 text-sm text-secondary">
+              <Loader2 size={14} className="animate-spin" />
+              Loading reasoning trace...
+            </div>
+          )}
+
+          {traceData?.steps && traceData.steps.length > 0 ? (
+            <ReasoningTraceView steps={traceData.steps} />
+          ) : (
+            !traceLoading && (
+              <p className="text-xs text-secondary">
+                No reasoning trace available yet.
+              </p>
+            )
+          )}
+        </div>
       )}
 
       {/* Actions */}
