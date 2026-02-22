@@ -42,7 +42,7 @@ export class ParserRegistry {
     );
     const fileTimeoutMs = parsePositiveNumber(
       process.env.PARSER_FILE_TIMEOUT_MS,
-      180_000
+      600_000
     );
 
     this.timeoutByType = {

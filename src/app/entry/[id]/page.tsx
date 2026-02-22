@@ -184,7 +184,11 @@ export default function EntryDetailPage() {
           <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
             <Loader2 size={16} className="animate-spin text-primary" />
             <span className="text-sm">
-              {entry.processStatus === "PARSING" ? "Parsing content..." : "AI analyzing..."}
+              {entry.processError?.trim()
+                ? entry.processError
+                : entry.processStatus === "PARSING"
+                  ? "Parsing content..."
+                  : "AI analyzing..."}
             </span>
           </div>
         )}

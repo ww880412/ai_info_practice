@@ -14,9 +14,14 @@ import {
 import { setServerConfig } from "@/lib/gemini";
 import { isDynamicSummaryEnabled } from "@/config/flags";
 import { buildConfidenceScore } from "@/lib/ai/agent/confidence";
+import {
+  isRetriableAgentError,
+  isRetriableParseError,
+  runWithProgressRetry,
+} from "@/lib/ingest/retry";
 import { readFile, unlink } from "fs/promises";
 import { join } from "path";
-import type { Prisma, SourceType } from "@prisma/client";
+import type { Prisma, ProcessStatus, SourceType } from "@prisma/client";
 
 function buildDecisionFromClassifier(
   result: ClassifyAndExtractResult
@@ -89,6 +94,24 @@ function normalizePracticeTaskFromLegacyResult(
   };
 }
 
+function shouldAllowLegacyClassifierFallback(): boolean {
+  return process.env.ALLOW_CLASSIFIER_FALLBACK === "true";
+}
+
+async function updateEntryProcessStatus(
+  entryId: string,
+  processStatus: ProcessStatus,
+  message?: string | null
+) {
+  await prisma.entry.update({
+    where: { id: entryId },
+    data: {
+      processStatus,
+      processError: message ?? null,
+    },
+  });
+}
+
 /**
  * Async processing pipeline - runs after response is sent.
  */
@@ -107,17 +130,25 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
 
     // Step 1: Parse content if needed
     if (entry.inputType === "LINK" && entry.rawUrl) {
-      await prisma.entry.update({
-        where: { id: entryId },
-        data: { processStatus: "PARSING" },
-      });
+      await updateEntryProcessStatus(entryId, "PARSING", "正在解析链接内容...");
 
       try {
-        const parsed = await parseWithLogging(entryId, {
-          type: "WEBPAGE",
-          data: entry.rawUrl,
-          size: entry.rawUrl.length,
+        const parsed = await runWithProgressRetry({
+          label: "链接解析",
+          attempts: 3,
+          baseDelayMs: 1500,
+          isRetriable: isRetriableParseError,
+          onProgress: async (message) => {
+            await updateEntryProcessStatus(entryId, "PARSING", message);
+          },
+          operation: async () =>
+            parseWithLogging(entryId, {
+              type: "WEBPAGE",
+              data: entry.rawUrl!,
+              size: entry.rawUrl!.length,
+            }),
         });
+
         content = parsed.content;
         title = parsed.title;
         await prisma.entry.update({
@@ -129,20 +160,15 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
           },
         });
       } catch (parseError) {
-        await prisma.entry.update({
-          where: { id: entryId },
-          data: {
-            processStatus: "FAILED",
-            processError: `Content parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-          },
-        });
+        await updateEntryProcessStatus(
+          entryId,
+          "FAILED",
+          `Content parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`
+        );
         return;
       }
     } else if (entry.inputType === "PDF") {
-      await prisma.entry.update({
-        where: { id: entryId },
-        data: { processStatus: "PARSING" },
-      });
+      await updateEntryProcessStatus(entryId, "PARSING", "正在解析文件内容（大文件可能需要更久）...");
 
       try {
         // rawUrl stores the fileKey for uploaded files
@@ -163,16 +189,27 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
           heic: "image/heic",
         };
         const mimeType = mimeMap[ext || ""] || "application/pdf";
-
         const parseType: ParseInput["type"] = mimeType.startsWith("image/")
           ? "IMAGE"
           : "PDF";
-        const parsed = await parseWithLogging(entryId, {
-          type: parseType,
-          data: buffer,
-          mimeType,
-          size: buffer.length,
+
+        const parsed = await runWithProgressRetry({
+          label: "文件解析",
+          attempts: 4,
+          baseDelayMs: 3000,
+          isRetriable: isRetriableParseError,
+          onProgress: async (message) => {
+            await updateEntryProcessStatus(entryId, "PARSING", message);
+          },
+          operation: async () =>
+            parseWithLogging(entryId, {
+              type: parseType,
+              data: buffer,
+              mimeType,
+              size: buffer.length,
+            }),
         });
+
         content = parsed.content;
         title = parsed.title;
 
@@ -195,42 +232,41 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
           const filePath = join(process.cwd(), "public", "uploads", fileKey);
           await unlink(filePath).catch(() => {});
         }
-        await prisma.entry.update({
-          where: { id: entryId },
-          data: {
-            processStatus: "FAILED",
-            processError: `File parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-          },
-        });
+        await updateEntryProcessStatus(
+          entryId,
+          "FAILED",
+          `File parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`
+        );
         return;
       }
     } else if (entry.inputType === "TEXT") {
-      const rawText = entry.rawText || "";
-      const parsed = await parseWithLogging(entryId, {
-        type: "TEXT",
-        data: rawText,
-        size: rawText.length,
-      });
-      content = parsed.content;
-      title = parsed.title;
+      await updateEntryProcessStatus(entryId, "PARSING", "正在处理文本内容...");
+      try {
+        const rawText = entry.rawText || "";
+        const parsed = await parseWithLogging(entryId, {
+          type: "TEXT",
+          data: rawText,
+          size: rawText.length,
+        });
+        content = parsed.content;
+        title = parsed.title;
+      } catch (parseError) {
+        await updateEntryProcessStatus(
+          entryId,
+          "FAILED",
+          `Text parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`
+        );
+        return;
+      }
     }
 
     if (!content) {
-      await prisma.entry.update({
-        where: { id: entryId },
-        data: {
-          processStatus: "FAILED",
-          processError: "No content to process",
-        },
-      });
+      await updateEntryProcessStatus(entryId, "FAILED", "No content to process");
       return;
     }
 
-    // Step 2: AI processing (Agent-first, classifier fallback)
-    await prisma.entry.update({
-      where: { id: entryId },
-      data: { processStatus: "AI_PROCESSING" },
-    });
+    // Step 2: AI processing (Agent-first, retry-first)
+    await updateEntryProcessStatus(entryId, "AI_PROCESSING", "正在进行 AI 分析...");
 
     let decision: NormalizedAgentIngestDecision | null = null;
 
@@ -242,20 +278,40 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
         content,
         sourceType: entry.sourceType,
       };
-      const trace = await agent.process(entryId, parseInput);
-      decision = normalizeAgentIngestDecision(trace.finalResult);
-      if (!decision) {
-        console.warn(
-          "Agent final result is missing required fields; fallback to classifyAndExtract"
-        );
-      }
+
+      decision = await runWithProgressRetry({
+        label: "AI分析",
+        attempts: 5,
+        baseDelayMs: 2000,
+        isRetriable: isRetriableAgentError,
+        onProgress: async (message) => {
+          await updateEntryProcessStatus(entryId, "AI_PROCESSING", message);
+        },
+        operation: async () => {
+          const trace = await agent.process(entryId, parseInput);
+          const normalized = normalizeAgentIngestDecision(trace.finalResult);
+          if (!normalized) {
+            throw new Error("Agent output missing required fields");
+          }
+          return normalized;
+        },
+      });
     } catch (agentError) {
       console.error("Agent processing error:", agentError);
     }
 
     if (!decision) {
-      const fallbackResult = await classifyAndExtract(content);
-      decision = buildDecisionFromClassifier(fallbackResult);
+      if (shouldAllowLegacyClassifierFallback()) {
+        await updateEntryProcessStatus(
+          entryId,
+          "AI_PROCESSING",
+          "主流程暂不可用，正在使用兼容模式..."
+        );
+        const fallbackResult = await classifyAndExtract(content);
+        decision = buildDecisionFromClassifier(fallbackResult);
+      } else {
+        throw new Error("AI processing failed after retries");
+      }
     }
 
     const dynamicSummaryEnabled = isDynamicSummaryEnabled();
@@ -339,19 +395,14 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
     }
 
     // Mark as done
-    await prisma.entry.update({
-      where: { id: entryId },
-      data: { processStatus: "DONE" },
-    });
+    await updateEntryProcessStatus(entryId, "DONE", null);
   } catch (error) {
     console.error("Async processing error:", error);
-    await prisma.entry.update({
-      where: { id: entryId },
-      data: {
-        processStatus: "FAILED",
-        processError: error instanceof Error ? error.message : String(error),
-      },
-    }).catch(() => {});
+    await updateEntryProcessStatus(
+      entryId,
+      "FAILED",
+      error instanceof Error ? error.message : String(error)
+    ).catch(() => {});
   }
 }
 
@@ -396,6 +447,7 @@ export async function POST(request: NextRequest) {
         rawText: inputType === "TEXT" ? text : null,
         sourceType,
         processStatus: "PENDING",
+        processError: "任务已提交，等待处理...",
       },
     });
 

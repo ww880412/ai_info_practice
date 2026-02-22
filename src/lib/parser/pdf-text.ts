@@ -46,7 +46,7 @@ export class PdfTextStrategy implements ParseStrategy {
   constructor(options: PdfTextStrategyOptions = {}) {
     this.timeoutMs = options.timeoutMs ?? parsePositiveNumber(
       process.env.PARSER_PDF_TEXT_TIMEOUT_MS,
-      20_000
+      60_000
     );
     this.minTextLength = options.minTextLength ?? parsePositiveNumber(
       process.env.PARSER_PDF_MIN_TEXT_LENGTH,
@@ -60,7 +60,7 @@ export class PdfTextStrategy implements ParseStrategy {
   }
 
   canHandle(input: ParseInput): boolean {
-    return input.type === 'PDF' && input.size < 20 * 1024 * 1024;
+    return input.type === 'PDF' && input.size < 35 * 1024 * 1024;
   }
 
   async execute(input: ParseInput): Promise<ParseResult> {

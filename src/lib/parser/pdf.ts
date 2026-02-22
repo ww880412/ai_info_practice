@@ -49,7 +49,7 @@ function runCommand(
 
 async function renderPdfPagesAsImages(buffer: Buffer): Promise<Buffer[]> {
   const maxPages = parsePositiveNumber(process.env.PARSER_PDF_MAX_IMAGE_PAGES, 3);
-  const timeoutMs = parsePositiveNumber(process.env.PARSER_PDF_RENDER_TIMEOUT_MS, 30_000);
+  const timeoutMs = parsePositiveNumber(process.env.PARSER_PDF_RENDER_TIMEOUT_MS, 90_000);
   const tempDir = await mkdtemp(join(tmpdir(), "ai-info-practice-pdf-images-"));
   const pdfPath = join(tempDir, "input.pdf");
   const outputPrefix = join(tempDir, "page");

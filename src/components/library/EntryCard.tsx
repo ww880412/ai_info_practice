@@ -65,6 +65,7 @@ interface EntryCardProps {
     title?: string | null;
     sourceType: string;
     processStatus: string;
+    processError?: string | null;
     contentType?: string | null;
     techDomain?: string | null;
     coreSummary?: string | null;
@@ -87,6 +88,10 @@ export function EntryCard({
   onSelectChange,
 }: EntryCardProps) {
   const SourceIcon = sourceIconMap[entry.sourceType] || Globe;
+  const isProcessingStatus =
+    entry.processStatus === "PENDING" ||
+    entry.processStatus === "PARSING" ||
+    entry.processStatus === "AI_PROCESSING";
 
   return (
     <div
@@ -120,6 +125,12 @@ export function EntryCard({
       {entry.coreSummary && (
         <p className="text-xs text-secondary mb-3 line-clamp-2">
           {entry.coreSummary}
+        </p>
+      )}
+
+      {isProcessingStatus && entry.processError && (
+        <p className="text-xs text-secondary mb-3 line-clamp-2">
+          {entry.processError}
         </p>
       )}
 
