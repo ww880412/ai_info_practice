@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { parseBulkDeleteIds } from "@/lib/entries/bulk-delete";
+import { deleteEntriesWithDependencies } from "@/lib/entries/delete";
 
 /**
  * GET /api/entries - List entries with filtering, search, and pagination.
@@ -57,5 +59,36 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("List entries error:", error);
     return NextResponse.json({ error: "Failed to list entries" }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/entries - Batch delete entries by ids.
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json().catch(() => null);
+    const ids = parseBulkDeleteIds(body);
+
+    if (ids.length === 0) {
+      return NextResponse.json(
+        { error: "ids must be a non-empty string array" },
+        { status: 400 }
+      );
+    }
+
+    const result = await deleteEntriesWithDependencies(ids);
+
+    return NextResponse.json({
+      success: true,
+      deletedCount: result.deletedCount,
+      requestedCount: ids.length,
+    });
+  } catch (error) {
+    console.error("Batch delete entries error:", error);
+    return NextResponse.json(
+      { error: "Failed to batch delete entries" },
+      { status: 500 }
+    );
   }
 }

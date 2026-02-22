@@ -21,7 +21,14 @@ COPY --from=deps /app/package.json  ./package.json
 COPY . .
 
 # Generate Prisma client (schema is at prisma/schema.prisma)
-RUN npx prisma generate --schema=prisma/schema.prisma
+RUN set -eux; \
+    for i in 1 2 3 4 5; do \
+      npx prisma generate --schema=prisma/schema.prisma && exit 0; \
+      echo "prisma generate failed (attempt ${i}), retrying..."; \
+      sleep 3; \
+    done; \
+    echo "prisma generate failed after 5 attempts"; \
+    exit 1
 
 # Build Next.js (standalone output)
 ENV NEXT_TELEMETRY_DISABLED=1

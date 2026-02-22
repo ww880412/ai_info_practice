@@ -74,9 +74,18 @@ interface EntryCardProps {
     createdAt: string;
   };
   onClick: (id: string) => void;
+  showSelection?: boolean;
+  selected?: boolean;
+  onSelectChange?: (id: string, checked: boolean) => void;
 }
 
-export function EntryCard({ entry, onClick }: EntryCardProps) {
+export function EntryCard({
+  entry,
+  onClick,
+  showSelection = false,
+  selected = false,
+  onSelectChange,
+}: EntryCardProps) {
   const SourceIcon = sourceIconMap[entry.sourceType] || Globe;
 
   return (
@@ -87,6 +96,16 @@ export function EntryCard({ entry, onClick }: EntryCardProps) {
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
+          {showSelection && (
+            <input
+              type="checkbox"
+              checked={selected}
+              aria-label={`Select entry ${entry.title || entry.id}`}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => onSelectChange?.(entry.id, e.target.checked)}
+            />
+          )}
           <SourceIcon size={16} className="text-secondary shrink-0" />
           <h3 className="text-sm font-medium truncate">
             {entry.title || "Untitled"}
