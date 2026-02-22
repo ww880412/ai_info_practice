@@ -130,6 +130,12 @@ function ensureQueueLoop() {
 export function initializeIngestQueue(taskRunner: IngestTaskRunner) {
   runner = taskRunner;
 
+  // `next build` may import route modules without runtime DB env.
+  // Skip recovery bootstrap during build to avoid noisy initialization errors.
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
+
   if (!recoveryTimer) {
     recoveryTimer = setInterval(() => {
       void recoverStaleEntries(false).catch((error) => {
