@@ -3,7 +3,7 @@
  * 根据 summaryStructure.type 动态渲染不同的展示组件
  */
 
-import type { Difficulty, ContentForm, Timeliness, TrustLevel } from '@prisma/client';
+import type { Difficulty } from '@prisma/client';
 
 // Types matching Prisma schema
 export interface SummaryStructure {
@@ -165,22 +165,133 @@ export function DynamicSummary({
 
   const { type, fields, reasoning } = summaryStructure;
 
+  const toObject = (value: unknown): Record<string, unknown> | null => {
+    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+    return null;
+  };
+
+  const toString = (value: unknown): string => (typeof value === "string" ? value : "");
+  const toStringArray = (value: unknown): string[] =>
+    Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+
+  const parseProblemSolutionSteps = (value: unknown) => {
+    const record = toObject(value);
+    if (!record) return null;
+    const stepsRaw = Array.isArray(record.steps) ? record.steps : [];
+    type ParsedStep = { order: number; title: string; description: string | undefined };
+    const steps = stepsRaw
+      .map((step, index) => {
+        const stepRecord = toObject(step);
+        if (!stepRecord) return null;
+        const title = toString(stepRecord.title);
+        if (!title) return null;
+        const order = typeof stepRecord.order === "number" ? stepRecord.order : index + 1;
+        return {
+          order,
+          title,
+          description: toString(stepRecord.description) || undefined,
+        };
+      })
+      .filter((step): step is ParsedStep => step !== null);
+
+    if (!toString(record.problem) || !toString(record.solution) || steps.length === 0) {
+      return null;
+    }
+
+    return {
+      problem: toString(record.problem),
+      solution: toString(record.solution),
+      steps,
+      tips: toString(record.tips) || undefined,
+    };
+  };
+
+  const parseConceptMechanismFlow = (value: unknown) => {
+    const record = toObject(value);
+    if (!record) return null;
+    if (!toString(record.concept) || !toString(record.mechanism)) return null;
+    return {
+      concept: toString(record.concept),
+      mechanism: toString(record.mechanism),
+      flow: toStringArray(record.flow),
+      boundary: toString(record.boundary) || undefined,
+    };
+  };
+
+  const parseToolFeatureComparison = (value: unknown) => {
+    const record = toObject(value);
+    if (!record) return null;
+    if (!toString(record.tool)) return null;
+    return {
+      tool: toString(record.tool),
+      features: toStringArray(record.features),
+      pros: toStringArray(record.pros),
+      cons: toStringArray(record.cons),
+      scenarios: toStringArray(record.scenarios),
+    };
+  };
+
+  const parseBackgroundResultInsight = (value: unknown) => {
+    const record = toObject(value);
+    if (!record) return null;
+    if (!toString(record.background) || !toString(record.result)) return null;
+    return {
+      background: toString(record.background),
+      result: toString(record.result),
+      insights: toStringArray(record.insights),
+    };
+  };
+
+  const parseArgumentEvidenceCondition = (value: unknown) => {
+    const record = toObject(value);
+    if (!record) return null;
+    if (!toString(record.argument)) return null;
+    return {
+      argument: toString(record.argument),
+      evidence: toStringArray(record.evidence),
+      conditions: toStringArray(record.conditions),
+    };
+  };
+
+  const parseGenericSummary = (value: unknown) => {
+    const record = toObject(value);
+    if (!record) return null;
+    return {
+      summary: toString(record.summary) || undefined,
+      keyPoints: toStringArray(record.keyPoints),
+    };
+  };
+
   // Render appropriate component based on type
   const renderStructure = () => {
     switch (type) {
-      case 'problem-solution-steps':
-        return <ProblemSolutionSteps data={fields as any} />;
-      case 'concept-mechanism-flow':
-        return <ConceptMechanismFlow data={fields as any} />;
-      case 'tool-feature-comparison':
-        return <ToolFeatureComparison data={fields as any} />;
-      case 'background-result-insight':
-        return <BackgroundResultInsight data={fields as any} />;
-      case 'argument-evidence-condition':
-        return <ArgumentEvidenceCondition data={fields as any} />;
+      case 'problem-solution-steps': {
+        const data = parseProblemSolutionSteps(fields);
+        return data ? <ProblemSolutionSteps data={data} /> : null;
+      }
+      case 'concept-mechanism-flow': {
+        const data = parseConceptMechanismFlow(fields);
+        return data ? <ConceptMechanismFlow data={data} /> : null;
+      }
+      case 'tool-feature-comparison': {
+        const data = parseToolFeatureComparison(fields);
+        return data ? <ToolFeatureComparison data={data} /> : null;
+      }
+      case 'background-result-insight': {
+        const data = parseBackgroundResultInsight(fields);
+        return data ? <BackgroundResultInsight data={data} /> : null;
+      }
+      case 'argument-evidence-condition': {
+        const data = parseArgumentEvidenceCondition(fields);
+        return data ? <ArgumentEvidenceCondition data={data} /> : null;
+      }
       case 'generic':
-      default:
-        return <GenericSummary data={fields as any} />;
+      default: {
+        const data = parseGenericSummary(fields);
+        return data ? <GenericSummary data={data} /> : null;
+      }
     }
   };
 

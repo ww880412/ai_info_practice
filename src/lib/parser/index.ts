@@ -56,7 +56,7 @@ const githubStrategy: ParseStrategy = {
 const webpageStrategy: ParseStrategy = {
   name: "webpage",
   canHandle: (input: ParseInput): boolean => {
-    return input.type === "WEBPAGE" || (input.type === "TEXT" && typeof input.data === "string" && !isGitHubUrl(input.data));
+    return input.type === "WEBPAGE";
   },
   execute: async (input: ParseInput): Promise<StrategyParseResult> => {
     const url = input.data as string;

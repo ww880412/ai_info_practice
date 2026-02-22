@@ -12,9 +12,11 @@ import {
   type NormalizedPracticeTask,
 } from "@/lib/ai/agent/ingest-contract";
 import { setServerConfig } from "@/lib/gemini";
+import { isDynamicSummaryEnabled } from "@/config/flags";
+import { buildConfidenceScore } from "@/lib/ai/agent/confidence";
 import { readFile, unlink } from "fs/promises";
 import { join } from "path";
-import type { SourceType } from "@prisma/client";
+import type { Prisma, SourceType } from "@prisma/client";
 
 function buildDecisionFromClassifier(
   result: ClassifyAndExtractResult
@@ -25,6 +27,27 @@ function buildDecisionFromClassifier(
     aiTags: result.aiTags,
     coreSummary: result.coreSummary,
     keyPoints: result.keyPoints,
+    summaryStructure: {
+      type: "generic",
+      reasoning: "Fallback from classifier output",
+      fields: {
+        summary: result.coreSummary,
+        keyPoints: result.keyPoints,
+      },
+    },
+    keyPointsNew: {
+      core: result.keyPoints,
+      extended: [],
+    },
+    boundaries: {
+      applicable: [],
+      notApplicable: [],
+    },
+    confidence: null,
+    difficulty: null,
+    sourceTrust: null,
+    timeliness: null,
+    contentForm: null,
     practiceValue: result.practiceValue,
     practiceReason: result.practiceReason,
     practiceTask: null,
@@ -235,6 +258,14 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
       decision = buildDecisionFromClassifier(fallbackResult);
     }
 
+    const dynamicSummaryEnabled = isDynamicSummaryEnabled();
+    const computedConfidence = decision.confidence ?? buildConfidenceScore(
+      decision.sourceTrust,
+      decision.timeliness,
+      decision.difficulty,
+      0.6
+    );
+
     await prisma.entry.update({
       where: { id: entryId },
       data: {
@@ -245,6 +276,19 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
         coreSummary: decision.coreSummary,
         keyPoints: decision.keyPoints,
         practiceValue: decision.practiceValue,
+        ...(dynamicSummaryEnabled
+          ? {
+              keyPointsNew: decision.keyPointsNew as unknown as Prisma.InputJsonValue,
+              boundaries: decision.boundaries as unknown as Prisma.InputJsonValue,
+              summaryStructure:
+                decision.summaryStructure as unknown as Prisma.InputJsonValue,
+              confidence: computedConfidence,
+              difficulty: decision.difficulty,
+              sourceTrust: decision.sourceTrust,
+              timeliness: decision.timeliness,
+              contentForm: decision.contentForm,
+            }
+          : {}),
       },
     });
 

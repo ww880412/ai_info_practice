@@ -8,7 +8,7 @@ export class TextStrategy implements ParseStrategy {
   name = 'TextStrategy';
 
   canHandle(input: ParseInput): boolean {
-    return input.type === 'TEXT' || typeof input.data === 'string';
+    return input.type === 'TEXT';
   }
 
   async execute(input: ParseInput): Promise<ParseResult> {

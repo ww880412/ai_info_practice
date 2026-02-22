@@ -251,10 +251,10 @@ export default function EntryDetailPage() {
             <div className="border border-border rounded-lg p-4 space-y-3">
               <p className="text-xs font-medium text-secondary">Dynamic Summary</p>
               <DynamicSummary
-                summaryStructure={entry.summaryStructure as any}
-                keyPoints={entry.keyPointsNew as any}
-                boundaries={entry.boundaries as any}
-                difficulty={entry.difficulty as any}
+                summaryStructure={entry.summaryStructure}
+                keyPoints={entry.keyPointsNew}
+                boundaries={entry.boundaries}
+                difficulty={entry.difficulty}
                 confidence={entry.confidence}
               />
             </div>
