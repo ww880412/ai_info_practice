@@ -1,5 +1,6 @@
 /**
- * PDF/Image parser - uses Gemini multimodal to extract text content.
+ * PDF/Image parser - resilient multimodal extraction.
+ * For PDF: render pages and extract page-by-page with partial-success tolerance.
  */
 import { generateFromFile } from "../gemini";
 import { PROMPTS } from "../ai/prompts";
@@ -12,6 +13,17 @@ interface FileParseResult {
   title: string;
   content: string;
   sourceType: "PDF";
+}
+
+interface RenderedPage {
+  page: number;
+  image: Buffer;
+}
+
+interface PageExtractionResult {
+  page: number;
+  title: string;
+  content: string;
 }
 
 function parsePositiveNumber(value: string | undefined, fallback: number): number {
@@ -47,9 +59,35 @@ function runCommand(
   });
 }
 
-async function renderPdfPagesAsImages(buffer: Buffer): Promise<Buffer[]> {
-  const maxPages = parsePositiveNumber(process.env.PARSER_PDF_MAX_IMAGE_PAGES, 3);
-  const timeoutMs = parsePositiveNumber(process.env.PARSER_PDF_RENDER_TIMEOUT_MS, 90_000);
+function getDefaultMaxPdfPages(fileSizeBytes: number): number {
+  const sizeMb = fileSizeBytes / (1024 * 1024);
+  if (sizeMb >= 20) return 16;
+  if (sizeMb >= 10) return 12;
+  return 8;
+}
+
+function toRenderedPages(tempDir: string, files: string[], maxPages: number): string[] {
+  return files
+    .filter((name) => /^page-\d+\.png$/.test(name))
+    .sort((a, b) => {
+      const left = Number(a.match(/\d+/)?.[0] || "0");
+      const right = Number(b.match(/\d+/)?.[0] || "0");
+      return left - right;
+    })
+    .slice(0, maxPages)
+    .map((name) => join(tempDir, name));
+}
+
+async function renderPdfPagesAsImages(buffer: Buffer): Promise<RenderedPage[]> {
+  const defaultMaxPages = getDefaultMaxPdfPages(buffer.length);
+  const maxPages = Math.min(
+    30,
+    parsePositiveNumber(process.env.PARSER_PDF_MAX_IMAGE_PAGES, defaultMaxPages)
+  );
+  const timeoutMs = parsePositiveNumber(
+    process.env.PARSER_PDF_RENDER_TIMEOUT_MS,
+    90_000
+  );
   const tempDir = await mkdtemp(join(tmpdir(), "ai-info-practice-pdf-images-"));
   const pdfPath = join(tempDir, "input.pdf");
   const outputPrefix = join(tempDir, "page");
@@ -63,52 +101,84 @@ async function renderPdfPagesAsImages(buffer: Buffer): Promise<Buffer[]> {
     );
 
     const files = await readdir(tempDir);
-    const pageFiles = files
-      .filter((name) => /^page-\d+\.png$/.test(name))
-      .sort((a, b) => {
-        const left = Number(a.match(/\d+/)?.[0] || "0");
-        const right = Number(b.match(/\d+/)?.[0] || "0");
-        return left - right;
-      })
-      .slice(0, maxPages);
-
+    const pageFiles = toRenderedPages(tempDir, files, maxPages);
     if (pageFiles.length === 0) return [];
 
-    const images: Buffer[] = [];
-    for (const pageFile of pageFiles) {
-      images.push(await readFile(join(tempDir, pageFile)));
+    const pages: RenderedPage[] = [];
+    for (const filePath of pageFiles) {
+      const match = filePath.match(/page-(\d+)\.png$/);
+      const page = Number(match?.[1] || "0");
+      pages.push({
+        page,
+        image: await readFile(filePath),
+      });
     }
-    return images;
+    return pages;
   } finally {
     await rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
 }
 
-async function parsePdfViaPageImages(buffer: Buffer): Promise<FileParseResult | null> {
-  const pageImages = await renderPdfPagesAsImages(buffer);
-  if (pageImages.length === 0) return null;
-
-  const prompt = PROMPTS.extractFromFile();
-  const pageResults: Array<{ title?: string; content?: string }> = [];
-
-  for (const imageBuffer of pageImages) {
-    const base64 = imageBuffer.toString("base64");
-    const result = await generateFromFile<{ title?: string; content?: string }>(prompt, {
-      base64,
-      mimeType: "image/png",
-    });
-    pageResults.push(result);
-  }
-
-  const content = pageResults
-    .map((result) => result.content?.trim())
-    .filter((value): value is string => Boolean(value))
+function buildPdfContentFromPages(results: PageExtractionResult[]): string {
+  return results
+    .map((result) => `[Page ${result.page}]\n${result.content.trim()}`)
     .join("\n\n")
     .trim();
+}
 
-  if (!content) return null;
+async function parsePdfViaPageImages(buffer: Buffer): Promise<FileParseResult> {
+  const pages = await renderPdfPagesAsImages(buffer);
+  if (pages.length === 0) {
+    throw new Error("No rendered pages from PDF");
+  }
 
-  const title = pageResults.find((result) => result.title?.trim())?.title?.trim() || "Uploaded Document";
+  const prompt = PROMPTS.extractFromFile();
+  const results: PageExtractionResult[] = [];
+  const failures: string[] = [];
+
+  for (const page of pages) {
+    try {
+      const base64 = page.image.toString("base64");
+      const result = await generateFromFile<{ title?: string; content?: string }>(prompt, {
+        base64,
+        mimeType: "image/png",
+      });
+
+      const content = (result.content || "").trim();
+      if (!content) {
+        failures.push(`page ${page.page}: empty content`);
+        continue;
+      }
+
+      results.push({
+        page: page.page,
+        title: (result.title || "").trim(),
+        content,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      failures.push(`page ${page.page}: ${message}`);
+    }
+  }
+
+  const minSuccessPages = parsePositiveNumber(
+    process.env.PARSER_PDF_MIN_SUCCESS_PAGES,
+    1
+  );
+
+  if (results.length < minSuccessPages) {
+    const reason = failures[0] || "no successful page extraction";
+    throw new Error(`PDF page extraction failed: ${reason}`);
+  }
+
+  const title =
+    results.find((item) => item.title.length > 0)?.title || "Uploaded Document";
+  const content = buildPdfContentFromPages(results);
+
+  if (!content) {
+    throw new Error("PDF page extraction returned empty content");
+  }
+
   return {
     title,
     content,
@@ -122,15 +192,17 @@ export async function parseFile(
 ): Promise<FileParseResult> {
   if (mimeType.startsWith("application/pdf")) {
     try {
-      const pageBased = await parsePdfViaPageImages(buffer);
-      if (pageBased) return pageBased;
-    } catch {
-      // Fall through to the direct-file approach below.
+      return await parsePdfViaPageImages(buffer);
+    } catch (error) {
+      const directFallbackEnabled =
+        process.env.PARSER_PDF_ENABLE_DIRECT_FALLBACK === "true";
+      if (!directFallbackEnabled) {
+        throw error;
+      }
     }
   }
 
   const base64 = buffer.toString("base64");
-
   const result = await generateFromFile<{ title: string; content: string }>(
     PROMPTS.extractFromFile(),
     { base64, mimeType }
@@ -142,3 +214,8 @@ export async function parseFile(
     sourceType: "PDF",
   };
 }
+
+export const __internal = {
+  getDefaultMaxPdfPages,
+  buildPdfContentFromPages,
+};

@@ -33,6 +33,13 @@ interface RunWithProgressRetryOptions<T> {
   baseDelayMs?: number;
   operation: (attempt: number) => Promise<T>;
   onProgress?: (message: string, attempt: number) => Promise<void> | void;
+  heartbeatIntervalMs?: number;
+  formatHeartbeat?: (params: {
+    label: string;
+    attempt: number;
+    attempts: number;
+    elapsedMs: number;
+  }) => string;
   isRetriable?: (error: unknown) => boolean;
   sleep?: (ms: number) => Promise<void>;
 }
@@ -43,6 +50,8 @@ export async function runWithProgressRetry<T>({
   baseDelayMs = 2000,
   operation,
   onProgress,
+  heartbeatIntervalMs,
+  formatHeartbeat,
   isRetriable = isRetriableIngestError,
   sleep = defaultSleep,
 }: RunWithProgressRetryOptions<T>): Promise<T> {
@@ -56,9 +65,27 @@ export async function runWithProgressRetry<T>({
       attempt
     );
 
+    let heartbeatTimer: NodeJS.Timeout | null = null;
+    const startedAt = Date.now();
+
+    if (heartbeatIntervalMs && heartbeatIntervalMs > 0 && onProgress) {
+      heartbeatTimer = setInterval(() => {
+        const elapsedMs = Date.now() - startedAt;
+        const message = formatHeartbeat
+          ? formatHeartbeat({ label, attempt, attempts, elapsedMs })
+          : `${label}进行中（${attempt}/${attempts}，已运行 ${Math.round(
+              elapsedMs / 1000
+            )} 秒）...`;
+        void onProgress(message, attempt);
+      }, heartbeatIntervalMs);
+    }
+
     try {
-      return await operation(attempt);
+      const result = await operation(attempt);
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      return result;
     } catch (error) {
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
       lastError = error;
       const canRetry = attempt < attempts && isRetriable(error);
 

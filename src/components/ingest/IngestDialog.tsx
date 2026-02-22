@@ -73,6 +73,13 @@ export function IngestDialog({ open, onClose }: IngestDialogProps) {
   const statusText = () => {
     if (isProcessing) return "Submitting...";
     if (!processingEntry) return "Processing...";
+    if (
+      processingEntry.processStatus !== "DONE" &&
+      processingEntry.processStatus !== "FAILED" &&
+      processingEntry.processError?.trim()
+    ) {
+      return processingEntry.processError;
+    }
     switch (processingEntry.processStatus) {
       case "PENDING": return "Queued...";
       case "PARSING": return "Parsing content...";
@@ -201,7 +208,7 @@ export function IngestDialog({ open, onClose }: IngestDialogProps) {
                   <div className="text-center">
                     <FileUp size={24} className="mx-auto mb-1 text-secondary" />
                     <p className="text-sm text-secondary">Click or drag to upload</p>
-                    <p className="text-xs text-secondary mt-1">PDF, PNG, JPEG, WEBP (max 20MB)</p>
+                    <p className="text-xs text-secondary mt-1">PDF, PNG, JPEG, WEBP (max 100MB)</p>
                   </div>
                 )}
                 <input

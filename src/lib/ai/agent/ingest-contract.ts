@@ -66,6 +66,10 @@ export interface NormalizedAgentIngestDecision {
   practiceTask: NormalizedPracticeTask | null;
 }
 
+interface NormalizeAgentDecisionOptions {
+  contentLength?: number;
+}
+
 const CONTENT_TYPES: ContentType[] = [
   "TUTORIAL",
   "TOOL_RECOMMENDATION",
@@ -166,6 +170,10 @@ function dedupeStrings(values: string[]): string[] {
   }
 
   return output;
+}
+
+function clampString(value: string, maxLength = 180): string {
+  return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
 }
 
 function normalizeContentType(value: unknown): ContentType | null {
@@ -386,6 +394,145 @@ function normalizeBoundaries(value: unknown): NormalizedBoundaries {
   };
 }
 
+function collectStringCandidates(value: unknown, depth = 0): string[] {
+  if (depth > 2) return [];
+
+  if (typeof value === "string") {
+    const normalized = value.replace(/\s+/g, " ").trim();
+    if (normalized.length < 6) return [];
+    return [clampString(normalized)];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectStringCandidates(item, depth + 1));
+  }
+
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const preferred = [
+      toStringValue(record.title),
+      toStringValue(record.description),
+      toStringValue(record.summary),
+      toStringValue(record.reasoning),
+    ].filter(Boolean);
+
+    const nested = Object.values(record).flatMap((item) =>
+      collectStringCandidates(item, depth + 1)
+    );
+
+    return [...preferred.map((item) => clampString(item)), ...nested];
+  }
+
+  return [];
+}
+
+function splitSentenceCandidates(value: string): string[] {
+  return value
+    .split(/[。！？!?；;：:\n]+/g)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 6)
+    .map((item) => clampString(item));
+}
+
+function getKeyPointDensityTarget(
+  contentLength?: number
+): { minCore: number; maxCore: number; minExtended: number; maxExtended: number } | null {
+  if (typeof contentLength !== "number" || !Number.isFinite(contentLength) || contentLength <= 0) {
+    return null;
+  }
+
+  if (contentLength < 5000) {
+    return { minCore: 3, maxCore: 5, minExtended: 1, maxExtended: 2 };
+  }
+
+  if (contentLength <= 20000) {
+    return { minCore: 5, maxCore: 8, minExtended: 2, maxExtended: 4 };
+  }
+
+  return { minCore: 8, maxCore: 12, minExtended: 4, maxExtended: 8 };
+}
+
+function buildDensityCandidates(params: {
+  coreSummary: string;
+  practiceReason: string;
+  summaryStructure: NormalizedSummaryStructure;
+  boundaries: NormalizedBoundaries;
+  practiceTask: NormalizedPracticeTask | null;
+}): string[] {
+  const candidates = [
+    ...collectStringCandidates(params.summaryStructure.fields),
+    ...collectStringCandidates(params.boundaries.applicable),
+    ...collectStringCandidates(params.boundaries.notApplicable),
+    ...collectStringCandidates(
+      params.practiceTask
+        ? params.practiceTask.steps.map((step) => `${step.title}：${step.description}`)
+        : []
+    ),
+    ...splitSentenceCandidates(params.practiceReason),
+    ...splitSentenceCandidates(params.coreSummary),
+  ];
+
+  return dedupeStrings(candidates);
+}
+
+function enforceKeyPointDensity(params: {
+  keyPoints: NormalizedKeyPoints;
+  coreSummary: string;
+  practiceReason: string;
+  summaryStructure: NormalizedSummaryStructure;
+  boundaries: NormalizedBoundaries;
+  practiceTask: NormalizedPracticeTask | null;
+  contentLength?: number;
+}): NormalizedKeyPoints {
+  const target = getKeyPointDensityTarget(params.contentLength);
+  if (!target) {
+    return {
+      core: dedupeStrings(params.keyPoints.core),
+      extended: dedupeStrings(params.keyPoints.extended),
+    };
+  }
+
+  const core = dedupeStrings(params.keyPoints.core);
+  const extended = dedupeStrings(params.keyPoints.extended);
+
+  while (core.length < target.minCore && extended.length > 0) {
+    core.push(extended.shift() as string);
+  }
+
+  const used = new Set<string>([...core, ...extended]);
+  const candidates = buildDensityCandidates({
+    coreSummary: params.coreSummary,
+    practiceReason: params.practiceReason,
+    summaryStructure: params.summaryStructure,
+    boundaries: params.boundaries,
+    practiceTask: params.practiceTask,
+  });
+
+  for (const candidate of candidates) {
+    if (used.has(candidate)) continue;
+
+    if (core.length < target.minCore) {
+      core.push(candidate);
+      used.add(candidate);
+      continue;
+    }
+
+    if (extended.length < target.minExtended) {
+      extended.push(candidate);
+      used.add(candidate);
+    }
+
+    if (core.length >= target.minCore && extended.length >= target.minExtended) {
+      break;
+    }
+  }
+
+  return {
+    core: core.slice(0, target.maxCore),
+    extended: extended.slice(0, target.maxExtended),
+  };
+}
+
 function buildFallbackSummaryFields(coreSummary: string, keyPoints: string[]): Record<string, unknown> {
   return {
     summary: coreSummary,
@@ -420,7 +567,8 @@ function normalizeSummaryStructure(
 }
 
 export function normalizeAgentIngestDecision(
-  finalResult: unknown
+  finalResult: unknown,
+  options: NormalizeAgentDecisionOptions = {}
 ): NormalizedAgentIngestDecision | null {
   const record = toObject(finalResult);
   if (!record) return null;
@@ -456,14 +604,28 @@ export function normalizeAgentIngestDecision(
     record.practiceTask ?? record.practice ?? record.task
   );
 
+  const densifiedKeyPoints = enforceKeyPointDensity({
+    keyPoints: normalizedKeyPoints.structured,
+    coreSummary,
+    practiceReason: toStringValue(record.practiceReason),
+    summaryStructure,
+    boundaries,
+    practiceTask,
+    contentLength: options.contentLength,
+  });
+  const flatKeyPoints = dedupeStrings([
+    ...densifiedKeyPoints.core,
+    ...densifiedKeyPoints.extended,
+  ]);
+
   return {
     contentType,
     techDomain,
     aiTags,
     coreSummary,
-    keyPoints: normalizedKeyPoints.flat,
+    keyPoints: flatKeyPoints,
     summaryStructure,
-    keyPointsNew: normalizedKeyPoints.structured,
+    keyPointsNew: densifiedKeyPoints,
     boundaries,
     confidence,
     difficulty,

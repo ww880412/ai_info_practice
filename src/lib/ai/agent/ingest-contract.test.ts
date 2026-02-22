@@ -135,4 +135,54 @@ describe('normalizeAgentIngestDecision', () => {
     expect(normalized).toHaveProperty("keyPointsNew.extended", []);
     expect(normalized).toHaveProperty("summaryStructure.type", "generic");
   });
+
+  it("densifies key points for long content using structured fields", () => {
+    const normalized = normalizeAgentIngestDecision(
+      {
+        contentType: "CASE_STUDY",
+        techDomain: "FINE_TUNING",
+        aiTags: ["VLM"],
+        coreSummary: "长文总结：覆盖了背景、路线、实验、落地和未来规划。",
+        keyPoints: {
+          core: ["核心点1", "核心点2", "核心点3"],
+          extended: ["扩展点1"],
+        },
+        summaryStructure: {
+          type: "background-result-insight",
+          fields: {
+            background: "背景：内容安全场景要求高召回与低误报。",
+            route: "路线：自研视觉基座并结合多模态对齐。",
+            data: "数据：业务数据与开源数据混合训练。",
+            experiment: "实验：分辨率和蒸馏策略带来稳定增益。",
+            impact: "落地：在直播和短视频风险识别上显著提升。",
+          },
+        },
+        boundaries: {
+          applicable: ["短视频审核", "直播审核"],
+          notApplicable: ["纯音频原始建模"],
+        },
+        practiceValue: "ACTIONABLE",
+        practiceReason: "具备复现实验路径与参数对照。",
+        practiceTask: {
+          title: "训练任务",
+          summary: "构建垂类多模态基座",
+          difficulty: "HARD",
+          estimatedTime: "4周",
+          prerequisites: ["GPU 集群"],
+          steps: [
+            { order: 1, title: "准备数据", description: "构建高质量图文对齐集" },
+            { order: 2, title: "训练视觉基座", description: "引入蒸馏增强泛化能力" },
+            { order: 3, title: "多任务训练", description: "注入 OCR 与风险识别任务" },
+            { order: 4, title: "评估上线", description: "离线评估后灰度发布" },
+          ],
+        },
+      },
+      { contentLength: 35_000 }
+    );
+
+    expect(normalized).not.toBeNull();
+    expect(normalized?.keyPointsNew.core.length).toBeGreaterThanOrEqual(8);
+    expect(normalized?.keyPointsNew.extended.length).toBeGreaterThanOrEqual(4);
+    expect(normalized?.keyPoints.length).toBeGreaterThanOrEqual(12);
+  });
 });

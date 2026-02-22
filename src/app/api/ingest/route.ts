@@ -19,6 +19,11 @@ import {
   isRetriableParseError,
   runWithProgressRetry,
 } from "@/lib/ingest/retry";
+import {
+  enqueueIngestTask,
+  initializeIngestQueue,
+  type IngestTaskConfig,
+} from "@/lib/ingest/queue";
 import { readFile, unlink } from "fs/promises";
 import { join } from "path";
 import type { Prisma, ProcessStatus, SourceType } from "@prisma/client";
@@ -112,10 +117,53 @@ async function updateEntryProcessStatus(
   });
 }
 
+async function saveFallbackTrace(
+  entryId: string,
+  input: ParseResult,
+  reason: string,
+  finalResult: NormalizedAgentIngestDecision
+) {
+  const timestamp = new Date().toISOString();
+
+  await prisma.reasoningTrace.create({
+    data: {
+      entryId,
+      steps: JSON.stringify([
+        {
+          step: 1,
+          timestamp,
+          thought: "主 Agent 流程失败，已切换兼容分类流程。",
+          action: "FALLBACK_CLASSIFIER",
+          observation: JSON.stringify({
+            reason,
+            inputLength: input.content.length,
+          }),
+          reasoning: "为了提高任务成功率，使用兼容分类链路生成可用结果。",
+          context: {
+            stage: "fallback",
+            sourceType: input.sourceType,
+          },
+        },
+      ]),
+      finalResult: JSON.stringify(finalResult),
+      metadata: JSON.stringify({
+        startTime: timestamp,
+        endTime: timestamp,
+        iterations: 1,
+        toolsUsed: ["legacy_classifier_fallback"],
+        fallback: true,
+      }),
+    },
+  });
+}
+
 /**
  * Async processing pipeline - runs after response is sent.
  */
-async function asyncProcess(entryId: string, config: { geminiApiKey?: string; geminiModel?: string } = {}) {
+async function asyncProcess(
+  entryId: string,
+  config: IngestTaskConfig = {}
+) {
   // Set server config for Gemini
   if (config.geminiApiKey || config.geminiModel) {
     setServerConfig(config);
@@ -137,6 +185,11 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
           label: "链接解析",
           attempts: 3,
           baseDelayMs: 1500,
+          heartbeatIntervalMs: 15_000,
+          formatHeartbeat: ({ attempt, attempts, elapsedMs }) =>
+            `链接解析进行中（${attempt}/${attempts}，已运行 ${Math.round(
+              elapsedMs / 1000
+            )} 秒）...`,
           isRetriable: isRetriableParseError,
           onProgress: async (message) => {
             await updateEntryProcessStatus(entryId, "PARSING", message);
@@ -197,6 +250,11 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
           label: "文件解析",
           attempts: 4,
           baseDelayMs: 3000,
+          heartbeatIntervalMs: 15_000,
+          formatHeartbeat: ({ attempt, attempts, elapsedMs }) =>
+            `文件解析进行中（${attempt}/${attempts}，已运行 ${Math.round(
+              elapsedMs / 1000
+            )} 秒）...`,
           isRetriable: isRetriableParseError,
           onProgress: async (message) => {
             await updateEntryProcessStatus(entryId, "PARSING", message);
@@ -269,27 +327,39 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
     await updateEntryProcessStatus(entryId, "AI_PROCESSING", "正在进行 AI 分析...");
 
     let decision: NormalizedAgentIngestDecision | null = null;
+    let agentFailureReason = "";
+    const parseInput: ParseResult = {
+      title: title || entry.title || "",
+      content,
+      sourceType: entry.sourceType,
+    };
 
     try {
       const agentConfig = await getAgentConfig();
       const agent = new ReActAgent(agentConfig);
-      const parseInput: ParseResult = {
-        title: title || entry.title || "",
-        content,
-        sourceType: entry.sourceType,
-      };
 
       decision = await runWithProgressRetry({
         label: "AI分析",
         attempts: 5,
         baseDelayMs: 2000,
+        heartbeatIntervalMs: 10_000,
+        formatHeartbeat: ({ attempt, attempts, elapsedMs }) =>
+          `AI分析进行中（${attempt}/${attempts}，已运行 ${Math.round(
+            elapsedMs / 1000
+          )} 秒）...`,
         isRetriable: isRetriableAgentError,
         onProgress: async (message) => {
           await updateEntryProcessStatus(entryId, "AI_PROCESSING", message);
         },
         operation: async () => {
-          const trace = await agent.process(entryId, parseInput);
-          const normalized = normalizeAgentIngestDecision(trace.finalResult);
+          const trace = await agent.process(entryId, parseInput, {
+            onProgress: async (message) => {
+              await updateEntryProcessStatus(entryId, "AI_PROCESSING", message);
+            },
+          });
+          const normalized = normalizeAgentIngestDecision(trace.finalResult, {
+            contentLength: content.length,
+          });
           if (!normalized) {
             throw new Error("Agent output missing required fields");
           }
@@ -297,6 +367,8 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
         },
       });
     } catch (agentError) {
+      agentFailureReason =
+        agentError instanceof Error ? agentError.message : String(agentError);
       console.error("Agent processing error:", agentError);
     }
 
@@ -309,6 +381,14 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
         );
         const fallbackResult = await classifyAndExtract(content);
         decision = buildDecisionFromClassifier(fallbackResult);
+        await saveFallbackTrace(
+          entryId,
+          parseInput,
+          agentFailureReason || "Agent retries exhausted",
+          decision
+        ).catch((error) => {
+          console.warn("Failed to persist fallback reasoning trace:", error);
+        });
       } else {
         throw new Error("AI processing failed after retries");
       }
@@ -406,6 +486,8 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
   }
 }
 
+initializeIngestQueue(asyncProcess);
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -466,8 +548,8 @@ export async function POST(request: NextRequest) {
     // Extract config from request body
     const config = body.config || {};
 
-    // Trigger async processing (fire and forget) with config
-    void asyncProcess(entry.id, config);
+    // Trigger async processing via ingest queue
+    enqueueIngestTask(entry.id, config, "submit");
 
     return NextResponse.json({
       entryId: entry.id,

@@ -78,4 +78,30 @@ describe("runWithProgressRetry", () => {
     expect(attempts).toBe(1);
     expect(sleep).not.toHaveBeenCalled();
   });
+
+  it("emits heartbeat while one attempt is still running", async () => {
+    vi.useFakeTimers();
+
+    const progress: string[] = [];
+    const task = runWithProgressRetry({
+      label: "文件解析",
+      attempts: 1,
+      heartbeatIntervalMs: 1000,
+      onProgress: async (message) => {
+        progress.push(message);
+      },
+      operation: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 2600));
+        return "ok";
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(3000);
+    const result = await task;
+
+    expect(result).toBe("ok");
+    expect(progress.some((message) => message.includes("已运行"))).toBe(true);
+
+    vi.useRealTimers();
+  });
 });
