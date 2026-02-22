@@ -37,6 +37,18 @@ model Entry {
   keyPoints     String[]
   practiceValue PracticeValue?
 
+  // Dynamic summary (Phase 2)
+  summaryStructure Json?   // { type, fields, reasoning }
+  keyPointsNew    Json?   // { core: [], extended: [] } - 双写字段
+  boundaries      Json?   // { applicable: [], notApplicable: [] }
+  confidence      Float?  // 综合置信度
+
+  // Evaluation dimensions
+  difficulty      Difficulty?  // BEGINNER/INTERMEDIATE/ADVANCED/EXPERT
+  contentForm     ContentForm? // TEXTUAL/CODE_HEAVY/VISUAL/MULTIMODAL
+  timeliness      Timeliness?  // RECENT/OUTDATED/CLASSIC
+  sourceTrust     TrustLevel? // HIGH/MEDIUM/LOW
+
   // Smart summary (V2 Task 2)
   smartSummary  String? @db.Text
   keyInsights   String[]
@@ -200,6 +212,25 @@ enum Difficulty {
   EASY
   MEDIUM
   HARD
+}
+
+enum ContentForm {
+  TEXTUAL
+  CODE_HEAVY
+  VISUAL
+  MULTIMODAL
+}
+
+enum Timeliness {
+  RECENT
+  OUTDATED
+  CLASSIC
+}
+
+enum TrustLevel {
+  HIGH
+  MEDIUM
+  LOW
 }
 
 // ─────────────── Agent Config ───────────────

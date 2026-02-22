@@ -6,6 +6,7 @@ import { useEntry } from "@/hooks/useEntries";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { StepTracker } from "@/components/practice/StepTracker";
 import { ReasoningTraceView } from "@/components/agent/ReasoningTraceView";
+import { DynamicSummary } from "@/components/entry/DynamicSummary";
 import {
   ArrowLeft,
   ExternalLink,
@@ -242,6 +243,20 @@ export default function EntryDetailPage() {
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {/* Dynamic Summary - 优先展示 */}
+          {(entry.summaryStructure || entry.keyPointsNew || entry.boundaries || entry.confidence) && (
+            <div className="border border-border rounded-lg p-4 space-y-3">
+              <p className="text-xs font-medium text-secondary">Dynamic Summary</p>
+              <DynamicSummary
+                summaryStructure={entry.summaryStructure as any}
+                keyPoints={entry.keyPointsNew as any}
+                boundaries={entry.boundaries as any}
+                difficulty={entry.difficulty as any}
+                confidence={entry.confidence}
+              />
             </div>
           )}
 

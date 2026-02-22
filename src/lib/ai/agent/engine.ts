@@ -176,6 +176,14 @@ ${dimensions}
 ## 处理策略
 ${strategies}
 
+## 两步式工作流
+
+### Step 1: 内容分析 + 结构推理
+分析内容特征，推理最适合的总结结构。
+
+### Step 2: 按结构提取
+根据推理的结构提取知识内容。
+
 ## 输出格式
 每一步用以下格式：
 THINK: [你的思考]
@@ -187,39 +195,78 @@ OBSERVATION: [工具返回结果]
 FINAL: [最终结果 JSON]
 
 FINAL JSON 必须严格包含以下字段：
-{
-  "contentType": "TUTORIAL" | "TOOL_RECOMMENDATION" | "TECH_PRINCIPLE" | "CASE_STUDY" | "OPINION",
-  "techDomain": "PROMPT_ENGINEERING" | "AGENT" | "RAG" | "FINE_TUNING" | "DEPLOYMENT" | "OTHER",
-  "aiTags": ["string"],
-  "coreSummary": "string",
-  "keyPoints": ["string"],
-  "practiceValue": "KNOWLEDGE" | "ACTIONABLE",
-  "practiceReason": "string",
-  "practiceTask": null | {
-    "title": "string",
-    "summary": "string",
-    "difficulty": "EASY" | "MEDIUM" | "HARD",
-    "estimatedTime": "string",
-    "prerequisites": ["string"],
-    "steps": [
-      { "order": 1, "title": "string", "description": "string" }
-    ]
-  }
-}
+
+// Step 1 结果
+"contentType": "TUTORIAL" | "TOOL_RECOMMENDATION" | "TECH_PRINCIPLE" | "CASE_STUDY" | "OPINION",
+"techDomain": "PROMPT_ENGINEERING" | "AGENT" | "RAG" | "FINE_TUNING" | "DEPLOYMENT" | "OTHER",
+"aiTags": ["string"],
+
+// Step 1: 动态总结结构
+"summaryStructure": {
+  "type": "problem-solution-steps" | "concept-mechanism-flow" | "tool-feature-comparison" | "background-result-insight" | "argument-evidence-condition" | "generic",
+  "reasoning": "为什么选择这个结构"
+},
+"keyPoints": {
+  "core": ["必须掌握的点1", "必须掌握的点2"],
+  "extended": ["扩展了解的点1"]
+},
+"boundaries": {
+  "applicable": ["适用场景1", "适用场景2"],
+  "notApplicable": ["不适用场景1"]
+},
+"confidence": 0.85,
+
+// Step 2: 核心产出
+"coreSummary": "string",
+"practiceValue": "KNOWLEDGE" | "ACTIONABLE",
+"practiceReason": "string",
+"practiceTask": null | {
+  "title": "string",
+  "summary": "string",
+  "difficulty": "EASY" | "MEDIUM" | "HARD",
+  "estimatedTime": "string",
+  "prerequisites": ["string"],
+  "steps": [
+    { "order": 1, "title": "string", "description": "string" }
+  ]
+},
+
+// 额外维度
+"difficulty": "EASY" | "MEDIUM" | "HARD",
+"sourceTrust": "HIGH" | "MEDIUM" | "LOW",
+"timeliness": "RECENT" | "OUTDATED" | "CLASSIC"
 
 约束：
 - 返回严格 JSON，不要 markdown，不要代码块。
+- 优先产出详细的 summaryStructure.fields。
 - 如果 practiceValue=KNOWLEDGE，则 practiceTask 必须为 null。
-- 如果 practiceValue=ACTIONABLE，优先输出完整 practiceTask。`;
+- confidence 值为 0-1 之间的数字。`;
   }
 
-  private buildUserPrompt(input: ParseResult): string {
-    return `内容标题：${input.title}
+  private buildUserPrompt(input: ParseResult, step: 'analyze' | 'extract' = 'analyze'): string {
+    const truncated = input.content.length > 40000
+      ? input.content.slice(0, 40000) + '\n...(内容已截断)'
+      : input.content;
+
+    if (step === 'analyze') {
+      return `内容标题：${input.title}
 内容类型：${input.sourceType}
 内容长度：${input.content.length} 字符
 
+请分析以下内容，推理最佳总结结构：
+
 内容：
-${input.content.slice(0, 3000)}`;
+${truncated.slice(0, 5000)}`;
+    }
+
+    // Step 2: extract
+    return `内容标题：${input.title}
+内容类型：${input.sourceType}
+
+请根据推理的结构，提取完整知识内容：
+
+内容：
+${truncated}`;
   }
 
   private checkDone(steps: ReasoningStep[], finalResult: unknown): boolean {
