@@ -1,3 +1,5 @@
+import type { ParseResult } from '../../parser/index';
+
 export interface EvaluationDimension {
   id: string;
   name: string;
@@ -29,15 +31,15 @@ export interface ReasoningStep {
   action: string;
   observation: string;
   reasoning: string;
-  context: any;
+  context: Record<string, unknown>;
   error?: string;
 }
 
 export interface ReasoningTrace {
   entryId: string;
-  input: any;
+  input: ParseResult;
   steps: ReasoningStep[];
-  finalResult: any;
+  finalResult: unknown;
   metadata: {
     startTime: string;
     endTime: string;
@@ -47,8 +49,8 @@ export interface ReasoningTrace {
 }
 
 export interface AgentContext {
-  input: any;
-  evaluations: Record<string, any>;
+  input: ParseResult;
+  evaluations: Record<string, unknown>;
   observations: string[];
   history: ReasoningStep[];
 }

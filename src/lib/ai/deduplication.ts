@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import type { Entry } from "@prisma/client";
 
 /**
  * Calculate similarity between two texts using simple token overlap (Jaccard similarity)

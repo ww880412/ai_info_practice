@@ -1,17 +1,10 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useIngest } from "@/hooks/useIngest";
 import { useEntry } from "@/hooks/useEntries";
 import { X, Link2, FileUp, Type, Loader2, CheckCircle2, AlertCircle, TriangleAlert } from "lucide-react";
 import Link from "next/link";
-
-interface SimilarEntry {
-  id: string;
-  title: string | null;
-  coreSummary: string | null;
-  similarity: number;
-}
 
 type Tab = "link" | "file" | "text";
 
@@ -25,7 +18,7 @@ export function IngestDialog({ open, onClose }: IngestDialogProps) {
   const [url, setUrl] = useState("");
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [showSimilarWarning, setShowSimilarWarning] = useState(false);
+  const [dismissedSimilarWarning, setDismissedSimilarWarning] = useState(false);
 
   const { ingestLink, ingestFile, ingestText, processingId, clearProcessingId, similarEntries } = useIngest();
 
@@ -36,8 +29,11 @@ export function IngestDialog({ open, onClose }: IngestDialogProps) {
   const isWatching = !!processingId;
   const isDone = processingEntry?.processStatus === "DONE";
   const isFailed = processingEntry?.processStatus === "FAILED";
+  const hasSimilarEntries = (similarEntries?.length ?? 0) > 0;
+  const showSimilarWarning = hasSimilarEntries && !dismissedSimilarWarning;
 
   const handleSubmit = useCallback(() => {
+    setDismissedSimilarWarning(false);
     if (tab === "link" && url.trim()) {
       ingestLink.mutate({ url: url.trim() });
     } else if (tab === "file" && file) {
@@ -47,22 +43,15 @@ export function IngestDialog({ open, onClose }: IngestDialogProps) {
     }
   }, [tab, url, file, text, ingestLink, ingestFile, ingestText]);
 
-  // Show warning when similar entries are found
-  useEffect(() => {
-    if (similarEntries && similarEntries.length > 0 && !showSimilarWarning) {
-      setShowSimilarWarning(true);
-    }
-  }, [similarEntries, showSimilarWarning]);
-
   const handleCloseWarning = useCallback(() => {
-    setShowSimilarWarning(false);
+    setDismissedSimilarWarning(true);
   }, []);
 
   const handleClose = useCallback(() => {
     setUrl("");
     setText("");
     setFile(null);
-    setShowSimilarWarning(false);
+    setDismissedSimilarWarning(false);
     clearProcessingId();
     ingestLink.reset();
     ingestFile.reset();

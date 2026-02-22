@@ -3,7 +3,7 @@
  * Uses Strategy Pattern for extensible parser architecture.
  */
 import { isGitHubUrl, parseGitHub } from "./github";
-import { parseWebpage, isWeChatUrl, isTwitterUrl } from "./webpage";
+import { parseWebpage } from "./webpage";
 import { parseFile } from "./pdf";
 import { TextStrategy } from "./text";
 import { PdfTextStrategy } from "./pdf-text";
@@ -11,7 +11,7 @@ import { OcrStrategy } from "./ocr";
 import { ImageMultimodalStrategy } from "./image-multimodal";
 import type { SourceType } from "@prisma/client";
 import type { ParseInput, ParseResult as StrategyParseResult, ParseStrategy } from "./strategy";
-import { ParserRegistry, parserRegistry } from "./registry";
+import { parserRegistry } from "./registry";
 
 // Re-export strategy types for external use
 export type { ParseInput, ParseStrategy } from "./strategy";
@@ -32,7 +32,11 @@ export interface ParseResult {
 const githubStrategy: ParseStrategy = {
   name: "github",
   canHandle: (input: ParseInput): boolean => {
-    return input.type === "TEXT" && typeof input.data === "string" && isGitHubUrl(input.data);
+    return (
+      (input.type === "TEXT" || input.type === "WEBPAGE") &&
+      typeof input.data === "string" &&
+      isGitHubUrl(input.data)
+    );
   },
   execute: async (input: ParseInput): Promise<StrategyParseResult> => {
     const result = await parseGitHub(input.data as string);

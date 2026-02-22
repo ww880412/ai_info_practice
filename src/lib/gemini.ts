@@ -1,10 +1,47 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// Store config globally for server-side usage
-let serverConfig: { apiKey?: string; model?: string } = {};
+export interface GeminiRuntimeConfig {
+  apiKey?: string;
+  model?: string;
+  geminiApiKey?: string;
+  geminiModel?: string;
+}
 
-export function setServerConfig(config: { apiKey?: string; model?: string }) {
-  serverConfig = config;
+export interface NormalizedGeminiConfig {
+  apiKey?: string;
+  model?: string;
+}
+
+export function normalizeServerConfig(
+  config: GeminiRuntimeConfig = {}
+): NormalizedGeminiConfig {
+  return {
+    apiKey: config.apiKey ?? config.geminiApiKey,
+    model: config.model ?? config.geminiModel,
+  };
+}
+
+export function shouldRecreateClient({
+  hasClient,
+  currentApiKey,
+  nextApiKey,
+}: {
+  hasClient: boolean;
+  currentApiKey: string;
+  nextApiKey: string;
+}): boolean {
+  return !hasClient || currentApiKey !== nextApiKey;
+}
+
+// Store normalized config globally for server-side usage
+let serverConfig: NormalizedGeminiConfig = {};
+
+export function getServerConfig() {
+  return serverConfig;
+}
+
+export function setServerConfig(config: GeminiRuntimeConfig) {
+  serverConfig = normalizeServerConfig(config);
 }
 
 function getApiKey(): string {
@@ -54,11 +91,25 @@ function getModel(): string {
 
 let genAI: GoogleGenerativeAI | null = null;
 let currentModel: string = "";
+let currentApiKey: string = "";
 
 function getGenAI(): GoogleGenerativeAI {
   const apiKey = getApiKey();
-  if (!genAI || apiKey !== process.env.GEMINI_API_KEY) {
+  if (!apiKey) {
+    throw new Error("Gemini API key is not configured");
+  }
+  if (
+    shouldRecreateClient({
+      hasClient: !!genAI,
+      currentApiKey,
+      nextApiKey: apiKey,
+    })
+  ) {
     genAI = new GoogleGenerativeAI(apiKey);
+    currentApiKey = apiKey;
+  }
+  if (!genAI) {
+    throw new Error("Gemini client initialization failed");
   }
   return genAI;
 }
@@ -72,17 +123,80 @@ export function getGeminiModel() {
   return genAI.getGenerativeModel({ model });
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string
+): Promise<T> {
+  let timeoutId: NodeJS.Timeout | undefined;
+  const timeoutPromise = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
+      timeoutMs
+    );
+  });
+
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  }) as Promise<T>;
+}
+
+function isRetriableGeminiError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /fetch failed|network|timeout|timed out|429|500|502|503|504|ECONNRESET|ETIMEDOUT/i.test(
+    message
+  );
+}
+
+async function runWithRetry<T>(
+  operation: () => Promise<T>,
+  {
+    attempts = 3,
+    baseDelayMs = 1200,
+    requestTimeoutMs = 60_000,
+    label = "Gemini request",
+  }: {
+    attempts?: number;
+    baseDelayMs?: number;
+    requestTimeoutMs?: number;
+    label?: string;
+  } = {}
+): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await withTimeout(operation(), requestTimeoutMs, label);
+    } catch (error) {
+      lastError = error;
+      const canRetry = attempt < attempts && isRetriableGeminiError(error);
+      if (!canRetry) break;
+
+      const backoff = baseDelayMs * Math.pow(2, attempt - 1);
+      await wait(backoff);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
 /**
  * Generate structured JSON output from text prompt.
  */
 export async function generateJSON<T>(prompt: string): Promise<T> {
   const model = getGeminiModel();
-  const result = await model.generateContent({
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: {
-      responseMimeType: "application/json",
-    },
-  });
+  const result = await runWithRetry(() =>
+    model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: "application/json",
+      },
+    })
+  , { label: "Gemini JSON generation" });
   return JSON.parse(result.response.text());
 }
 
@@ -94,24 +208,39 @@ export async function generateFromFile<T>(
   fileData: { base64: string; mimeType: string }
 ): Promise<T> {
   const model = getGeminiModel();
-  const result = await model.generateContent({
-    contents: [
-      {
-        role: "user",
-        parts: [
-          {
-            inlineData: {
-              data: fileData.base64,
-              mimeType: fileData.mimeType,
+  const result = await runWithRetry(() =>
+    model.generateContent({
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              inlineData: {
+                data: fileData.base64,
+                mimeType: fileData.mimeType,
+              },
             },
-          },
-          { text: prompt },
-        ],
+            { text: prompt },
+          ],
+        },
+      ],
+      generationConfig: {
+        responseMimeType: "application/json",
       },
-    ],
-    generationConfig: {
-      responseMimeType: "application/json",
-    },
-  });
+    })
+  , { label: `Gemini file generation (${fileData.mimeType})` });
   return JSON.parse(result.response.text());
+}
+
+/**
+ * Generate plain text output with retry for transient failures.
+ */
+export async function generateText(prompt: string): Promise<string> {
+  const model = getGeminiModel();
+  const result = await runWithRetry(() =>
+    model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    })
+  , { label: "Gemini text generation" });
+  return result.response.text();
 }

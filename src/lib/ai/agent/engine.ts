@@ -4,6 +4,60 @@ import { toolsRegistry } from './tools';
 import { getGeminiModel } from '../../gemini';
 import { prisma } from '../../prisma';
 
+interface ParsedAction {
+  action: string;
+  params: Record<string, unknown>;
+}
+
+interface ParsedAgentResponse {
+  thought: string;
+  action: ParsedAction;
+  reasoning: string;
+  observation: string;
+  final: unknown | null;
+}
+
+function parseJSONSafely(raw: string): unknown | null {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function parseAgentResponse(response: string): ParsedAgentResponse {
+  const thoughtMatch = response.match(/THINK:\s*([\s\S]*?)(?=\n(?:ACTION|REASONING|OBSERVATION|FINAL):|$)/);
+  const actionMatch = response.match(/ACTION:\s*([a-zA-Z0-9_]+)\s*([\s\S]*?)(?=\n(?:REASONING|OBSERVATION|FINAL):|$)/);
+  const reasoningMatch = response.match(/REASONING:\s*([\s\S]*?)(?=\n(?:OBSERVATION|FINAL):|$)/);
+  const observationMatch = response.match(/OBSERVATION:\s*([\s\S]*?)(?=\nFINAL:|$)/);
+  const finalMatch = response.match(/FINAL:\s*([\s\S]*)$/);
+
+  let actionParams: Record<string, unknown> = {};
+  if (actionMatch?.[2]?.trim()) {
+    const parsed = parseJSONSafely(actionMatch[2].trim());
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      actionParams = parsed as Record<string, unknown>;
+    }
+  }
+
+  let final: unknown | null = null;
+  if (finalMatch?.[1]?.trim()) {
+    const parsedFinal = parseJSONSafely(finalMatch[1].trim());
+    final = parsedFinal ?? finalMatch[1].trim();
+  }
+
+  return {
+    thought: thoughtMatch?.[1]?.trim() || '',
+    action: {
+      action: actionMatch?.[1]?.trim() || '',
+      params: actionParams,
+    },
+    reasoning: reasoningMatch?.[1]?.trim() || '',
+    observation: observationMatch?.[1]?.trim() || '',
+    final,
+  };
+}
+
 export class ReActAgent {
   private config: AgentConfig;
   private maxIterations: number;
@@ -36,10 +90,30 @@ export class ReActAgent {
       iteration++;
 
       const llmResponse = await this.callLLM(systemPrompt, userPrompt, context);
-      const { thought, action, reasoning } = this.parseLLMResponse(llmResponse);
+      const parsed = parseAgentResponse(llmResponse);
+      const { thought, action, reasoning, final } = parsed;
+
+      if (final !== null) {
+        finalResult = final;
+        steps.push({
+          step: iteration,
+          timestamp: new Date().toISOString(),
+          thought,
+          action: action.action || 'FINAL',
+          observation: parsed.observation || 'FINAL result emitted by model',
+          reasoning,
+          context: { inputLength: input.content.length },
+        });
+        isDone = true;
+        break;
+      }
 
       let observation: string;
       try {
+        if (!action.action) {
+          throw new Error('Missing ACTION in model response');
+        }
+
         const toolResult = await toolsRegistry.execute(action.action, action.params, context);
         observation = toolResult.success
           ? JSON.stringify(toolResult.data)
@@ -62,10 +136,10 @@ export class ReActAgent {
         context: { inputLength: input.content.length },
       });
 
-      isDone = this.checkDone(steps, context);
+      isDone = this.checkDone(steps, finalResult);
 
       if (isDone) {
-        finalResult = this.extractResult(steps);
+        finalResult = this.extractResult(steps) ?? finalResult;
       }
 
       context.observations.push(observation);
@@ -110,7 +184,33 @@ REASONING: [决策理由]
 OBSERVATION: [工具返回结果]
 
 完成时用：
-FINAL: [最终结果 JSON]`;
+FINAL: [最终结果 JSON]
+
+FINAL JSON 必须严格包含以下字段：
+{
+  "contentType": "TUTORIAL" | "TOOL_RECOMMENDATION" | "TECH_PRINCIPLE" | "CASE_STUDY" | "OPINION",
+  "techDomain": "PROMPT_ENGINEERING" | "AGENT" | "RAG" | "FINE_TUNING" | "DEPLOYMENT" | "OTHER",
+  "aiTags": ["string"],
+  "coreSummary": "string",
+  "keyPoints": ["string"],
+  "practiceValue": "KNOWLEDGE" | "ACTIONABLE",
+  "practiceReason": "string",
+  "practiceTask": null | {
+    "title": "string",
+    "summary": "string",
+    "difficulty": "EASY" | "MEDIUM" | "HARD",
+    "estimatedTime": "string",
+    "prerequisites": ["string"],
+    "steps": [
+      { "order": 1, "title": "string", "description": "string" }
+    ]
+  }
+}
+
+约束：
+- 返回严格 JSON，不要 markdown，不要代码块。
+- 如果 practiceValue=KNOWLEDGE，则 practiceTask 必须为 null。
+- 如果 practiceValue=ACTIONABLE，优先输出完整 practiceTask。`;
   }
 
   private buildUserPrompt(input: ParseResult): string {
@@ -122,36 +222,11 @@ FINAL: [最终结果 JSON]`;
 ${input.content.slice(0, 3000)}`;
   }
 
-  private parseLLMResponse(response: string) {
-    const thoughtMatch = response.match(/THINK:\s*([\s\S]*?)(?=ACTION:|$)/);
-    const actionMatch = response.match(/ACTION:\s*(\w+)\s*(.*)/);
-    const reasoningMatch = response.match(/REASONING:\s*([\s\S]*?)(?=OBSERVATION:|$)/);
-    const observationMatch = response.match(/OBSERVATION:\s*([\s\S]*?)(?=FINAL:|$)/);
-
-    let actionParams: Record<string, unknown> = {};
-    try {
-      if (actionMatch?.[2]) {
-        actionParams = JSON.parse(actionMatch[2].trim());
-      }
-    } catch {
-      // Invalid JSON, use empty object
-    }
-
-    return {
-      thought: thoughtMatch?.[1]?.trim() || '',
-      action: {
-        action: actionMatch?.[1]?.trim() || '',
-        params: actionParams,
-      },
-      reasoning: reasoningMatch?.[1]?.trim() || '',
-      observation: observationMatch?.[1]?.trim() || '',
-    };
-  }
-
-  private checkDone(steps: ReasoningStep[], context: AgentContext): boolean {
+  private checkDone(steps: ReasoningStep[], finalResult: unknown): boolean {
+    if (finalResult !== null) return true;
     const lastStep = steps[steps.length - 1];
     if (!lastStep) return false;
-    return lastStep.observation.includes('FINAL:') || lastStep.action === 'store_knowledge';
+    return lastStep.action === 'store_knowledge' && !lastStep.observation.startsWith('Error:');
   }
 
   private extractResult(steps: ReasoningStep[]): unknown {
@@ -187,7 +262,7 @@ ${input.content.slice(0, 3000)}`;
     finalResult: unknown,
     metadata: ReasoningTrace['metadata']
   ): Promise<ReasoningTrace> {
-    const trace = await prisma.reasoningTrace.create({
+    await prisma.reasoningTrace.create({
       data: {
         entryId,
         steps: JSON.stringify(steps),

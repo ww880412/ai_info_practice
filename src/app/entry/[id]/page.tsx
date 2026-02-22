@@ -18,7 +18,6 @@ import {
   MessageCircle,
   Twitter,
   Sparkles,
-  Edit2,
   Brain,
 } from "lucide-react";
 
@@ -115,21 +114,6 @@ export default function EntryDetailPage() {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(["relatedEntries", id], data);
-    },
-  });
-
-  const updateSmartSummary = useMutation({
-    mutationFn: async (data: { keyInsights?: string[]; smartSummary?: string; tldr?: string }) => {
-      const res = await fetch(`/api/entries/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Update failed");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["entry", id] });
     },
   });
 
@@ -299,7 +283,7 @@ export default function EntryDetailPage() {
                 </div>
               )}
 
-              <StepTracker steps={entry.practiceTask.steps} taskId={entry.practiceTask.id} />
+              <StepTracker steps={entry.practiceTask.steps} />
             </div>
           )}
 
@@ -357,7 +341,7 @@ export default function EntryDetailPage() {
 
             {!entry.smartSummary && !generateSmartSummary.isPending && (
               <p className="text-xs text-secondary">
-                Click "Generate" to create a smart summary with key insights.
+                Click &quot;Generate&quot; to create a smart summary with key insights.
               </p>
             )}
           </div>

@@ -1,4 +1,4 @@
-import { parserRegistry } from './index';
+import { parserRegistry } from './registry';
 import { logParse } from './logger';
 import type { ParseInput, ParseResult } from './strategy';
 

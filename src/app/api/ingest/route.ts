@@ -1,15 +1,70 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { parseUrl, parseUploadedFile, type ParseResult } from "@/lib/parser";
-import { classifyAndExtract } from "@/lib/ai/classifier";
+import { parseWithLogging, type ParseInput, type ParseResult } from "@/lib/parser";
+import { classifyAndExtract, type ClassifyAndExtractResult } from "@/lib/ai/classifier";
 import { convertToPractice } from "@/lib/ai/practiceConverter";
 import { findSimilarEntries } from "@/lib/ai/deduplication";
 import { ReActAgent } from "@/lib/ai/agent";
 import { getAgentConfig } from "@/lib/ai/agent/get-config";
+import {
+  normalizeAgentIngestDecision,
+  type NormalizedAgentIngestDecision,
+  type NormalizedPracticeTask,
+} from "@/lib/ai/agent/ingest-contract";
 import { setServerConfig } from "@/lib/gemini";
 import { readFile, unlink } from "fs/promises";
 import { join } from "path";
 import type { SourceType } from "@prisma/client";
+
+function buildDecisionFromClassifier(
+  result: ClassifyAndExtractResult
+): NormalizedAgentIngestDecision {
+  return {
+    contentType: result.contentType,
+    techDomain: result.techDomain,
+    aiTags: result.aiTags,
+    coreSummary: result.coreSummary,
+    keyPoints: result.keyPoints,
+    practiceValue: result.practiceValue,
+    practiceReason: result.practiceReason,
+    practiceTask: null,
+  };
+}
+
+function normalizePracticeTaskFromLegacyResult(
+  practiceResult: Awaited<ReturnType<typeof convertToPractice>>,
+  summaryFallback: string
+): NormalizedPracticeTask | null {
+  const steps = Array.isArray(practiceResult.steps)
+    ? practiceResult.steps
+        .filter(
+          (step) =>
+            step &&
+            typeof step.order === "number" &&
+            typeof step.title === "string"
+        )
+        .map((step) => ({
+          order: step.order,
+          title: step.title,
+          description: step.description || "",
+        }))
+    : [];
+
+  if (steps.length === 0) {
+    return null;
+  }
+
+  return {
+    title: practiceResult.title || "Practice Task",
+    summary: practiceResult.summary || summaryFallback,
+    difficulty: practiceResult.difficulty || "MEDIUM",
+    estimatedTime: practiceResult.estimatedTime || "30-60 min",
+    prerequisites: Array.isArray(practiceResult.prerequisites)
+      ? practiceResult.prerequisites
+      : [],
+    steps,
+  };
+}
 
 /**
  * Async processing pipeline - runs after response is sent.
@@ -35,7 +90,11 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
       });
 
       try {
-        const parsed = await parseUrl(entry.rawUrl);
+        const parsed = await parseWithLogging(entryId, {
+          type: "WEBPAGE",
+          data: entry.rawUrl,
+          size: entry.rawUrl.length,
+        });
         content = parsed.content;
         title = parsed.title;
         await prisma.entry.update({
@@ -82,18 +141,31 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
         };
         const mimeType = mimeMap[ext || ""] || "application/pdf";
 
-        const parsed = await parseUploadedFile(buffer, mimeType);
+        const parseType: ParseInput["type"] = mimeType.startsWith("image/")
+          ? "IMAGE"
+          : "PDF";
+        const parsed = await parseWithLogging(entryId, {
+          type: parseType,
+          data: buffer,
+          mimeType,
+          size: buffer.length,
+        });
         content = parsed.content;
         title = parsed.title;
 
         await prisma.entry.update({
           where: { id: entryId },
-          data: { title, originalContent: content },
+          data: {
+            title,
+            originalContent: content,
+            sourceType: parsed.sourceType as SourceType,
+          },
         });
 
         // Clean up uploaded file
         await unlink(filePath).catch(() => {});
       } catch (parseError) {
+        console.error("PDF parse branch failed:", parseError);
         // Clean up uploaded file even on failure
         const fileKey = entry.rawUrl;
         if (fileKey) {
@@ -110,8 +182,14 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
         return;
       }
     } else if (entry.inputType === "TEXT") {
-      content = entry.rawText || "";
-      title = content.slice(0, 50);
+      const rawText = entry.rawText || "";
+      const parsed = await parseWithLogging(entryId, {
+        type: "TEXT",
+        data: rawText,
+        size: rawText.length,
+      });
+      content = parsed.content;
+      title = parsed.title;
     }
 
     if (!content) {
@@ -125,77 +203,95 @@ async function asyncProcess(entryId: string, config: { geminiApiKey?: string; ge
       return;
     }
 
-    // Step 2: AI Classification + Extraction (L1 + L2)
+    // Step 2: AI processing (Agent-first, classifier fallback)
     await prisma.entry.update({
       where: { id: entryId },
       data: { processStatus: "AI_PROCESSING" },
     });
 
-    const aiResult = await classifyAndExtract(content);
+    let decision: NormalizedAgentIngestDecision | null = null;
+
+    try {
+      const agentConfig = await getAgentConfig();
+      const agent = new ReActAgent(agentConfig);
+      const parseInput: ParseResult = {
+        title: title || entry.title || "",
+        content,
+        sourceType: entry.sourceType,
+      };
+      const trace = await agent.process(entryId, parseInput);
+      decision = normalizeAgentIngestDecision(trace.finalResult);
+      if (!decision) {
+        console.warn(
+          "Agent final result is missing required fields; fallback to classifyAndExtract"
+        );
+      }
+    } catch (agentError) {
+      console.error("Agent processing error:", agentError);
+    }
+
+    if (!decision) {
+      const fallbackResult = await classifyAndExtract(content);
+      decision = buildDecisionFromClassifier(fallbackResult);
+    }
 
     await prisma.entry.update({
       where: { id: entryId },
       data: {
         title: title || undefined,
-        contentType: aiResult.contentType,
-        techDomain: aiResult.techDomain,
-        aiTags: aiResult.aiTags,
-        coreSummary: aiResult.coreSummary,
-        keyPoints: aiResult.keyPoints,
-        practiceValue: aiResult.practiceValue,
+        contentType: decision.contentType,
+        techDomain: decision.techDomain,
+        aiTags: decision.aiTags,
+        coreSummary: decision.coreSummary,
+        keyPoints: decision.keyPoints,
+        practiceValue: decision.practiceValue,
       },
     });
 
-    // Step 2.5: ReAct Agent processing
-    try {
-      const agentConfig = await getAgentConfig();
-      const agent = new ReActAgent(agentConfig);
-      const parseInput: ParseResult = {
-        title: entry.title || title || '',
-        content: content,
-        sourceType: entry.sourceType,
-      };
-      const trace = await agent.process(entryId, parseInput);
+    // Step 3: Practice conversion (L3) - actionable only
+    if (decision.practiceValue === "ACTIONABLE") {
+      let practiceTask: NormalizedPracticeTask | null = decision.practiceTask;
 
-      // Merge agent tags with existing AI tags
-      const agentTags = trace.finalResult?.tags || [];
-      if (agentTags.length > 0) {
-        const currentEntry = await prisma.entry.findUnique({ where: { id: entryId } });
-        const mergedTags = [...(currentEntry?.aiTags || []), ...agentTags];
-        await prisma.entry.update({
-          where: { id: entryId },
-          data: { aiTags: [...new Set(mergedTags)] },
-        });
+      if (!practiceTask) {
+        const practiceResult = await convertToPractice(
+          content,
+          decision.coreSummary
+        );
+        practiceTask = normalizePracticeTaskFromLegacyResult(
+          practiceResult,
+          decision.coreSummary
+        );
       }
-    } catch (agentError) {
-      console.error('Agent processing error:', agentError);
-      // Continue with L3 even if agent fails
-    }
 
-    // Step 3: Practice conversion (L3) - only for ACTIONABLE
-    if (aiResult.practiceValue === "ACTIONABLE") {
-      const practiceResult = await convertToPractice(
-        content,
-        aiResult.coreSummary
-      );
-
-      await prisma.practiceTask.create({
-        data: {
-          entryId,
-          title: practiceResult.title,
-          summary: practiceResult.summary,
-          difficulty: practiceResult.difficulty,
-          estimatedTime: practiceResult.estimatedTime,
-          prerequisites: practiceResult.prerequisites,
-          steps: {
-            create: practiceResult.steps.map((step) => ({
-              order: step.order,
-              title: step.title,
-              description: step.description,
-            })),
+      if (practiceTask) {
+        await prisma.practiceTask.upsert({
+          where: { entryId },
+          update: {
+            title: practiceTask.title,
+            summary: practiceTask.summary,
+            difficulty: practiceTask.difficulty,
+            estimatedTime: practiceTask.estimatedTime,
+            prerequisites: practiceTask.prerequisites,
+            steps: {
+              deleteMany: {},
+              create: practiceTask.steps,
+            },
           },
-        },
-      });
+          create: {
+            entryId,
+            title: practiceTask.title,
+            summary: practiceTask.summary,
+            difficulty: practiceTask.difficulty,
+            estimatedTime: practiceTask.estimatedTime,
+            prerequisites: practiceTask.prerequisites,
+            steps: {
+              create: practiceTask.steps,
+            },
+          },
+        });
+      } else {
+        console.warn("No valid practice task produced for actionable content");
+      }
     }
 
     // Mark as done

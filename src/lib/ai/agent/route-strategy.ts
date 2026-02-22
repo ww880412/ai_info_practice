@@ -1,23 +1,44 @@
 import { z } from 'zod';
 import { toolsRegistry } from './tools';
-import { DEFAULT_PROCESSING_STRATEGIES, DEFAULT_EVALUATION_DIMENSIONS } from './config';
+import { DEFAULT_PROCESSING_STRATEGIES } from './config';
 import { getGeminiModel } from '@/lib/gemini';
+
+function asString(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function asStringRecord(value: unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(([, v]) => typeof v === 'string')
+  ) as Record<string, string>;
+}
 
 toolsRegistry.register({
   name: 'route_to_strategy',
   description: '根据评估结果选择处理策略',
   parameters: z.object({
-    evaluations: z.record(z.string(), z.string()),
-    content: z.string(),
+    evaluations: z.record(z.string(), z.string()).optional(),
+    content: z.string().optional(),
   }),
-  handler: async (params) => {
+  handler: async (params, context) => {
     const model = getGeminiModel();
+    const evaluationsMap = Object.keys(asStringRecord(params.evaluations)).length > 0
+      ? asStringRecord(params.evaluations)
+      : asStringRecord(context.evaluations);
+    const content = asString(params.content) ?? asString(context.input.content) ?? '';
+    if (!content) {
+      return { success: false, error: 'No content provided for strategy routing' };
+    }
 
     const strategies = DEFAULT_PROCESSING_STRATEGIES.map(s =>
       `${s.type}: ${s.condition}`
     ).join('\n');
 
-    const evaluations = Object.entries(params.evaluations)
+    const evaluations = Object.entries(evaluationsMap)
       .map(([k, v]) => `${k}: ${v}`)
       .join('\n');
 

@@ -1,16 +1,22 @@
 import { z } from 'zod';
 import type { AgentContext } from './types';
 
+type ToolParams = Record<string, unknown>;
+
+function isToolParams(value: unknown): value is ToolParams {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export interface Tool {
   name: string;
   description: string;
   parameters: z.ZodSchema;
-  handler: (params: any, context: AgentContext) => Promise<ToolResult>;
+  handler: (params: ToolParams, context: AgentContext) => Promise<ToolResult>;
 }
 
 export interface ToolResult {
   success: boolean;
-  data?: any;
+  data?: unknown;
   error?: string;
 }
 
@@ -29,7 +35,7 @@ export class ToolsRegistry {
     return Array.from(this.tools.values());
   }
 
-  async execute(action: string, params: any, context: AgentContext): Promise<ToolResult> {
+  async execute(action: string, params: unknown, context: AgentContext): Promise<ToolResult> {
     const tool = this.tools.get(action);
 
     if (!tool) {
@@ -38,6 +44,9 @@ export class ToolsRegistry {
 
     try {
       const validatedParams = tool.parameters.parse(params);
+      if (!isToolParams(validatedParams)) {
+        return { success: false, error: `Invalid params for tool ${action}` };
+      }
       const result = await tool.handler(validatedParams, context);
       return result;
     } catch (error) {
