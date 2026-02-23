@@ -2,6 +2,74 @@
 
 > AI 知识管理系统 - 智能知识收集、处理与实践跟踪
 
+## 🧭 阶段治理定义（Phase Governance）
+- **Phase 1**：规划中（知识库核心功能）
+- **阶段状态单点真理**：以 `PROGRESS.md` 与 `docs/PROJECT_STATUS.md` 为准；`CLAUDE.md` 仅承载治理规则，不再作为动态阶段状态来源。
+
+## 🐳 Docker 运行环境规范
+- **强制容器化执行**：所有构建、测试、数据库迁移等命令**建议**通过 `docker compose exec` 执行。
+- **环境自愈**：若发现服务未启动，Agent 应先运行 `docker compose up -d`。
+- **常用指令集参考**：
+  - 完整构建：`docker compose build`
+  - 启动环境：`docker compose up -d`
+  - 后端开发：`docker compose exec app npm run dev`
+  - 前端类型检查：`docker compose exec app npm run type-check`
+  - 前端 Lint：`docker compose exec app npm run lint`
+
+## 🌿 Git & 多 Agent 协作流
+- **分支驱动**：所有任务建议在 `codex/[feature-name]` 分支进行，严禁直接在 `main` 操作。
+- **先分支后建档/建文件**：任何"新增文件"操作前，建议先创建并切换任务分支。
+- **提交契约**：使用 Conventional Commits。
+- **状态交接棒**：任务结束或切换前，建议在 `PROGRESS.log` 末尾追加会话级操作记录。开启新任务前，先读取 log 尾部获取断点。
+- **PROGRESS.md 与 PROGRESS.log 职责分离**：
+  - `PROGRESS.md`：里程碑级状态索引（阶段总览表 + 活跃分支 + 测试基线 + 下一步方向），保持精简（<80行有效内容），禁止写入会话级执行细节。
+  - `PROGRESS.log`：会话级交接日志，记录每次操作的完整细节。
+
+## 📋 Agent 接手标准流程
+参考 [docs/guides/AGENT_ONBOARDING_CHECKLIST.md](./docs/guides/AGENT_ONBOARDING_CHECKLIST.md)（采用相同规范）：
+
+### 快速开始（5 分钟）
+1. **读取 PROGRESS.md** - 了解最近完成/进行中/待办事项
+2. **检查 Git 状态** - `git status` / `git log --oneline -10`
+3. **了解项目结构** - `ls -la` / `tree src/`
+
+### 首次接手必读
+- [ ] `PROGRESS.md` - 项目当前状态
+- [ ] `PROGRESS.log` - 会话级交接记录
+- [ ] `docs/guides/AGENT_COLLABORATION_GUIDE.md` - 协作规范
+- [ ] `docs/PROJECT_STATUS.md` - 项目健康状态
+
+### 标准工作流程
+```bash
+# 开始工作
+git checkout -b codex/your-task-name
+
+# 更新 PROGRESS.md（进行中部分）
+
+# 完成任务
+git add . && git commit -m "type: description"
+# 更新 PROGRESS.md（已完成部分）
+git status  # 应显示 "working tree clean"
+```
+
+## 🤝 深度一致性与对齐 (Context Guard)
+- **方案先行**：在编写任何代码前，必须先简述设计思路并等待用户确认。若需求模糊，必须先提问。
+- **契约定义优先**：涉及前后端、API 或数据库的改动，必须先更新/对齐 `types/` 或 API 文档。
+- **API 响应规范**：统一使用 `{ data: T }` 或 `{ error: string }` 格式。
+- **任务原子化**：若单个任务涉及超过 3 个文件的修改，建议先将其拆分为更小的子任务。
+- **单点真理**：禁止分散创建 README。所有项目级、工程级规约必须统一收敛至本文件。
+
+## 🧪 TDD 质量守卫 (Bug 修复协议)
+- **复现测试先行**：遇到 Bug 时，严禁直接修改逻辑。必须先写一个能复现该 Bug 的失败测试，修复后再验证通过。
+- **风险评估**：代码修改后，必须列出受影响的潜在模块，并建议相关测试覆盖。
+
+## 🛠 自我进化规则
+- **防错固化**：每当用户对 Agent 的行为进行纠正时，Agent 必须分析原因，并在本文件的本节下方增加一条新规则，以确保不再犯同类错误。
+- 当用户要求阅读或确认 CLAUDE.md 时，必须立即读取并在回复中明确确认已理解，优先于任何其他操作。
+
+## 📖 进度接力棒 (PROGRESS.log)
+- 2026-02-23: 整合 AlphaBrain 大型项目规范至 CLAUDE.md
+
 ## 技术栈
 
 - **前端**: Next.js 16, React 19, Tailwind CSS v4
@@ -122,6 +190,37 @@ npx prisma studio      # 数据库可视化
 # Docker
 docker-compose up -d   # 启动服务
 ```
+
+## 测试命令
+
+```bash
+# 单元测试 / 集成测试
+docker compose exec app npm run test
+
+# TypeScript 类型检查
+docker compose exec app npm run type-check
+
+# ESLint 检查
+docker compose exec app npm run lint
+```
+
+## 📚 文档规范
+参考 [docs/guides/AGENT_COLLABORATION_GUIDE.md](./docs/guides/AGENT_COLLABORATION_GUIDE.md)（采用相同规范）：
+
+| 目录 | 用途 |
+|------|------|
+| `docs/architecture/` | 架构设计文档 |
+| `docs/guides/` | 使用指南和教程 |
+| `docs/plans/` | 实施计划 |
+| `docs/operations/` | 运维文档 |
+| `docs/archive/` | 历史归档 |
+
+**命名规范**：
+- 总览文档：`UPPERCASE.md`（如 README.md, ARCHITECTURE.md）
+- 指南文档：`lowercase-with-dash.md`（如 quickstart.md）
+- 功能文档：`FEATURE_NAME.md`（如 AI_PROCESSING.md）
+
+**更新流程**：更新版本号 → 更新日期 → 更新 docs/README.md 索引
 
 ## 相关文档
 
