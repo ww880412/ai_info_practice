@@ -46,3 +46,7 @@ next-env.d.ts
 /.playwright-cli/
 /public/uploads/
 /uploads/
+/output/
+/prisma/dev.db
+/src/app/api/debug/
+/日志/
