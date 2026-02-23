@@ -20,7 +20,9 @@ export function isRetriableAgentError(error: unknown): boolean {
     return true;
   }
 
-  return /missing required fields|invalid final|output incomplete/i.test(message);
+  return /missing required fields|invalid final|output incomplete|language not chinese|language rewrite failed|quality validation failed|structure repair failed/i.test(
+    message
+  );
 }
 
 function defaultSleep(ms: number): Promise<void> {

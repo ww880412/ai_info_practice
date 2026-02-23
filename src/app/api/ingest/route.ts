@@ -11,6 +11,11 @@ import {
   type NormalizedAgentIngestDecision,
   type NormalizedPracticeTask,
 } from "@/lib/ai/agent/ingest-contract";
+import {
+  getMaxDecisionEnglishRatio,
+  getMinDecisionQualityScore,
+  validateAndRepairDecision,
+} from "@/lib/ai/agent/decision-repair";
 import { setServerConfig } from "@/lib/gemini";
 import { isDynamicSummaryEnabled } from "@/config/flags";
 import { buildConfidenceScore } from "@/lib/ai/agent/confidence";
@@ -363,7 +368,15 @@ async function asyncProcess(
           if (!normalized) {
             throw new Error("Agent output missing required fields");
           }
-          return normalized;
+          const { decision } = await validateAndRepairDecision(normalized, {
+            contentLength: content.length,
+            maxEnglishRatio: getMaxDecisionEnglishRatio(),
+            minQualityScore: getMinDecisionQualityScore(),
+            onProgress: async (message) => {
+              await updateEntryProcessStatus(entryId, "AI_PROCESSING", message);
+            },
+          });
+          return decision;
         },
       });
     } catch (agentError) {
@@ -381,6 +394,14 @@ async function asyncProcess(
         );
         const fallbackResult = await classifyAndExtract(content);
         decision = buildDecisionFromClassifier(fallbackResult);
+        const repaired = await validateAndRepairDecision(decision, {
+          contentLength: content.length,
+          maxEnglishRatio: getMaxDecisionEnglishRatio(),
+          minQualityScore: getMinDecisionQualityScore(),
+        }).catch(() => null);
+        if (repaired?.decision) {
+          decision = repaired.decision;
+        }
         await saveFallbackTrace(
           entryId,
           parseInput,

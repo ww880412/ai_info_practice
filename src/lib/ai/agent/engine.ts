@@ -323,6 +323,11 @@ ${strategyHints}
 内容片段：
 ${sampledContent}
 
+输出语言要求：
+- 所有自然语言字段默认使用简体中文。
+- 允许保留必要专业术语（如 RAG、Agent、LLM、API、CLIP、QPS）。
+- 不要输出整句英文描述。
+
 返回严格 JSON（不要 markdown）：
 {
   "contentType": "TUTORIAL" | "TOOL_RECOMMENDATION" | "TECH_PRINCIPLE" | "CASE_STUDY" | "OPINION",
@@ -368,6 +373,11 @@ ${step1Json}
 
 内容：
 ${contentSnapshot}
+
+输出语言要求：
+- 所有自然语言字段默认使用简体中文。
+- 允许保留必要专业术语（如 RAG、Agent、LLM、API、CLIP、QPS）。
+- 不要输出整句英文描述。
 
 返回严格 JSON（不要 markdown）：
 {

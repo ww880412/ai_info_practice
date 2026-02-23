@@ -26,6 +26,8 @@ describe("stage-specific retry classifiers", () => {
 
   it("treats incomplete agent output as retriable", () => {
     expect(isRetriableAgentError(new Error("Agent output missing required fields"))).toBe(true);
+    expect(isRetriableAgentError(new Error("Agent output language not Chinese enough"))).toBe(true);
+    expect(isRetriableAgentError(new Error("Agent output quality validation failed"))).toBe(true);
   });
 });
 

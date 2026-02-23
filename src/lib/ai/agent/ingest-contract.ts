@@ -70,6 +70,29 @@ interface NormalizeAgentDecisionOptions {
   contentLength?: number;
 }
 
+interface DecisionLanguageOptions {
+  maxEnglishRatio?: number;
+}
+
+interface DecisionQualityOptions {
+  contentLength?: number;
+  minScore?: number;
+}
+
+export interface DecisionQualityReport {
+  score: number;
+  issues: string[];
+  metrics: {
+    coreSummaryLength: number;
+    summaryFieldCount: number;
+    keyPointsCoreCount: number;
+    keyPointsExtendedCount: number;
+    boundariesApplicableCount: number;
+    boundariesNotApplicableCount: number;
+    practiceTaskStepsCount: number;
+  };
+}
+
 const CONTENT_TYPES: ContentType[] = [
   "TUTORIAL",
   "TOOL_RECOMMENDATION",
@@ -174,6 +197,206 @@ function dedupeStrings(values: string[]): string[] {
 
 function clampString(value: string, maxLength = 180): string {
   return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+}
+
+function collectTextValues(value: unknown, depth = 0): string[] {
+  if (depth > 3) return [];
+
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    return normalized ? [normalized] : [];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => collectTextValues(item, depth + 1));
+  }
+
+  if (value && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).flatMap((item) =>
+      collectTextValues(item, depth + 1)
+    );
+  }
+
+  return [];
+}
+
+function stripTechnicalTermsForLanguageCheck(text: string): string {
+  const patterns: RegExp[] = [
+    /\b[A-Z]{2,10}\b/g, // Acronyms like RAG/LLM/API
+    /\b[A-Za-z]+(?:[-_/.][A-Za-z0-9]+)+\b/g, // feature-dev, vllm/v1
+    /\b(?:v?\d+(?:\.\d+){0,2})\b/gi, // versions such as v2.5 / 1.0
+    /`[^`]+`/g, // code snippets
+  ];
+
+  return patterns.reduce((current, pattern) => current.replace(pattern, " "), text);
+}
+
+function buildDecisionLanguageSample(
+  decision: NormalizedAgentIngestDecision
+): string {
+  const texts: string[] = [
+    decision.coreSummary,
+    decision.practiceReason,
+    ...decision.keyPoints,
+    ...decision.keyPointsNew.core,
+    ...decision.keyPointsNew.extended,
+    ...decision.boundaries.applicable,
+    ...decision.boundaries.notApplicable,
+    ...(decision.summaryStructure.reasoning ? [decision.summaryStructure.reasoning] : []),
+    ...collectTextValues(decision.summaryStructure.fields),
+  ];
+
+  if (decision.practiceTask) {
+    texts.push(
+      decision.practiceTask.title,
+      decision.practiceTask.summary,
+      ...decision.practiceTask.prerequisites
+    );
+    for (const step of decision.practiceTask.steps) {
+      texts.push(step.title, step.description);
+    }
+  }
+
+  return texts.join("\n");
+}
+
+export function calculateDecisionEnglishRatio(
+  decision: NormalizedAgentIngestDecision
+): number {
+  const sample = stripTechnicalTermsForLanguageCheck(
+    buildDecisionLanguageSample(decision)
+  );
+  const zh = (sample.match(/[\u4e00-\u9fff]/g) || []).length;
+  const en = (sample.match(/[A-Za-z]/g) || []).length;
+  const total = zh + en;
+  if (total === 0) return 0;
+  return Number((en / total).toFixed(4));
+}
+
+export function isDecisionMostlyChinese(
+  decision: NormalizedAgentIngestDecision,
+  options: DecisionLanguageOptions = {}
+): boolean {
+  const maxEnglishRatio = options.maxEnglishRatio ?? 0.35;
+  return calculateDecisionEnglishRatio(decision) <= maxEnglishRatio;
+}
+
+function parseSummaryFieldCount(
+  summaryStructure: NormalizedSummaryStructure
+): number {
+  const fields = summaryStructure.fields;
+  if (!fields || typeof fields !== "object" || Array.isArray(fields)) return 0;
+  return Object.keys(fields).length;
+}
+
+function getSummaryLengthTarget(contentLength?: number): number {
+  if (!contentLength || !Number.isFinite(contentLength) || contentLength <= 0) {
+    return 60;
+  }
+  if (contentLength < 5000) return 60;
+  if (contentLength <= 20000) return 90;
+  return 120;
+}
+
+function getQualityKeyPointTarget(contentLength?: number): {
+  minCore: number;
+  minExtended: number;
+} {
+  const target = getKeyPointDensityTarget(contentLength);
+  if (!target) return { minCore: 3, minExtended: 1 };
+  return { minCore: target.minCore, minExtended: target.minExtended };
+}
+
+export function evaluateDecisionQuality(
+  decision: NormalizedAgentIngestDecision,
+  options: DecisionQualityOptions = {}
+): DecisionQualityReport {
+  const issues: string[] = [];
+  let passedChecks = 0;
+  const checks: boolean[] = [];
+
+  const coreSummaryLength = decision.coreSummary.length;
+  const summaryFieldCount = parseSummaryFieldCount(decision.summaryStructure);
+  const keyPointsCoreCount = decision.keyPointsNew.core.length;
+  const keyPointsExtendedCount = decision.keyPointsNew.extended.length;
+  const boundariesApplicableCount = decision.boundaries.applicable.length;
+  const boundariesNotApplicableCount = decision.boundaries.notApplicable.length;
+  const practiceTaskStepsCount = decision.practiceTask?.steps.length ?? 0;
+
+  const summaryLengthTarget = getSummaryLengthTarget(options.contentLength);
+  const keyPointTarget = getQualityKeyPointTarget(options.contentLength);
+
+  checks.push(coreSummaryLength >= summaryLengthTarget);
+  if (coreSummaryLength < summaryLengthTarget) {
+    issues.push(
+      `coreSummary too short (${coreSummaryLength} < ${summaryLengthTarget})`
+    );
+  }
+
+  checks.push(summaryFieldCount >= 2);
+  if (summaryFieldCount < 2) {
+    issues.push(`summaryStructure fields too sparse (${summaryFieldCount})`);
+  }
+
+  checks.push(keyPointsCoreCount >= keyPointTarget.minCore);
+  if (keyPointsCoreCount < keyPointTarget.minCore) {
+    issues.push(
+      `core key points too few (${keyPointsCoreCount} < ${keyPointTarget.minCore})`
+    );
+  }
+
+  checks.push(keyPointsExtendedCount >= keyPointTarget.minExtended);
+  if (keyPointsExtendedCount < keyPointTarget.minExtended) {
+    issues.push(
+      `extended key points too few (${keyPointsExtendedCount} < ${keyPointTarget.minExtended})`
+    );
+  }
+
+  checks.push(
+    boundariesApplicableCount >= 1 && boundariesNotApplicableCount >= 1
+  );
+  if (boundariesApplicableCount < 1 || boundariesNotApplicableCount < 1) {
+    issues.push(
+      `boundaries incomplete (applicable=${boundariesApplicableCount}, notApplicable=${boundariesNotApplicableCount})`
+    );
+  }
+
+  if (decision.practiceValue === "ACTIONABLE") {
+    checks.push(Boolean(decision.practiceTask && practiceTaskStepsCount >= 2));
+    if (!decision.practiceTask) {
+      issues.push("practiceTask missing for ACTIONABLE content");
+    } else if (practiceTaskStepsCount < 2) {
+      issues.push(`practiceTask steps too few (${practiceTaskStepsCount} < 2)`);
+    }
+  }
+
+  for (const check of checks) {
+    if (check) passedChecks += 1;
+  }
+  const score = checks.length > 0 ? Number((passedChecks / checks.length).toFixed(4)) : 0;
+
+  return {
+    score,
+    issues,
+    metrics: {
+      coreSummaryLength,
+      summaryFieldCount,
+      keyPointsCoreCount,
+      keyPointsExtendedCount,
+      boundariesApplicableCount,
+      boundariesNotApplicableCount,
+      practiceTaskStepsCount,
+    },
+  };
+}
+
+export function isDecisionStructurallyComplete(
+  decision: NormalizedAgentIngestDecision,
+  options: DecisionQualityOptions = {}
+): boolean {
+  const minScore = options.minScore ?? 0.72;
+  const report = evaluateDecisionQuality(decision, options);
+  return report.score >= minScore;
 }
 
 function normalizeContentType(value: unknown): ContentType | null {
