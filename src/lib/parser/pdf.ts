@@ -31,6 +31,25 @@ function parsePositiveNumber(value: string | undefined, fallback: number): numbe
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function toErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isMissingPopplerBinaryError(error: unknown): boolean {
+  const message = toErrorMessage(error);
+  return /spawn\s+(pdftoppm|pdftotext)\s+ENOENT|pdftoppm failed:.*ENOENT|pdftotext failed:.*ENOENT/i.test(
+    message
+  );
+}
+
+function shouldFallbackToDirectPdfParsing(
+  error: unknown,
+  directFallbackEnabled: boolean
+): boolean {
+  if (directFallbackEnabled) return true;
+  return isMissingPopplerBinaryError(error);
+}
+
 function runCommand(
   command: string,
   args: string[],
@@ -191,12 +210,12 @@ export async function parseFile(
   mimeType: string
 ): Promise<FileParseResult> {
   if (mimeType.startsWith("application/pdf")) {
+    const directFallbackEnabled =
+      process.env.PARSER_PDF_ENABLE_DIRECT_FALLBACK === "true";
     try {
       return await parsePdfViaPageImages(buffer);
     } catch (error) {
-      const directFallbackEnabled =
-        process.env.PARSER_PDF_ENABLE_DIRECT_FALLBACK === "true";
-      if (!directFallbackEnabled) {
+      if (!shouldFallbackToDirectPdfParsing(error, directFallbackEnabled)) {
         throw error;
       }
     }
@@ -218,4 +237,5 @@ export async function parseFile(
 export const __internal = {
   getDefaultMaxPdfPages,
   buildPdfContentFromPages,
+  shouldFallbackToDirectPdfParsing,
 };

@@ -19,4 +19,14 @@ describe("pdf parser internals", () => {
     expect(content).toContain("[Page 3]");
     expect(content).toContain("third page");
   });
+
+  it("enables direct fallback when Poppler binary is missing", () => {
+    const error = new Error("pdftoppm failed: spawn pdftoppm ENOENT");
+    expect(__internal.shouldFallbackToDirectPdfParsing(error, false)).toBe(true);
+  });
+
+  it("keeps direct fallback disabled for non-missing-binary errors by default", () => {
+    const error = new Error("PDF page extraction failed: empty content");
+    expect(__internal.shouldFallbackToDirectPdfParsing(error, false)).toBe(false);
+  });
 });
