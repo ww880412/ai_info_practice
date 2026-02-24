@@ -6,6 +6,8 @@ import { Tags, X } from "lucide-react";
 interface TagStats {
   tag: string;
   count: number;
+  aliases: { tag: string; count: number }[];
+  filterTags: string[];
 }
 
 interface TagStatsResponse {
@@ -44,9 +46,44 @@ function TagPill({
   tag,
   count,
   selected,
+  partial,
   onClick,
 }: {
   tag: string;
+  count: number;
+  selected: boolean;
+  partial?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`max-w-full inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full transition-colors ${
+        selected
+          ? "bg-primary text-white"
+          : partial
+          ? "bg-primary/15 text-primary hover:bg-primary/25"
+          : "bg-accent text-secondary hover:bg-accent-hover"
+      }`}
+      title={tag}
+    >
+      <span className="max-w-[220px] truncate">{tag}</span>
+      <span className={`shrink-0 ${selected ? "text-primary-foreground/70" : "text-secondary"}`}>
+        {count}
+      </span>
+    </button>
+  );
+}
+
+function AliasPill({
+  parentTag,
+  aliasTag,
+  count,
+  selected,
+  onClick,
+}: {
+  parentTag: string;
+  aliasTag: string;
   count: number;
   selected: boolean;
   onClick: () => void;
@@ -56,12 +93,13 @@ function TagPill({
       onClick={onClick}
       className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full transition-colors ${
         selected
-          ? "bg-primary text-white"
-          : "bg-accent text-secondary hover:bg-accent-hover"
+          ? "bg-primary/20 text-primary"
+          : "bg-accent/50 text-secondary hover:bg-accent"
       }`}
+      title={`${parentTag} / ${aliasTag}`}
     >
-      <span>{tag}</span>
-      <span className={selected ? "text-primary-foreground/70" : "text-secondary"}>
+      <span className="max-w-[180px] truncate">{aliasTag}</span>
+      <span className="shrink-0">
         {count}
       </span>
     </button>
@@ -75,11 +113,16 @@ export function TagSidebar({
   onUserTagsChange,
   scope = "all",
 }: TagSidebarProps) {
+  const tagLimit = 50;
+  const minTagCount = 2;
+
   const { data, isLoading } = useQuery<TagStatsResponse>({
     queryKey: ["tags", "stats", scope],
     queryFn: async () => {
       const searchParams = new URLSearchParams();
       searchParams.set("scope", scope);
+      searchParams.set("limit", String(tagLimit));
+      searchParams.set("minCount", String(minTagCount));
       const res = await fetch(`/api/tags/stats?${searchParams}`);
       if (!res.ok) throw new Error("Failed to fetch tag stats");
       return res.json();
@@ -100,6 +143,26 @@ export function TagSidebar({
     } else {
       onUserTagsChange([...selectedUserTags, tag]);
     }
+  };
+
+  const toggleAiTagGroup = (tags: string[]) => {
+    if (tags.length === 0) return;
+    const allSelected = tags.every((tag) => selectedAiTags.includes(tag));
+    if (allSelected) {
+      onAiTagsChange(selectedAiTags.filter((tag) => !tags.includes(tag)));
+      return;
+    }
+    onAiTagsChange(Array.from(new Set([...selectedAiTags, ...tags])));
+  };
+
+  const toggleUserTagGroup = (tags: string[]) => {
+    if (tags.length === 0) return;
+    const allSelected = tags.every((tag) => selectedUserTags.includes(tag));
+    if (allSelected) {
+      onUserTagsChange(selectedUserTags.filter((tag) => !tags.includes(tag)));
+      return;
+    }
+    onUserTagsChange(Array.from(new Set([...selectedUserTags, ...tags])));
   };
 
   const clearAiTags = () => onAiTagsChange([]);
@@ -148,14 +211,33 @@ export function TagSidebar({
                 )}
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {data.data.aiTags.map(({ tag, count }) => (
-                  <TagPill
-                    key={tag}
-                    tag={tag}
-                    count={count}
-                    selected={selectedAiTags.includes(tag)}
-                    onClick={() => toggleAiTag(tag)}
-                  />
+                {data.data.aiTags.map(({ tag, count, aliases, filterTags }) => (
+                  <div key={tag} className="space-y-1">
+                    <TagPill
+                      tag={tag}
+                      count={count}
+                      selected={filterTags.every((item) => selectedAiTags.includes(item))}
+                      partial={
+                        filterTags.some((item) => selectedAiTags.includes(item))
+                        && !filterTags.every((item) => selectedAiTags.includes(item))
+                      }
+                      onClick={() => toggleAiTagGroup(filterTags)}
+                    />
+                    {aliases.length > 1 && (
+                      <div className="ml-1 flex flex-wrap gap-1">
+                        {aliases.map((alias) => (
+                          <AliasPill
+                            key={`${tag}-${alias.tag}`}
+                            parentTag={tag}
+                            aliasTag={alias.tag}
+                            count={alias.count}
+                            selected={selectedAiTags.includes(alias.tag)}
+                            onClick={() => toggleAiTag(alias.tag)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
@@ -178,14 +260,33 @@ export function TagSidebar({
                 )}
               </div>
               <div className="flex flex-wrap gap-1.5">
-                {data.data.userTags.map(({ tag, count }) => (
-                  <TagPill
-                    key={tag}
-                    tag={tag}
-                    count={count}
-                    selected={selectedUserTags.includes(tag)}
-                    onClick={() => toggleUserTag(tag)}
-                  />
+                {data.data.userTags.map(({ tag, count, aliases, filterTags }) => (
+                  <div key={tag} className="space-y-1">
+                    <TagPill
+                      tag={tag}
+                      count={count}
+                      selected={filterTags.every((item) => selectedUserTags.includes(item))}
+                      partial={
+                        filterTags.some((item) => selectedUserTags.includes(item))
+                        && !filterTags.every((item) => selectedUserTags.includes(item))
+                      }
+                      onClick={() => toggleUserTagGroup(filterTags)}
+                    />
+                    {aliases.length > 1 && (
+                      <div className="ml-1 flex flex-wrap gap-1">
+                        {aliases.map((alias) => (
+                          <AliasPill
+                            key={`${tag}-${alias.tag}`}
+                            parentTag={tag}
+                            aliasTag={alias.tag}
+                            count={alias.count}
+                            selected={selectedUserTags.includes(alias.tag)}
+                            onClick={() => toggleUserTag(alias.tag)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>

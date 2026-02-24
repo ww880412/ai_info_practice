@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 interface UseEntriesParams {
   page?: number;
   pageSize?: number;
+  groupId?: string;
   q?: string;
   contentType?: string;
   techDomain?: string;
@@ -21,6 +22,7 @@ export function useEntries(params: UseEntriesParams = {}) {
   const {
     page = 1,
     pageSize = 20,
+    groupId,
     q,
     contentType,
     techDomain,
@@ -39,6 +41,7 @@ export function useEntries(params: UseEntriesParams = {}) {
       const searchParams = new URLSearchParams();
       searchParams.set("page", String(page));
       searchParams.set("pageSize", String(pageSize));
+      if (groupId) searchParams.set("groupId", groupId);
       if (q) searchParams.set("q", q);
       if (contentType) searchParams.set("contentType", contentType);
       if (techDomain) searchParams.set("techDomain", techDomain);

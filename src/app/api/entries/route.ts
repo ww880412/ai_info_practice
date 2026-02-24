@@ -1,7 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
+import {
+  ContentType,
+  ProcessStatus,
+  PracticeValue,
+  SourceType,
+  TechDomain,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { parseBulkDeleteIds } from "@/lib/entries/bulk-delete";
 import { deleteEntriesWithDependencies } from "@/lib/entries/delete";
+import {
+  buildCombinedTagFilterCondition,
+  normalizeTagList,
+} from "@/lib/entries/tag-filter";
+
+function parseEnum<T extends string>(value: string | null, allowed: readonly T[]): T | undefined {
+  if (!value) return undefined;
+  if ((allowed as readonly string[]).includes(value)) return value as T;
+  return undefined;
+}
 
 /**
  * GET /api/entries - List entries with filtering, search, and pagination.
@@ -27,12 +45,13 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
     const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get("pageSize") || "20")));
+    const groupId = searchParams.get("groupId");
     const q = searchParams.get("q") || "";
-    const contentType = searchParams.get("contentType");
-    const techDomain = searchParams.get("techDomain");
-    const practiceValue = searchParams.get("practiceValue");
-    const processStatus = searchParams.get("processStatus");
-    const sourceType = searchParams.get("sourceType");
+    const contentType = parseEnum(searchParams.get("contentType"), Object.values(ContentType));
+    const techDomain = parseEnum(searchParams.get("techDomain"), Object.values(TechDomain));
+    const practiceValue = parseEnum(searchParams.get("practiceValue"), Object.values(PracticeValue));
+    const processStatus = parseEnum(searchParams.get("processStatus"), Object.values(ProcessStatus));
+    const sourceType = parseEnum(searchParams.get("sourceType"), Object.values(SourceType));
 
     // Tag filters
     const aiTagsAll = searchParams.get("aiTagsAll");
@@ -43,17 +62,19 @@ export async function GET(request: NextRequest) {
     // Sort
     const sort = searchParams.get("sort") || "createdAt";
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const where: Record<string, any> = {};
+    const where: Prisma.EntryWhereInput = {};
+    const andConditions: Prisma.EntryWhereInput[] = [];
 
     // Search
     if (q) {
-      where.OR = [
-        { title: { contains: q, mode: "insensitive" } },
-        { coreSummary: { contains: q, mode: "insensitive" } },
-        { aiTags: { has: q } },
-        { userTags: { has: q } },
-      ];
+      andConditions.push({
+        OR: [
+          { title: { contains: q, mode: "insensitive" } },
+          { coreSummary: { contains: q, mode: "insensitive" } },
+          { aiTags: { has: q } },
+          { userTags: { has: q } },
+        ],
+      });
     }
 
     // Exact match filters
@@ -62,62 +83,24 @@ export async function GET(request: NextRequest) {
     if (practiceValue) where.practiceValue = practiceValue;
     if (processStatus) where.processStatus = processStatus;
     if (sourceType) where.sourceType = sourceType;
+    if (groupId) {
+      where.groups = { some: { id: groupId } };
+    }
 
     // Tag filtering logic: (aiAll AND aiAny) OR (userAll AND userAny)
     // All not passed = true, Any not passed = true
-    const aiTagsAllList = aiTagsAll ? aiTagsAll.split(",").filter(Boolean) : [];
-    const aiTagsAnyList = aiTagsAny ? aiTagsAny.split(",").filter(Boolean) : [];
-    const userTagsAllList = userTagsAll ? userTagsAll.split(",").filter(Boolean) : [];
-    const userTagsAnyList = userTagsAny ? userTagsAny.split(",").filter(Boolean) : [];
+    const tagFilterCondition = buildCombinedTagFilterCondition({
+      aiAll: normalizeTagList(aiTagsAll),
+      aiAny: normalizeTagList(aiTagsAny),
+      userAll: normalizeTagList(userTagsAll),
+      userAny: normalizeTagList(userTagsAny),
+    });
+    if (tagFilterCondition) {
+      andConditions.push(tagFilterCondition);
+    }
 
-    const hasAiFilter = aiTagsAllList.length > 0 || aiTagsAnyList.length > 0;
-    const hasUserFilter = userTagsAllList.length > 0 || userTagsAnyList.length > 0;
-
-    if (hasAiFilter || hasUserFilter) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const aiCondition: any = {};
-      if (aiTagsAllList.length > 0) aiCondition.hasEvery = aiTagsAllList;
-      if (aiTagsAnyList.length > 0) {
-        // For hasSome, need at least one match
-        if (aiCondition.hasEvery) {
-          // Both: must have all from aiAll AND at least one from aiAny
-          aiCondition.AND = [
-            { aiTags: { hasEvery: aiTagsAllList } },
-            { aiTags: { hasSome: aiTagsAnyList } },
-          ];
-          delete aiCondition.hasEvery;
-        } else {
-          aiCondition.hasSome = aiTagsAnyList;
-        }
-      }
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const userCondition: any = {};
-      if (userTagsAllList.length > 0) userCondition.hasEvery = userTagsAllList;
-      if (userTagsAnyList.length > 0) {
-        if (userCondition.hasEvery) {
-          userCondition.AND = [
-            { userTags: { hasEvery: userTagsAllList } },
-            { userTags: { hasSome: userTagsAnyList } },
-          ];
-          delete userCondition.hasEvery;
-        } else {
-          userCondition.hasSome = userTagsAnyList;
-        }
-      }
-
-      // Build combined condition
-      if (hasAiFilter && hasUserFilter) {
-        where.OR = [
-          { AND: [aiCondition, { NOT: userCondition }] },
-          { AND: [{ NOT: aiCondition }, userCondition] },
-          { AND: [aiCondition, userCondition] },
-        ];
-      } else if (hasAiFilter) {
-        Object.assign(where, aiCondition);
-      } else {
-        Object.assign(where, userCondition);
-      }
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     // Determine orderBy

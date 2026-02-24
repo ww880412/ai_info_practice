@@ -50,9 +50,10 @@ model Entry {
   sourceTrust     TrustLevel? // HIGH/MEDIUM/LOW
 
   // Smart summary (V2 Task 2)
-  smartSummary  String? @db.Text
-  keyInsights   String[]
-  tldr          String?
+  smartSummary    String? @db.Text
+  keyInsights     String[]
+  tldr            String?
+  qualityOverride Json?
 
   // L3 practice (1:1)
   practiceTask  PracticeTask?
@@ -63,10 +64,24 @@ model Entry {
   // Reasoning traces (1:many)
   reasoningTraces ReasoningTrace[]
 
+  // Quality revision history (1:many)
+  qualityHistories QualityRevision[] @relation("EntryQualityHistory")
+
+  // Process attempts (1:many)
+  processAttempts ProcessAttempt[] @relation("EntryProcessAttempts")
+
+  // Groups (many:many)
+  groups Group[] @relation("EntryGroups")
+
   @@index([processStatus])
   @@index([contentType])
   @@index([techDomain])
   @@index([createdAt])
+  @@index([updatedAt(sort: Desc)])
+  @@index([confidence(sort: Desc)])
+  @@index([practiceValue])
+  @@index([difficulty])
+  @@index([confidence, practiceValue, difficulty])
 }
 
 // Reasoning trace for ReAct agent
@@ -231,6 +246,63 @@ enum TrustLevel {
   HIGH
   MEDIUM
   LOW
+}
+
+enum AttemptStatus {
+  SUCCESS
+  FAILED
+  RUNNING
+}
+
+// ─────────────── Group ───────────────
+
+model Group {
+  id        String   @id @default(cuid())
+  name      String
+  parentId  String?
+  parent    Group?   @relation("GroupHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Group[]  @relation("GroupHierarchy")
+  entries   Entry[]  @relation("EntryGroups")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, parentId])
+  @@index([parentId])
+}
+
+model QualityRevision {
+  id             String   @id @default(cuid())
+  entryId        String
+  entry          Entry    @relation("EntryQualityHistory", fields: [entryId], references: [id], onDelete: Cascade)
+  previousJson   Json
+  newJson        Json
+  overrideReason String?
+  createdAt      DateTime @default(now())
+  createdBy      String?
+
+  @@index([entryId])
+}
+
+model ProcessAttempt {
+  id                String          @id @default(cuid())
+  entryId           String
+  entry             Entry           @relation("EntryProcessAttempts", fields: [entryId], references: [id], onDelete: Cascade)
+  attemptNumber     Int
+  status            AttemptStatus
+  startedAt         DateTime
+  completedAt       DateTime?
+  durationMs        Int?
+  inputSummary      String?
+  error             String?
+  previousAttemptId String?         @unique
+  previousAttempt   ProcessAttempt? @relation("AttemptChain", fields: [previousAttemptId], references: [id], onDelete: SetNull)
+  nextAttempt       ProcessAttempt? @relation("AttemptChain")
+  retryAfterMs      Int?
+  createdAt         DateTime        @default(now())
+
+  @@unique([entryId, attemptNumber])
+  @@index([entryId])
+  @@index([previousAttemptId])
 }
 
 // ─────────────── Agent Config ───────────────

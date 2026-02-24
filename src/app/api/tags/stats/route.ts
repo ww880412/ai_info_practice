@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { aggregateTags } from "@/lib/tag-aggregation";
+
+function parsePositiveInt(value: string | null, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
 
 /**
  * GET /api/tags/stats - Get tag statistics.
@@ -10,8 +18,8 @@ import { prisma } from "@/lib/prisma";
  * Response:
  * {
  *   "data": {
- *     "aiTags": [{ "tag": "Agent", "count": 12 }, ...],
- *     "userTags": [{ "tag": "重要", "count": 8 }, ...]
+ *     "aiTags": [{ "tag": "Agent", "count": 12, "aliases": [...], "filterTags": [...] }, ...],
+ *     "userTags": [{ "tag": "重要", "count": 8, "aliases": [...], "filterTags": [...] }, ...]
  *   }
  * }
  */
@@ -19,6 +27,8 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const scope = searchParams.get("scope") || "all";
+    const limit = parsePositiveInt(searchParams.get("limit"), 50);
+    const minCount = parsePositiveInt(searchParams.get("minCount"), 2);
 
     const where = scope === "recent30d"
       ? { createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }
@@ -42,14 +52,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Sort by count descending
-    const aiTags = Array.from(aiTagCounts.entries())
-      .map(([tag, count]) => ({ tag, count }))
-      .sort((a, b) => b.count - a.count);
+    const aiTags = aggregateTags(
+      Array.from(aiTagCounts.entries()).map(([tag, count]) => ({ tag, count })),
+      { limit, minCount, semantic: true }
+    );
 
-    const userTags = Array.from(userTagCounts.entries())
-      .map(([tag, count]) => ({ tag, count }))
-      .sort((a, b) => b.count - a.count);
+    const userTags = aggregateTags(
+      Array.from(userTagCounts.entries()).map(([tag, count]) => ({ tag, count })),
+      { limit, minCount, semantic: false }
+    );
 
     return NextResponse.json({ data: { aiTags, userTags } });
   } catch (error) {
