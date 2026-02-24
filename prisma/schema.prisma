@@ -37,6 +37,18 @@ model Entry {
   keyPoints     String[]
   practiceValue PracticeValue?
 
+  // Dynamic summary (Phase 2)
+  summaryStructure Json?   // { type, fields, reasoning }
+  keyPointsNew    Json?   // { core: [], extended: [] } - 双写字段
+  boundaries      Json?   // { applicable: [], notApplicable: [] }
+  confidence      Float?  // 综合置信度
+
+  // Evaluation dimensions
+  difficulty      Difficulty?  // BEGINNER/INTERMEDIATE/ADVANCED/EXPERT
+  contentForm     ContentForm? // TEXTUAL/CODE_HEAVY/VISUAL/MULTIMODAL
+  timeliness      Timeliness?  // RECENT/OUTDATED/CLASSIC
+  sourceTrust     TrustLevel? // HIGH/MEDIUM/LOW
+
   // Smart summary (V2 Task 2)
   smartSummary  String? @db.Text
   keyInsights   String[]
@@ -45,10 +57,50 @@ model Entry {
   // L3 practice (1:1)
   practiceTask  PracticeTask?
 
+  // Parse logs (1:many)
+  parseLogs ParseLog[]
+
+  // Reasoning traces (1:many)
+  reasoningTraces ReasoningTrace[]
+
   @@index([processStatus])
   @@index([contentType])
   @@index([techDomain])
   @@index([createdAt])
+}
+
+// Reasoning trace for ReAct agent
+model ReasoningTrace {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  entryId   String
+  entry     Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  // Steps stored as JSON
+  steps        String @db.Text
+
+  // Final result from the agent
+  finalResult  String @db.Text
+
+  // Metadata about the trace
+  metadata     String @db.Text
+
+  @@index([entryId])
+}
+
+model ParseLog {
+  id            String   @id @default(cuid())
+  entryId       String
+  strategy      String
+  inputSize     Int
+  outputSize    Int
+  processingTime Int
+  success       Boolean
+  error         String?
+  createdAt    DateTime @default(now())
+
+  entry         Entry   @relation(fields: [entryId], references: [id])
 }
 
 model PracticeTask {
@@ -160,4 +212,34 @@ enum Difficulty {
   EASY
   MEDIUM
   HARD
+}
+
+enum ContentForm {
+  TEXTUAL
+  CODE_HEAVY
+  VISUAL
+  MULTIMODAL
+}
+
+enum Timeliness {
+  RECENT
+  OUTDATED
+  CLASSIC
+}
+
+enum TrustLevel {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+// ─────────────── Agent Config ───────────────
+
+model AgentConfig {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  config    Json
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

@@ -1,0 +1,12 @@
+# ai_info_practice 进度日志（交接简版）
+
+## 2026-02-23
+- ✅ 从 alphabrain 项目借鉴大型项目规范
+- ✅ 更新 CLAUDE.md：新增阶段治理、Docker 规范、Git 协作流、深度一致性、TDD 守卫、自我进化规则
+- ✅ 拷贝协作文档到 docs/guides/：
+  - AGENT_ONBOARDING_CHECKLIST.md
+  - AGENT_COLLABORATION_GUIDE.md
+- ✅ 拷贝文档规范：docs/DOCUMENTATION_STANDARDS.md
+- ✅ 创建 PROGRESS.md 模板
+- ✅ 创建 PROGRESS.log 模板
+- 🔜 下一步：完善测试覆盖、创建 PROJECT_STATUS.md

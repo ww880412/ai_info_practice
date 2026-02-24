@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Eye, EyeOff, Check, AlertCircle } from "lucide-react";
+
+const CONFIG_STORAGE_KEY = "ai-practice-config";
+const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 
 interface ConfigState {
   geminiApiKey: string;
@@ -10,39 +13,46 @@ interface ConfigState {
   isChecking: boolean;
 }
 
-export default function SettingsPage() {
-  const [config, setConfig] = useState<ConfigState>({
+function getInitialConfig(): ConfigState {
+  const defaultConfig: ConfigState = {
     geminiApiKey: "",
-    geminiModel: "gemini-2.0-flash-exp",
+    geminiModel: DEFAULT_GEMINI_MODEL,
     isValid: false,
     isChecking: false,
-  });
+  };
+
+  if (typeof window === "undefined") return defaultConfig;
+
+  const saved = localStorage.getItem(CONFIG_STORAGE_KEY);
+  if (!saved) return defaultConfig;
+
+  try {
+    const parsed = JSON.parse(saved);
+    return {
+      ...defaultConfig,
+      geminiApiKey:
+        typeof parsed?.geminiApiKey === "string" ? parsed.geminiApiKey : "",
+      geminiModel:
+        typeof parsed?.geminiModel === "string" && parsed.geminiModel
+          ? parsed.geminiModel
+          : DEFAULT_GEMINI_MODEL,
+    };
+  } catch {
+    return defaultConfig;
+  }
+}
+
+export default function SettingsPage() {
+  const [config, setConfig] = useState<ConfigState>(() => getInitialConfig());
   const [showKey, setShowKey] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
-
-  // Load config from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem("ai-practice-config");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setConfig((prev) => ({
-          ...prev,
-          geminiApiKey: parsed.geminiApiKey || "",
-          geminiModel: parsed.geminiModel || "gemini-2.0-flash-exp",
-        }));
-      } catch {
-        // Ignore parse errors
-      }
-    }
-  }, []);
 
   const handleSave = async () => {
     setSaveStatus("saving");
     try {
       // Save to localStorage
       localStorage.setItem(
-        "ai-practice-config",
+        CONFIG_STORAGE_KEY,
         JSON.stringify({
           geminiApiKey: config.geminiApiKey,
           geminiModel: config.geminiModel,
@@ -73,10 +83,10 @@ export default function SettingsPage() {
   };
 
   const handleReset = () => {
-    localStorage.removeItem("ai-practice-config");
+    localStorage.removeItem(CONFIG_STORAGE_KEY);
     setConfig({
       geminiApiKey: "",
-      geminiModel: "gemini-2.0-flash-exp",
+      geminiModel: DEFAULT_GEMINI_MODEL,
       isValid: false,
       isChecking: false,
     });
@@ -138,7 +148,12 @@ export default function SettingsPage() {
                 onChange={(e) => setConfig((prev) => ({ ...prev, geminiModel: e.target.value }))}
                 className="w-full px-3 py-2 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
               >
-                <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Experimental)</option>
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash (Stable)</option>
+                <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                <option value="gemini-3.1-pro-preview">Gemini 3.1 Pro Preview</option>
+                <option value="gemini-3.0-flash-preview">Gemini 3.0 Flash Preview</option>
+                <option value="gemini-1.5-flash-8b">Gemini 1.5 Flash 8B</option>
                 <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
                 <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
               </select>

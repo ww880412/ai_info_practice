@@ -27,6 +27,21 @@ interface IngestResponse {
   }>;
 }
 
+function getConfig() {
+  if (typeof window === "undefined") return {};
+  const saved = localStorage.getItem("ai-practice-config");
+  if (!saved) return {};
+  try {
+    const parsed = JSON.parse(saved);
+    return {
+      geminiApiKey: parsed.geminiApiKey,
+      geminiModel: parsed.geminiModel,
+    };
+  } catch {
+    return {};
+  }
+}
+
 export function useIngest() {
   const queryClient = useQueryClient();
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -34,10 +49,11 @@ export function useIngest() {
 
   const ingestLink = useMutation({
     mutationFn: async ({ url }: IngestLinkParams): Promise<IngestResponse> => {
+      const config = getConfig();
       const res = await fetch("/api/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inputType: "LINK", url }),
+        body: JSON.stringify({ inputType: "LINK", url, config }),
       });
       if (!res.ok) throw new Error("Failed to ingest link");
       return res.json();
@@ -67,10 +83,11 @@ export function useIngest() {
       const { fileKey } = await uploadRes.json();
 
       // Step 2: Ingest with fileKey
+      const config = getConfig();
       const res = await fetch("/api/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inputType: "PDF", fileKey }),
+        body: JSON.stringify({ inputType: "PDF", fileKey, config }),
       });
       if (!res.ok) throw new Error("Failed to ingest file");
       return res.json();
@@ -86,10 +103,11 @@ export function useIngest() {
 
   const ingestText = useMutation({
     mutationFn: async ({ text }: IngestTextParams): Promise<IngestResponse> => {
+      const config = getConfig();
       const res = await fetch("/api/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inputType: "TEXT", text }),
+        body: JSON.stringify({ inputType: "TEXT", text, config }),
       });
       if (!res.ok) throw new Error("Failed to ingest text");
       return res.json();

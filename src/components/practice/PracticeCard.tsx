@@ -114,7 +114,7 @@ export function PracticeCard({ task }: PracticeCardProps) {
           )}
 
           {/* Steps */}
-          <StepTracker steps={task.steps} taskId={task.id} />
+          <StepTracker steps={task.steps} />
         </div>
       )}
     </div>

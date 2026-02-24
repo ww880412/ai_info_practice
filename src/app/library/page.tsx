@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEntries } from "@/hooks/useEntries";
 import { EntryCard } from "@/components/library/EntryCard";
 import { EntryFilters } from "@/components/library/EntryFilters";
 import { IngestDialog } from "@/components/ingest/IngestDialog";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 // Skeleton component for loading state
 function EntryCardSkeleton() {
@@ -34,12 +35,14 @@ function EntryCardSkeleton() {
 
 export default function LibraryPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [ingestOpen, setIngestOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
   const [contentType, setContentType] = useState("");
   const [techDomain, setTechDomain] = useState("");
   const [practiceValue, setPracticeValue] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   // Debounce search
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -60,9 +63,63 @@ export default function LibraryPage() {
     practiceValue: practiceValue || undefined,
   });
 
-  const entries = data?.data || [];
+  const entries: EntryCardEntry[] = (data?.data as EntryCardEntry[]) || [];
   const total = data?.total || 0;
   const totalPages = Math.ceil(total / 20);
+  const entryIds = entries.map((entry) => entry.id);
+  const selectedIdsOnPage = selectedIds.filter((id) => entryIds.includes(id));
+  const selectedCount = selectedIdsOnPage.length;
+  const allSelected = entryIds.length > 0 && selectedCount === entryIds.length;
+
+  const batchDeleteEntries = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await fetch("/api/entries", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+
+      const payload = (await res.json().catch(() => null)) as
+        | { error?: string; deletedCount?: number }
+        | null;
+      if (!res.ok) {
+        throw new Error(payload?.error || "Failed to batch delete entries");
+      }
+      return payload as { deletedCount: number };
+    },
+    onSuccess: (_data, ids) => {
+      setSelectedIds((prev) => prev.filter((id) => !ids.includes(id)));
+      queryClient.invalidateQueries({ queryKey: ["entries"] });
+      queryClient.invalidateQueries({ queryKey: ["practice"] });
+    },
+  });
+
+  const toggleSelectAllOnPage = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(entryIds);
+      return;
+    }
+    setSelectedIds([]);
+  };
+
+  const toggleSelectEntry = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      if (checked) {
+        if (prev.includes(id)) return prev;
+        return [...prev, id];
+      }
+      return prev.filter((item) => item !== id);
+    });
+  };
+
+  const handleBatchDelete = () => {
+    if (selectedCount === 0 || batchDeleteEntries.isPending) return;
+    const confirmed = window.confirm(
+      `Delete ${selectedCount} selected entr${selectedCount > 1 ? "ies" : "y"}? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+    batchDeleteEntries.mutate([...selectedIdsOnPage]);
+  };
 
   return (
     <div className="space-y-6">
@@ -86,14 +143,50 @@ export default function LibraryPage() {
       {/* Filters */}
       <EntryFilters
         q={q}
-        onQChange={(v) => { setQ(v); setPage(1); }}
+        onQChange={(v) => { setQ(v); setPage(1); setSelectedIds([]); }}
         contentType={contentType}
-        onContentTypeChange={(v) => { setContentType(v); setPage(1); }}
+        onContentTypeChange={(v) => { setContentType(v); setPage(1); setSelectedIds([]); }}
         techDomain={techDomain}
-        onTechDomainChange={(v) => { setTechDomain(v); setPage(1); }}
+        onTechDomainChange={(v) => { setTechDomain(v); setPage(1); setSelectedIds([]); }}
         practiceValue={practiceValue}
-        onPracticeValueChange={(v) => { setPracticeValue(v); setPage(1); }}
+        onPracticeValueChange={(v) => { setPracticeValue(v); setPage(1); setSelectedIds([]); }}
       />
+
+      {/* Batch actions */}
+      {entries.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
+          <label className="inline-flex items-center gap-2 text-sm text-secondary">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
+              disabled={batchDeleteEntries.isPending}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+            />
+            Select all on this page
+          </label>
+
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-secondary">{selectedCount} selected</span>
+            <button
+              onClick={handleBatchDelete}
+              disabled={selectedCount === 0 || batchDeleteEntries.isPending}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-950/20"
+            >
+              <Trash2 size={14} />
+              {batchDeleteEntries.isPending ? "Deleting..." : "Delete selected"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {batchDeleteEntries.error && (
+        <p className="text-sm text-danger">
+          {batchDeleteEntries.error instanceof Error
+            ? batchDeleteEntries.error.message
+            : "Failed to batch delete entries"}
+        </p>
+      )}
 
       {/* Entries grid */}
       {isLoading ? (
@@ -114,11 +207,14 @@ export default function LibraryPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {entries.map((entry: Record<string, unknown>) => (
+          {entries.map((entry) => (
             <EntryCard
-              key={entry.id as string}
-              entry={entry as EntryCardEntry}
+              key={entry.id}
+              entry={entry}
               onClick={(id) => router.push(`/entry/${id}`)}
+              showSelection
+              selected={selectedIdsOnPage.includes(entry.id)}
+              onSelectChange={toggleSelectEntry}
             />
           ))}
         </div>
@@ -128,7 +224,10 @@ export default function LibraryPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
           <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => {
+              setSelectedIds([]);
+              setPage((p) => Math.max(1, p - 1));
+            }}
             disabled={page === 1}
             className="px-3 py-1.5 text-sm border border-border rounded-lg disabled:opacity-50 hover:bg-accent transition-colors"
           >
@@ -138,7 +237,10 @@ export default function LibraryPage() {
             {page} / {totalPages}
           </span>
           <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() => {
+              setSelectedIds([]);
+              setPage((p) => Math.min(totalPages, p + 1));
+            }}
             disabled={page === totalPages}
             className="px-3 py-1.5 text-sm border border-border rounded-lg disabled:opacity-50 hover:bg-accent transition-colors"
           >

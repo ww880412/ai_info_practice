@@ -1,17 +1,179 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { parseUrl, parseUploadedFile } from "@/lib/parser";
-import { classifyAndExtract } from "@/lib/ai/classifier";
+import { parseWithLogging, type ParseInput, type ParseResult } from "@/lib/parser";
+import { classifyAndExtract, type ClassifyAndExtractResult } from "@/lib/ai/classifier";
 import { convertToPractice } from "@/lib/ai/practiceConverter";
 import { findSimilarEntries } from "@/lib/ai/deduplication";
+import { ReActAgent } from "@/lib/ai/agent";
+import { getAgentConfig } from "@/lib/ai/agent/get-config";
+import {
+  normalizeAgentIngestDecision,
+  type NormalizedAgentIngestDecision,
+  type NormalizedPracticeTask,
+} from "@/lib/ai/agent/ingest-contract";
+import {
+  getMaxDecisionEnglishRatio,
+  getMinDecisionQualityScore,
+  validateAndRepairDecision,
+} from "@/lib/ai/agent/decision-repair";
+import { setServerConfig } from "@/lib/gemini";
+import { isDynamicSummaryEnabled } from "@/config/flags";
+import { buildConfidenceScore } from "@/lib/ai/agent/confidence";
+import {
+  isRetriableAgentError,
+  isRetriableParseError,
+  runWithProgressRetry,
+} from "@/lib/ingest/retry";
+import {
+  enqueueIngestTask,
+  initializeIngestQueue,
+  type IngestTaskConfig,
+} from "@/lib/ingest/queue";
 import { readFile, unlink } from "fs/promises";
 import { join } from "path";
-import type { SourceType } from "@prisma/client";
+import type { Prisma, ProcessStatus, SourceType } from "@prisma/client";
+
+function buildDecisionFromClassifier(
+  result: ClassifyAndExtractResult
+): NormalizedAgentIngestDecision {
+  return {
+    contentType: result.contentType,
+    techDomain: result.techDomain,
+    aiTags: result.aiTags,
+    coreSummary: result.coreSummary,
+    keyPoints: result.keyPoints,
+    summaryStructure: {
+      type: "generic",
+      reasoning: "Fallback from classifier output",
+      fields: {
+        summary: result.coreSummary,
+        keyPoints: result.keyPoints,
+      },
+    },
+    keyPointsNew: {
+      core: result.keyPoints,
+      extended: [],
+    },
+    boundaries: {
+      applicable: [],
+      notApplicable: [],
+    },
+    confidence: null,
+    difficulty: null,
+    sourceTrust: null,
+    timeliness: null,
+    contentForm: null,
+    practiceValue: result.practiceValue,
+    practiceReason: result.practiceReason,
+    practiceTask: null,
+  };
+}
+
+function normalizePracticeTaskFromLegacyResult(
+  practiceResult: Awaited<ReturnType<typeof convertToPractice>>,
+  summaryFallback: string
+): NormalizedPracticeTask | null {
+  const steps = Array.isArray(practiceResult.steps)
+    ? practiceResult.steps
+        .filter(
+          (step) =>
+            step &&
+            typeof step.order === "number" &&
+            typeof step.title === "string"
+        )
+        .map((step) => ({
+          order: step.order,
+          title: step.title,
+          description: step.description || "",
+        }))
+    : [];
+
+  if (steps.length === 0) {
+    return null;
+  }
+
+  return {
+    title: practiceResult.title || "Practice Task",
+    summary: practiceResult.summary || summaryFallback,
+    difficulty: practiceResult.difficulty || "MEDIUM",
+    estimatedTime: practiceResult.estimatedTime || "30-60 min",
+    prerequisites: Array.isArray(practiceResult.prerequisites)
+      ? practiceResult.prerequisites
+      : [],
+    steps,
+  };
+}
+
+function shouldAllowLegacyClassifierFallback(): boolean {
+  return process.env.ALLOW_CLASSIFIER_FALLBACK === "true";
+}
+
+async function updateEntryProcessStatus(
+  entryId: string,
+  processStatus: ProcessStatus,
+  message?: string | null
+) {
+  await prisma.entry.update({
+    where: { id: entryId },
+    data: {
+      processStatus,
+      processError: message ?? null,
+    },
+  });
+}
+
+async function saveFallbackTrace(
+  entryId: string,
+  input: ParseResult,
+  reason: string,
+  finalResult: NormalizedAgentIngestDecision
+) {
+  const timestamp = new Date().toISOString();
+
+  await prisma.reasoningTrace.create({
+    data: {
+      entryId,
+      steps: JSON.stringify([
+        {
+          step: 1,
+          timestamp,
+          thought: "主 Agent 流程失败，已切换兼容分类流程。",
+          action: "FALLBACK_CLASSIFIER",
+          observation: JSON.stringify({
+            reason,
+            inputLength: input.content.length,
+          }),
+          reasoning: "为了提高任务成功率，使用兼容分类链路生成可用结果。",
+          context: {
+            stage: "fallback",
+            sourceType: input.sourceType,
+          },
+        },
+      ]),
+      finalResult: JSON.stringify(finalResult),
+      metadata: JSON.stringify({
+        startTime: timestamp,
+        endTime: timestamp,
+        iterations: 1,
+        toolsUsed: ["legacy_classifier_fallback"],
+        fallback: true,
+      }),
+    },
+  });
+}
 
 /**
  * Async processing pipeline - runs after response is sent.
  */
-async function asyncProcess(entryId: string) {
+async function asyncProcess(
+  entryId: string,
+  config: IngestTaskConfig = {}
+) {
+  // Set server config for Gemini
+  if (config.geminiApiKey || config.geminiModel) {
+    setServerConfig(config);
+  }
+
   try {
     const entry = await prisma.entry.findUnique({ where: { id: entryId } });
     if (!entry) return;
@@ -21,13 +183,30 @@ async function asyncProcess(entryId: string) {
 
     // Step 1: Parse content if needed
     if (entry.inputType === "LINK" && entry.rawUrl) {
-      await prisma.entry.update({
-        where: { id: entryId },
-        data: { processStatus: "PARSING" },
-      });
+      await updateEntryProcessStatus(entryId, "PARSING", "正在解析链接内容...");
 
       try {
-        const parsed = await parseUrl(entry.rawUrl);
+        const parsed = await runWithProgressRetry({
+          label: "链接解析",
+          attempts: 3,
+          baseDelayMs: 1500,
+          heartbeatIntervalMs: 15_000,
+          formatHeartbeat: ({ attempt, attempts, elapsedMs }) =>
+            `链接解析进行中（${attempt}/${attempts}，已运行 ${Math.round(
+              elapsedMs / 1000
+            )} 秒）...`,
+          isRetriable: isRetriableParseError,
+          onProgress: async (message) => {
+            await updateEntryProcessStatus(entryId, "PARSING", message);
+          },
+          operation: async () =>
+            parseWithLogging(entryId, {
+              type: "WEBPAGE",
+              data: entry.rawUrl!,
+              size: entry.rawUrl!.length,
+            }),
+        });
+
         content = parsed.content;
         title = parsed.title;
         await prisma.entry.update({
@@ -39,20 +218,15 @@ async function asyncProcess(entryId: string) {
           },
         });
       } catch (parseError) {
-        await prisma.entry.update({
-          where: { id: entryId },
-          data: {
-            processStatus: "FAILED",
-            processError: `Content parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-          },
-        });
+        await updateEntryProcessStatus(
+          entryId,
+          "FAILED",
+          `Content parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`
+        );
         return;
       }
     } else if (entry.inputType === "PDF") {
-      await prisma.entry.update({
-        where: { id: entryId },
-        data: { processStatus: "PARSING" },
-      });
+      await updateEntryProcessStatus(entryId, "PARSING", "正在解析文件内容（大文件可能需要更久）...");
 
       try {
         // rawUrl stores the fileKey for uploaded files
@@ -73,113 +247,267 @@ async function asyncProcess(entryId: string) {
           heic: "image/heic",
         };
         const mimeType = mimeMap[ext || ""] || "application/pdf";
+        const parseType: ParseInput["type"] = mimeType.startsWith("image/")
+          ? "IMAGE"
+          : "PDF";
 
-        const parsed = await parseUploadedFile(buffer, mimeType);
+        const parsed = await runWithProgressRetry({
+          label: "文件解析",
+          attempts: 4,
+          baseDelayMs: 3000,
+          heartbeatIntervalMs: 15_000,
+          formatHeartbeat: ({ attempt, attempts, elapsedMs }) =>
+            `文件解析进行中（${attempt}/${attempts}，已运行 ${Math.round(
+              elapsedMs / 1000
+            )} 秒）...`,
+          isRetriable: isRetriableParseError,
+          onProgress: async (message) => {
+            await updateEntryProcessStatus(entryId, "PARSING", message);
+          },
+          operation: async () =>
+            parseWithLogging(entryId, {
+              type: parseType,
+              data: buffer,
+              mimeType,
+              size: buffer.length,
+            }),
+        });
+
         content = parsed.content;
         title = parsed.title;
 
         await prisma.entry.update({
           where: { id: entryId },
-          data: { title, originalContent: content },
+          data: {
+            title,
+            originalContent: content,
+            sourceType: parsed.sourceType as SourceType,
+          },
         });
 
         // Clean up uploaded file
         await unlink(filePath).catch(() => {});
       } catch (parseError) {
+        console.error("PDF parse branch failed:", parseError);
         // Clean up uploaded file even on failure
         const fileKey = entry.rawUrl;
         if (fileKey) {
           const filePath = join(process.cwd(), "public", "uploads", fileKey);
           await unlink(filePath).catch(() => {});
         }
-        await prisma.entry.update({
-          where: { id: entryId },
-          data: {
-            processStatus: "FAILED",
-            processError: `File parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-          },
-        });
+        await updateEntryProcessStatus(
+          entryId,
+          "FAILED",
+          `File parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`
+        );
         return;
       }
     } else if (entry.inputType === "TEXT") {
-      content = entry.rawText || "";
-      title = content.slice(0, 50);
+      await updateEntryProcessStatus(entryId, "PARSING", "正在处理文本内容...");
+      try {
+        const rawText = entry.rawText || "";
+        const parsed = await parseWithLogging(entryId, {
+          type: "TEXT",
+          data: rawText,
+          size: rawText.length,
+        });
+        content = parsed.content;
+        title = parsed.title;
+      } catch (parseError) {
+        await updateEntryProcessStatus(
+          entryId,
+          "FAILED",
+          `Text parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`
+        );
+        return;
+      }
     }
 
     if (!content) {
-      await prisma.entry.update({
-        where: { id: entryId },
-        data: {
-          processStatus: "FAILED",
-          processError: "No content to process",
-        },
-      });
+      await updateEntryProcessStatus(entryId, "FAILED", "No content to process");
       return;
     }
 
-    // Step 2: AI Classification + Extraction (L1 + L2)
-    await prisma.entry.update({
-      where: { id: entryId },
-      data: { processStatus: "AI_PROCESSING" },
-    });
+    // Step 2: AI processing (Agent-first, retry-first)
+    await updateEntryProcessStatus(entryId, "AI_PROCESSING", "正在进行 AI 分析...");
 
-    const aiResult = await classifyAndExtract(content);
+    let decision: NormalizedAgentIngestDecision | null = null;
+    let agentFailureReason = "";
+    const parseInput: ParseResult = {
+      title: title || entry.title || "",
+      content,
+      sourceType: entry.sourceType,
+    };
+
+    try {
+      const agentConfig = await getAgentConfig();
+      const agent = new ReActAgent(agentConfig);
+
+      decision = await runWithProgressRetry({
+        label: "AI分析",
+        attempts: 5,
+        baseDelayMs: 2000,
+        heartbeatIntervalMs: 10_000,
+        formatHeartbeat: ({ attempt, attempts, elapsedMs }) =>
+          `AI分析进行中（${attempt}/${attempts}，已运行 ${Math.round(
+            elapsedMs / 1000
+          )} 秒）...`,
+        isRetriable: isRetriableAgentError,
+        onProgress: async (message) => {
+          await updateEntryProcessStatus(entryId, "AI_PROCESSING", message);
+        },
+        operation: async () => {
+          const trace = await agent.process(entryId, parseInput, {
+            onProgress: async (message) => {
+              await updateEntryProcessStatus(entryId, "AI_PROCESSING", message);
+            },
+          });
+          const normalized = normalizeAgentIngestDecision(trace.finalResult, {
+            contentLength: content.length,
+          });
+          if (!normalized) {
+            throw new Error("Agent output missing required fields");
+          }
+          const { decision } = await validateAndRepairDecision(normalized, {
+            contentLength: content.length,
+            maxEnglishRatio: getMaxDecisionEnglishRatio(),
+            minQualityScore: getMinDecisionQualityScore(),
+            onProgress: async (message) => {
+              await updateEntryProcessStatus(entryId, "AI_PROCESSING", message);
+            },
+          });
+          return decision;
+        },
+      });
+    } catch (agentError) {
+      agentFailureReason =
+        agentError instanceof Error ? agentError.message : String(agentError);
+      console.error("Agent processing error:", agentError);
+    }
+
+    if (!decision) {
+      if (shouldAllowLegacyClassifierFallback()) {
+        await updateEntryProcessStatus(
+          entryId,
+          "AI_PROCESSING",
+          "主流程暂不可用，正在使用兼容模式..."
+        );
+        const fallbackResult = await classifyAndExtract(content);
+        decision = buildDecisionFromClassifier(fallbackResult);
+        const repaired = await validateAndRepairDecision(decision, {
+          contentLength: content.length,
+          maxEnglishRatio: getMaxDecisionEnglishRatio(),
+          minQualityScore: getMinDecisionQualityScore(),
+        }).catch(() => null);
+        if (repaired?.decision) {
+          decision = repaired.decision;
+        }
+        await saveFallbackTrace(
+          entryId,
+          parseInput,
+          agentFailureReason || "Agent retries exhausted",
+          decision
+        ).catch((error) => {
+          console.warn("Failed to persist fallback reasoning trace:", error);
+        });
+      } else {
+        throw new Error("AI processing failed after retries");
+      }
+    }
+
+    const dynamicSummaryEnabled = isDynamicSummaryEnabled();
+    const computedConfidence = decision.confidence ?? buildConfidenceScore(
+      decision.sourceTrust,
+      decision.timeliness,
+      decision.difficulty,
+      0.6
+    );
 
     await prisma.entry.update({
       where: { id: entryId },
       data: {
         title: title || undefined,
-        contentType: aiResult.contentType,
-        techDomain: aiResult.techDomain,
-        aiTags: aiResult.aiTags,
-        coreSummary: aiResult.coreSummary,
-        keyPoints: aiResult.keyPoints,
-        practiceValue: aiResult.practiceValue,
+        contentType: decision.contentType,
+        techDomain: decision.techDomain,
+        aiTags: decision.aiTags,
+        coreSummary: decision.coreSummary,
+        keyPoints: decision.keyPoints,
+        practiceValue: decision.practiceValue,
+        ...(dynamicSummaryEnabled
+          ? {
+              keyPointsNew: decision.keyPointsNew as unknown as Prisma.InputJsonValue,
+              boundaries: decision.boundaries as unknown as Prisma.InputJsonValue,
+              summaryStructure:
+                decision.summaryStructure as unknown as Prisma.InputJsonValue,
+              confidence: computedConfidence,
+              difficulty: decision.difficulty,
+              sourceTrust: decision.sourceTrust,
+              timeliness: decision.timeliness,
+              contentForm: decision.contentForm,
+            }
+          : {}),
       },
     });
 
-    // Step 3: Practice conversion (L3) - only for ACTIONABLE
-    if (aiResult.practiceValue === "ACTIONABLE") {
-      const practiceResult = await convertToPractice(
-        content,
-        aiResult.coreSummary
-      );
+    // Step 3: Practice conversion (L3) - actionable only
+    if (decision.practiceValue === "ACTIONABLE") {
+      let practiceTask: NormalizedPracticeTask | null = decision.practiceTask;
 
-      await prisma.practiceTask.create({
-        data: {
-          entryId,
-          title: practiceResult.title,
-          summary: practiceResult.summary,
-          difficulty: practiceResult.difficulty,
-          estimatedTime: practiceResult.estimatedTime,
-          prerequisites: practiceResult.prerequisites,
-          steps: {
-            create: practiceResult.steps.map((step) => ({
-              order: step.order,
-              title: step.title,
-              description: step.description,
-            })),
+      if (!practiceTask) {
+        const practiceResult = await convertToPractice(
+          content,
+          decision.coreSummary
+        );
+        practiceTask = normalizePracticeTaskFromLegacyResult(
+          practiceResult,
+          decision.coreSummary
+        );
+      }
+
+      if (practiceTask) {
+        await prisma.practiceTask.upsert({
+          where: { entryId },
+          update: {
+            title: practiceTask.title,
+            summary: practiceTask.summary,
+            difficulty: practiceTask.difficulty,
+            estimatedTime: practiceTask.estimatedTime,
+            prerequisites: practiceTask.prerequisites,
+            steps: {
+              deleteMany: {},
+              create: practiceTask.steps,
+            },
           },
-        },
-      });
+          create: {
+            entryId,
+            title: practiceTask.title,
+            summary: practiceTask.summary,
+            difficulty: practiceTask.difficulty,
+            estimatedTime: practiceTask.estimatedTime,
+            prerequisites: practiceTask.prerequisites,
+            steps: {
+              create: practiceTask.steps,
+            },
+          },
+        });
+      } else {
+        console.warn("No valid practice task produced for actionable content");
+      }
     }
 
     // Mark as done
-    await prisma.entry.update({
-      where: { id: entryId },
-      data: { processStatus: "DONE" },
-    });
+    await updateEntryProcessStatus(entryId, "DONE", null);
   } catch (error) {
     console.error("Async processing error:", error);
-    await prisma.entry.update({
-      where: { id: entryId },
-      data: {
-        processStatus: "FAILED",
-        processError: error instanceof Error ? error.message : String(error),
-      },
-    }).catch(() => {});
+    await updateEntryProcessStatus(
+      entryId,
+      "FAILED",
+      error instanceof Error ? error.message : String(error)
+    ).catch(() => {});
   }
 }
+
+initializeIngestQueue(asyncProcess);
 
 export async function POST(request: NextRequest) {
   try {
@@ -222,6 +550,7 @@ export async function POST(request: NextRequest) {
         rawText: inputType === "TEXT" ? text : null,
         sourceType,
         processStatus: "PENDING",
+        processError: "任务已提交，等待处理...",
       },
     });
 
@@ -237,8 +566,11 @@ export async function POST(request: NextRequest) {
       similarEntries = await findSimilarEntries(text, 0.5);
     }
 
-    // Trigger async processing (fire and forget)
-    void asyncProcess(entry.id);
+    // Extract config from request body
+    const config = body.config || {};
+
+    // Trigger async processing via ingest queue
+    enqueueIngestTask(entry.id, config, "submit");
 
     return NextResponse.json({
       entryId: entry.id,
