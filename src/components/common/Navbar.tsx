@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Zap, Settings } from "lucide-react";
+import { LayoutDashboard, BookOpen, Zap, Settings } from "lucide-react";
 
 const navItems = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/library", label: "Knowledge Base", icon: BookOpen },
   { href: "/practice", label: "Practice", icon: Zap },
   { href: "/settings", label: "Settings", icon: Settings },
@@ -17,7 +18,7 @@ export function Navbar() {
     <nav className="sticky top-0 z-50 bg-card border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
-          <Link href="/library" className="flex items-center gap-2 font-semibold text-lg">
+          <Link href="/dashboard" className="flex items-center gap-2 font-semibold text-lg">
             <span className="text-primary">AI</span>
             <span>Practice Hub</span>
           </Link>
