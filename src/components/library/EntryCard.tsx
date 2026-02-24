@@ -65,6 +65,7 @@ interface EntryCardProps {
     title?: string | null;
     sourceType: string;
     processStatus: string;
+    processError?: string | null;
     contentType?: string | null;
     techDomain?: string | null;
     coreSummary?: string | null;
@@ -74,10 +75,23 @@ interface EntryCardProps {
     createdAt: string;
   };
   onClick: (id: string) => void;
+  showSelection?: boolean;
+  selected?: boolean;
+  onSelectChange?: (id: string, checked: boolean) => void;
 }
 
-export function EntryCard({ entry, onClick }: EntryCardProps) {
+export function EntryCard({
+  entry,
+  onClick,
+  showSelection = false,
+  selected = false,
+  onSelectChange,
+}: EntryCardProps) {
   const SourceIcon = sourceIconMap[entry.sourceType] || Globe;
+  const isProcessingStatus =
+    entry.processStatus === "PENDING" ||
+    entry.processStatus === "PARSING" ||
+    entry.processStatus === "AI_PROCESSING";
 
   return (
     <div
@@ -87,6 +101,16 @@ export function EntryCard({ entry, onClick }: EntryCardProps) {
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
+          {showSelection && (
+            <input
+              type="checkbox"
+              checked={selected}
+              aria-label={`Select entry ${entry.title || entry.id}`}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => onSelectChange?.(entry.id, e.target.checked)}
+            />
+          )}
           <SourceIcon size={16} className="text-secondary shrink-0" />
           <h3 className="text-sm font-medium truncate">
             {entry.title || "Untitled"}
@@ -101,6 +125,12 @@ export function EntryCard({ entry, onClick }: EntryCardProps) {
       {entry.coreSummary && (
         <p className="text-xs text-secondary mb-3 line-clamp-2">
           {entry.coreSummary}
+        </p>
+      )}
+
+      {isProcessingStatus && entry.processError && (
+        <p className="text-xs text-secondary mb-3 line-clamp-2">
+          {entry.processError}
         </p>
       )}
 

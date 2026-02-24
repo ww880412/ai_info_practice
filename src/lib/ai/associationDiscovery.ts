@@ -68,7 +68,7 @@ export async function findRelatedEntries(
 
   try {
     const result = await generateJSON<{ relatedEntries: RelatedEntry[] }>(prompt);
-    return result.relatedEntries || [];
+    return (result.relatedEntries || []).slice(0, limit);
   } catch (error) {
     console.error("Association discovery error:", error);
     return [];

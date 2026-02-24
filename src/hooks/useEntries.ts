@@ -10,10 +10,28 @@ interface UseEntriesParams {
   techDomain?: string;
   practiceValue?: string;
   sourceType?: string;
+  aiTagsAll?: string[];
+  aiTagsAny?: string[];
+  userTagsAll?: string[];
+  userTagsAny?: string[];
+  sort?: "createdAt" | "updatedAt" | "confidence" | "practiceValue" | "difficulty" | "smart";
 }
 
 export function useEntries(params: UseEntriesParams = {}) {
-  const { page = 1, pageSize = 20, q, contentType, techDomain, practiceValue, sourceType } = params;
+  const {
+    page = 1,
+    pageSize = 20,
+    q,
+    contentType,
+    techDomain,
+    practiceValue,
+    sourceType,
+    aiTagsAll,
+    aiTagsAny,
+    userTagsAll,
+    userTagsAny,
+    sort,
+  } = params;
 
   return useQuery({
     queryKey: ["entries", params],
@@ -26,6 +44,11 @@ export function useEntries(params: UseEntriesParams = {}) {
       if (techDomain) searchParams.set("techDomain", techDomain);
       if (practiceValue) searchParams.set("practiceValue", practiceValue);
       if (sourceType) searchParams.set("sourceType", sourceType);
+      if (aiTagsAll && aiTagsAll.length > 0) searchParams.set("aiTagsAll", aiTagsAll.join(","));
+      if (aiTagsAny && aiTagsAny.length > 0) searchParams.set("aiTagsAny", aiTagsAny.join(","));
+      if (userTagsAll && userTagsAll.length > 0) searchParams.set("userTagsAll", userTagsAll.join(","));
+      if (userTagsAny && userTagsAny.length > 0) searchParams.set("userTagsAny", userTagsAny.join(","));
+      if (sort) searchParams.set("sort", sort);
 
       const res = await fetch(`/api/entries?${searchParams}`);
       if (!res.ok) throw new Error("Failed to fetch entries");

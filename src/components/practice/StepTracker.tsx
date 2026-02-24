@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Circle, Clock, SkipForward, Play, MessageSquare } from "lucide-react";
+import { CheckCircle2, Circle, SkipForward, Play, MessageSquare } from "lucide-react";
 import { useState } from "react";
 
 interface Step {
@@ -15,10 +15,9 @@ interface Step {
 
 interface StepTrackerProps {
   steps: Step[];
-  taskId: string;
 }
 
-export function StepTracker({ steps, taskId }: StepTrackerProps) {
+export function StepTracker({ steps }: StepTrackerProps) {
   const queryClient = useQueryClient();
   const [expandedStep, setExpandedStep] = useState<string | null>(null);
   const [noteInput, setNoteInput] = useState("");

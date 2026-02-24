@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useEntry } from "@/hooks/useEntries";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { StepTracker } from "@/components/practice/StepTracker";
+import { ReasoningTraceView } from "@/components/agent/ReasoningTraceView";
+import { DynamicSummary } from "@/components/entry/DynamicSummary";
 import {
   ArrowLeft,
   ExternalLink,
@@ -17,7 +19,7 @@ import {
   MessageCircle,
   Twitter,
   Sparkles,
-  Edit2,
+  Brain,
 } from "lucide-react";
 
 const sourceIconMap: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
@@ -116,19 +118,15 @@ export default function EntryDetailPage() {
     },
   });
 
-  const updateSmartSummary = useMutation({
-    mutationFn: async (data: { keyInsights?: string[]; smartSummary?: string; tldr?: string }) => {
-      const res = await fetch(`/api/entries/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Update failed");
+  // Fetch reasoning trace
+  const { data: traceData, isLoading: traceLoading } = useQuery({
+    queryKey: ["entryTrace", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/entries/${id}/trace`);
+      if (!res.ok) return null;
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["entry", id] });
-    },
+    enabled: !!id && entry?.processStatus === "DONE",
   });
 
   if (isLoading) {
@@ -186,7 +184,11 @@ export default function EntryDetailPage() {
           <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
             <Loader2 size={16} className="animate-spin text-primary" />
             <span className="text-sm">
-              {entry.processStatus === "PARSING" ? "Parsing content..." : "AI analyzing..."}
+              {entry.processError?.trim()
+                ? entry.processError
+                : entry.processStatus === "PARSING"
+                  ? "Parsing content..."
+                  : "AI analyzing..."}
             </span>
           </div>
         )}
@@ -248,6 +250,20 @@ export default function EntryDetailPage() {
             </div>
           )}
 
+          {/* Dynamic Summary - 优先展示 */}
+          {(entry.summaryStructure || entry.keyPointsNew || entry.boundaries || entry.confidence) && (
+            <div className="border border-border rounded-lg p-4 space-y-3">
+              <p className="text-xs font-medium text-secondary">Dynamic Summary</p>
+              <DynamicSummary
+                summaryStructure={entry.summaryStructure}
+                keyPoints={entry.keyPointsNew}
+                boundaries={entry.boundaries}
+                difficulty={entry.difficulty}
+                confidence={entry.confidence}
+              />
+            </div>
+          )}
+
           {/* AI Tags */}
           {entry.aiTags?.length > 0 && (
             <div>
@@ -286,7 +302,7 @@ export default function EntryDetailPage() {
                 </div>
               )}
 
-              <StepTracker steps={entry.practiceTask.steps} taskId={entry.practiceTask.id} />
+              <StepTracker steps={entry.practiceTask.steps} />
             </div>
           )}
 
@@ -344,7 +360,7 @@ export default function EntryDetailPage() {
 
             {!entry.smartSummary && !generateSmartSummary.isPending && (
               <p className="text-xs text-secondary">
-                Click "Generate" to create a smart summary with key insights.
+                Click &quot;Generate&quot; to create a smart summary with key insights.
               </p>
             )}
           </div>
@@ -406,6 +422,33 @@ export default function EntryDetailPage() {
               )
             )}
           </div>
+        </div>
+      )}
+
+      {/* Reasoning Trace */}
+      {entry.processStatus === "DONE" && (
+        <div className="border border-border rounded-lg p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Brain size={16} className="text-primary" />
+            <h3 className="text-sm font-semibold">AI Processing Trace</h3>
+          </div>
+
+          {traceLoading && (
+            <div className="flex items-center gap-2 text-sm text-secondary">
+              <Loader2 size={14} className="animate-spin" />
+              Loading reasoning trace...
+            </div>
+          )}
+
+          {traceData?.steps && traceData.steps.length > 0 ? (
+            <ReasoningTraceView steps={traceData.steps} />
+          ) : (
+            !traceLoading && (
+              <p className="text-xs text-secondary">
+                No reasoning trace available yet.
+              </p>
+            )
+          )}
         </div>
       )}
 

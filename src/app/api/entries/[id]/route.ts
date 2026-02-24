@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { deleteEntryWithDependencies } from "@/lib/entries/delete";
 
 /**
  * GET /api/entries/[id] - Get entry detail.
@@ -89,7 +90,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    await prisma.entry.delete({ where: { id } });
+    await deleteEntryWithDependencies(id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Delete entry error:", error);
