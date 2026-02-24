@@ -6,9 +6,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEntries } from "@/hooks/useEntries";
 import { EntryCard } from "@/components/library/EntryCard";
 import { EntryFilters } from "@/components/library/EntryFilters";
-import { TagSidebar } from "@/components/library/TagSidebar";
 import { IngestDialog } from "@/components/ingest/IngestDialog";
-import { Plus, Trash2, Menu, X } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 // Skeleton component for loading state
 function EntryCardSkeleton() {
@@ -38,17 +37,12 @@ export default function LibraryPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [ingestOpen, setIngestOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
   const [contentType, setContentType] = useState("");
   const [techDomain, setTechDomain] = useState("");
   const [practiceValue, setPracticeValue] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
-  // Tag filter states
-  const [selectedAiTags, setSelectedAiTags] = useState<string[]>([]);
-  const [selectedUserTags, setSelectedUserTags] = useState<string[]>([]);
 
   // Debounce search
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -67,10 +61,6 @@ export default function LibraryPage() {
     contentType: contentType || undefined,
     techDomain: techDomain || undefined,
     practiceValue: practiceValue || undefined,
-    aiTagsAll: selectedAiTags.length > 0 ? selectedAiTags : undefined,
-    aiTagsAny: selectedAiTags.length > 0 ? selectedAiTags : undefined,
-    userTagsAll: selectedUserTags.length > 0 ? selectedUserTags : undefined,
-    userTagsAny: selectedUserTags.length > 0 ? selectedUserTags : undefined,
   });
 
   const entries: EntryCardEntry[] = (data?.data as EntryCardEntry[]) || [];
@@ -135,20 +125,11 @@ export default function LibraryPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {/* Mobile sidebar toggle */}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden p-2 rounded-lg border border-border hover:bg-accent transition-colors"
-          >
-            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold">Knowledge Base</h1>
-            <p className="text-sm text-secondary mt-1">
-              {total} entries collected
-            </p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold">Knowledge Base</h1>
+          <p className="text-sm text-secondary mt-1">
+            {total} entries collected
+          </p>
         </div>
         <button
           onClick={() => setIngestOpen(true)}
@@ -159,105 +140,62 @@ export default function LibraryPage() {
         </button>
       </div>
 
-      {/* Main content with sidebar */}
-      <div className="flex gap-6">
-        {/* Sidebar - Desktop */}
-        <aside className="hidden lg:block w-64 flex-shrink-0">
-          <div className="sticky top-6 rounded-lg border border-border bg-card p-4">
-            <TagSidebar
-              selectedAiTags={selectedAiTags}
-              selectedUserTags={selectedUserTags}
-              onAiTagsChange={(tags) => { setSelectedAiTags(tags); setPage(1); setSelectedIds([]); }}
-              onUserTagsChange={(tags) => { setSelectedUserTags(tags); setPage(1); setSelectedIds([]); }}
+      {/* Filters */}
+      <EntryFilters
+        q={q}
+        onQChange={(v) => { setQ(v); setPage(1); setSelectedIds([]); }}
+        contentType={contentType}
+        onContentTypeChange={(v) => { setContentType(v); setPage(1); setSelectedIds([]); }}
+        techDomain={techDomain}
+        onTechDomainChange={(v) => { setTechDomain(v); setPage(1); setSelectedIds([]); }}
+        practiceValue={practiceValue}
+        onPracticeValueChange={(v) => { setPracticeValue(v); setPage(1); setSelectedIds([]); }}
+      />
+
+      {/* Batch actions */}
+      {entries.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
+          <label className="inline-flex items-center gap-2 text-sm text-secondary">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
+              disabled={batchDeleteEntries.isPending}
+              className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
             />
+            Select all on this page
+          </label>
+
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-secondary">{selectedCount} selected</span>
+            <button
+              onClick={handleBatchDelete}
+              disabled={selectedCount === 0 || batchDeleteEntries.isPending}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-950/20"
+            >
+              <Trash2 size={14} />
+              {batchDeleteEntries.isPending ? "Deleting..." : "Delete selected"}
+            </button>
           </div>
-        </aside>
+        </div>
+      )}
 
-        {/* Sidebar - Mobile Drawer */}
-        {sidebarOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden">
-            <div
-              className="absolute inset-0 bg-black/50"
-              onClick={() => setSidebarOpen(false)}
-            />
-            <div className="absolute left-0 top-0 bottom-0 w-72 bg-card border-r border-border p-4 overflow-y-auto">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-medium">Filters</h2>
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  className="p-1 hover:bg-accent rounded"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              <TagSidebar
-                selectedAiTags={selectedAiTags}
-                selectedUserTags={selectedUserTags}
-                onAiTagsChange={(tags) => { setSelectedAiTags(tags); setPage(1); setSelectedIds([]); }}
-                onUserTagsChange={(tags) => { setSelectedUserTags(tags); setPage(1); setSelectedIds([]); }}
-              />
-            </div>
-          </div>
-        )}
+      {batchDeleteEntries.error && (
+        <p className="text-sm text-danger">
+          {batchDeleteEntries.error instanceof Error
+            ? batchDeleteEntries.error.message
+            : "Failed to batch delete entries"}
+        </p>
+      )}
 
-        {/* Main area */}
-        <div className="flex-1 space-y-6 min-w-0">
-          {/* Filters */}
-          <EntryFilters
-            q={q}
-            onQChange={(v) => { setQ(v); setPage(1); setSelectedIds([]); }}
-            contentType={contentType}
-            onContentTypeChange={(v) => { setContentType(v); setPage(1); setSelectedIds([]); }}
-            techDomain={techDomain}
-            onTechDomainChange={(v) => { setTechDomain(v); setPage(1); setSelectedIds([]); }}
-            practiceValue={practiceValue}
-            onPracticeValueChange={(v) => { setPracticeValue(v); setPage(1); setSelectedIds([]); }}
-          />
-
-          {/* Batch actions */}
-          {entries.length > 0 && (
-            <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
-              <label className="inline-flex items-center gap-2 text-sm text-secondary">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
-                  disabled={batchDeleteEntries.isPending}
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                />
-                Select all on this page
-              </label>
-
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-secondary">{selectedCount} selected</span>
-                <button
-                  onClick={handleBatchDelete}
-                  disabled={selectedCount === 0 || batchDeleteEntries.isPending}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-950/20"
-                >
-                  <Trash2 size={14} />
-                  {batchDeleteEntries.isPending ? "Deleting..." : "Delete selected"}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {batchDeleteEntries.error && (
-            <p className="text-sm text-danger">
-              {batchDeleteEntries.error instanceof Error
-                ? batchDeleteEntries.error.message
-                : "Failed to batch delete entries"}
-            </p>
-          )}
-
-          {/* Entries grid */}
-          {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[...Array(6)].map((_, i) => (
-                <EntryCardSkeleton key={i} />
-              ))}
-            </div>
-          ) : entries.length === 0 ? (
+      {/* Entries grid */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <EntryCardSkeleton key={i} />
+          ))}
+        </div>
+      ) : entries.length === 0 ? (
         <div className="text-center py-20">
           <p className="text-secondary">No entries yet</p>
           <button
@@ -311,10 +249,8 @@ export default function LibraryPage() {
         </div>
       )}
 
-          {/* Ingest Dialog */}
-          <IngestDialog open={ingestOpen} onClose={() => setIngestOpen(false)} />
-        </div>
-      </div>
+      {/* Ingest Dialog */}
+      <IngestDialog open={ingestOpen} onClose={() => setIngestOpen(false)} />
     </div>
   );
 }
