@@ -2,6 +2,7 @@ import type { AgentConfig, ReasoningStep, ReasoningTrace } from "./types";
 import type { ParseResult } from "../../parser/index";
 import { generateJSON, getGeminiModel } from "../../gemini";
 import { prisma } from "../../prisma";
+import { stringifyObservation } from "../../trace/observation";
 
 interface ParsedAction {
   action: string;
@@ -62,13 +63,6 @@ function toObject(value: unknown): Record<string, unknown> | null {
   }
 
   return null;
-}
-
-function summarizeObservation(value: unknown, limit = 1000): string {
-  const serialized = JSON.stringify(value);
-  if (!serialized) return "{}";
-  if (serialized.length <= limit) return serialized;
-  return `${serialized.slice(0, limit)}...`;
 }
 
 function normalizeStep1Payload(payload: Record<string, unknown>): Record<string, unknown> {
@@ -225,7 +219,7 @@ export class ReActAgent {
       timestamp: new Date().toISOString(),
       thought: toNonEmptyString((step1.summaryStructure as Record<string, unknown> | undefined)?.reasoning) || "完成结构推理",
       action: "ANALYZE_STRUCTURE",
-      observation: summarizeObservation(step1),
+      observation: stringifyObservation(step1),
       reasoning: "执行 Step 1：提取内容类型、结构类型、关键要点与边界。",
       context: {
         stage: "step1",
@@ -243,7 +237,7 @@ export class ReActAgent {
       timestamp: new Date().toISOString(),
       thought: "根据结构完成知识提取",
       action: "EXTRACT_KNOWLEDGE",
-      observation: summarizeObservation(step2),
+      observation: stringifyObservation(step2),
       reasoning: "执行 Step 2：结合 Step 1 的结构与边界生成最终知识结果。",
       context: {
         stage: "step2",

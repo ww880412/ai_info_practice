@@ -4,12 +4,22 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEntries } from "@/hooks/useEntries";
+import { useAddEntriesToGroup, useGroups } from "@/hooks/useGroups";
+import { getGroupImportState } from "@/lib/library/group-import";
+import { flattenGroupOptions } from "@/lib/library/group-options";
 import { EntryCard } from "@/components/library/EntryCard";
 import { EntryFilters } from "@/components/library/EntryFilters";
 import GroupSidebar from "@/components/library/GroupSidebar";
 import { TagSidebar } from "@/components/library/TagSidebar";
 import { IngestDialog } from "@/components/ingest/IngestDialog";
-import { ChevronDown, ChevronRight, Plus, SlidersHorizontal, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  LayoutPanelLeft,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 
 function parseTagParam(value: string | null): string[] {
   if (!value) return [];
@@ -19,7 +29,6 @@ function parseTagParam(value: string | null): string[] {
     .filter(Boolean);
 }
 
-// Skeleton component for loading state
 function EntryCardSkeleton() {
   return (
     <div className="bg-card border border-border rounded-lg p-4 animate-pulse">
@@ -43,6 +52,32 @@ function EntryCardSkeleton() {
   );
 }
 
+function ActiveFilterChip({
+  label,
+  onRemove,
+  tone = "neutral",
+}: {
+  label: string;
+  onRemove: () => void;
+  tone?: "primary" | "neutral";
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onRemove}
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs transition-colors ${
+        tone === "primary"
+          ? "bg-primary/10 text-primary hover:bg-primary/20"
+          : "bg-accent text-secondary hover:bg-accent/80"
+      }`}
+      title={`Remove filter: ${label}`}
+    >
+      <span>{label}</span>
+      <X size={12} />
+    </button>
+  );
+}
+
 export default function LibraryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -53,7 +88,10 @@ export default function LibraryPage() {
   const [contentType, setContentType] = useState("");
   const [techDomain, setTechDomain] = useState("");
   const [practiceValue, setPracticeValue] = useState("");
-  const [tagFiltersExpanded, setTagFiltersExpanded] = useState(false);
+  const [isPanelStackVisible, setIsPanelStackVisible] = useState(false);
+  const [groupsExpanded, setGroupsExpanded] = useState(true);
+  const [tagsExpanded, setTagsExpanded] = useState(true);
+  const [targetGroupId, setTargetGroupId] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const selectedGroupId = searchParams.get("groupId");
@@ -66,7 +104,9 @@ export default function LibraryPage() {
     [searchParams]
   );
 
-  // Debounce search
+  const selectedTagCount = selectedAiTags.length + selectedUserTags.length;
+  const shouldShowPanelStack = isPanelStackVisible || Boolean(selectedGroupId) || selectedTagCount > 0;
+
   const [debouncedQ, setDebouncedQ] = useState("");
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
@@ -95,6 +135,10 @@ export default function LibraryPage() {
   const selectedIdsOnPage = selectedIds.filter((id) => entryIds.includes(id));
   const selectedCount = selectedIdsOnPage.length;
   const allSelected = entryIds.length > 0 && selectedCount === entryIds.length;
+  const { data: groups } = useGroups();
+  const groupOptions = useMemo(() => flattenGroupOptions(groups ?? []), [groups]);
+  const addEntriesToGroup = useAddEntriesToGroup();
+  const groupImportState = getGroupImportState(targetGroupId || null, selectedCount);
 
   const batchDeleteEntries = useMutation({
     mutationFn: async (ids: string[]) => {
@@ -118,6 +162,14 @@ export default function LibraryPage() {
       queryClient.invalidateQueries({ queryKey: ["practice"] });
     },
   });
+
+  const applyQueryParams = (mutator: (params: URLSearchParams) => void) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    mutator(nextParams);
+    router.replace(nextParams.toString() ? `/library?${nextParams.toString()}` : "/library");
+    setPage(1);
+    setSelectedIds([]);
+  };
 
   const toggleSelectAllOnPage = (checked: boolean) => {
     if (checked) {
@@ -146,44 +198,50 @@ export default function LibraryPage() {
     batchDeleteEntries.mutate([...selectedIdsOnPage]);
   };
 
+  const handleImportToGroup = () => {
+    if (!targetGroupId || selectedCount === 0 || addEntriesToGroup.isPending) return;
+    addEntriesToGroup.mutate(
+      {
+        groupId: targetGroupId,
+        entryIds: [...selectedIdsOnPage],
+      },
+      {
+        onSuccess: () => {
+          setSelectedIds([]);
+          queryClient.invalidateQueries({ queryKey: ["entries"] });
+          queryClient.invalidateQueries({ queryKey: ["groups"] });
+        },
+      }
+    );
+  };
+
   const handleAiTagsChange = (tags: string[]) => {
-    const nextParams = new URLSearchParams(searchParams.toString());
-    if (tags.length > 0) nextParams.set("aiTagsAny", tags.join(","));
-    else nextParams.delete("aiTagsAny");
-    router.replace(nextParams.toString() ? `/library?${nextParams.toString()}` : "/library");
-    setPage(1);
-    setSelectedIds([]);
+    applyQueryParams((nextParams) => {
+      if (tags.length > 0) nextParams.set("aiTagsAny", tags.join(","));
+      else nextParams.delete("aiTagsAny");
+    });
   };
 
   const handleUserTagsChange = (tags: string[]) => {
-    const nextParams = new URLSearchParams(searchParams.toString());
-    if (tags.length > 0) nextParams.set("userTagsAny", tags.join(","));
-    else nextParams.delete("userTagsAny");
-    router.replace(nextParams.toString() ? `/library?${nextParams.toString()}` : "/library");
-    setPage(1);
-    setSelectedIds([]);
+    applyQueryParams((nextParams) => {
+      if (tags.length > 0) nextParams.set("userTagsAny", tags.join(","));
+      else nextParams.delete("userTagsAny");
+    });
   };
 
   const handleGroupSelect = (groupId: string | null) => {
-    const nextParams = new URLSearchParams(searchParams.toString());
-    if (groupId) nextParams.set("groupId", groupId);
-    else nextParams.delete("groupId");
-    router.replace(nextParams.toString() ? `/library?${nextParams.toString()}` : "/library");
-    setPage(1);
-    setSelectedIds([]);
+    applyQueryParams((nextParams) => {
+      if (groupId) nextParams.set("groupId", groupId);
+      else nextParams.delete("groupId");
+    });
   };
 
-  const selectedTagCount = selectedAiTags.length + selectedUserTags.length;
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Knowledge Base</h1>
-          <p className="text-sm text-secondary mt-1">
-            {total} entries collected
-          </p>
+          <p className="text-sm text-secondary mt-1">{total} entries collected</p>
         </div>
         <button
           onClick={() => setIngestOpen(true)}
@@ -194,93 +252,151 @@ export default function LibraryPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[260px_minmax(0,1fr)] gap-6">
-        <aside className="space-y-3">
-          <div className="rounded-lg border border-border bg-card p-3">
-            <GroupSidebar
-              selectedGroupId={selectedGroupId}
-              onGroupSelect={handleGroupSelect}
-            />
+      <div className="rounded-xl border border-border bg-card p-3 sm:p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-secondary">Search first, then narrow with groups and tags.</p>
+          <button
+            type="button"
+            onClick={() => setIsPanelStackVisible((prev) => !prev)}
+            className="xl:hidden inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-secondary hover:bg-accent"
+            aria-expanded={shouldShowPanelStack}
+          >
+            <LayoutPanelLeft size={14} />
+            {shouldShowPanelStack ? "Hide Panels" : "Show Panels"}
+          </button>
+        </div>
+
+        <EntryFilters
+          q={q}
+          onQChange={(v) => {
+            setQ(v);
+            setPage(1);
+            setSelectedIds([]);
+          }}
+          contentType={contentType}
+          onContentTypeChange={(v) => {
+            setContentType(v);
+            setPage(1);
+            setSelectedIds([]);
+          }}
+          techDomain={techDomain}
+          onTechDomainChange={(v) => {
+            setTechDomain(v);
+            setPage(1);
+            setSelectedIds([]);
+          }}
+          practiceValue={practiceValue}
+          onPracticeValueChange={(v) => {
+            setPracticeValue(v);
+            setPage(1);
+            setSelectedIds([]);
+          }}
+        />
+
+        {(selectedGroupId || selectedTagCount > 0) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedGroupId && (
+              <ActiveFilterChip
+                label="Group filter"
+                tone="primary"
+                onRemove={() => handleGroupSelect(null)}
+              />
+            )}
+
+            {selectedAiTags.map((tag) => (
+              <ActiveFilterChip
+                key={`active-ai-${tag}`}
+                label={`AI: ${tag}`}
+                tone="primary"
+                onRemove={() => handleAiTagsChange(selectedAiTags.filter((item) => item !== tag))}
+              />
+            ))}
+
+            {selectedUserTags.map((tag) => (
+              <ActiveFilterChip
+                key={`active-user-${tag}`}
+                label={`User: ${tag}`}
+                onRemove={() => handleUserTagsChange(selectedUserTags.filter((item) => item !== tag))}
+              />
+            ))}
+
+            {selectedTagCount > 1 && (
+              <button
+                type="button"
+                onClick={() => {
+                  applyQueryParams((nextParams) => {
+                    nextParams.delete("aiTagsAny");
+                    nextParams.delete("userTagsAny");
+                  });
+                }}
+                className="ml-auto text-xs text-secondary hover:text-primary"
+              >
+                Clear tag filters
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[290px_minmax(0,1fr)] gap-5 items-start">
+        <aside
+          className={`${shouldShowPanelStack ? "block" : "hidden"} xl:block space-y-3 xl:sticky xl:top-24`}
+        >
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setGroupsExpanded((open) => !open)}
+              className="w-full px-3 py-2.5 flex items-center justify-between text-sm font-medium hover:bg-accent/40 transition-colors"
+              aria-expanded={groupsExpanded}
+            >
+              <span className="inline-flex items-center gap-2">Groups</span>
+              <span className="inline-flex items-center gap-1 text-secondary">
+                {selectedGroupId && (
+                  <span className="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] text-primary leading-none">
+                    1
+                  </span>
+                )}
+                {groupsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </span>
+            </button>
+            {groupsExpanded && (
+              <div className="border-t border-border p-3">
+                <GroupSidebar selectedGroupId={selectedGroupId} onGroupSelect={handleGroupSelect} />
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-border bg-card overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setTagsExpanded((open) => !open)}
+              className="w-full px-3 py-2.5 flex items-center justify-between text-sm font-medium hover:bg-accent/40 transition-colors"
+              aria-expanded={tagsExpanded}
+            >
+              <span className="inline-flex items-center gap-2">Tag Intelligence</span>
+              <span className="inline-flex items-center gap-1 text-secondary">
+                {selectedTagCount > 0 && (
+                  <span className="inline-flex items-center rounded-full bg-accent px-1.5 py-0.5 text-[11px] leading-none">
+                    {selectedTagCount}
+                  </span>
+                )}
+                {tagsExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </span>
+            </button>
+            {tagsExpanded && (
+              <div className="border-t border-border p-3">
+                <TagSidebar
+                  selectedAiTags={selectedAiTags}
+                  selectedUserTags={selectedUserTags}
+                  onAiTagsChange={handleAiTagsChange}
+                  onUserTagsChange={handleUserTagsChange}
+                />
+              </div>
+            )}
           </div>
         </aside>
 
-        <section className="space-y-4">
-          {/* Filters */}
-          <div className="space-y-3">
-            <EntryFilters
-              q={q}
-              onQChange={(v) => { setQ(v); setPage(1); setSelectedIds([]); }}
-              contentType={contentType}
-              onContentTypeChange={(v) => { setContentType(v); setPage(1); setSelectedIds([]); }}
-              techDomain={techDomain}
-              onTechDomainChange={(v) => { setTechDomain(v); setPage(1); setSelectedIds([]); }}
-              practiceValue={practiceValue}
-              onPracticeValueChange={(v) => { setPracticeValue(v); setPage(1); setSelectedIds([]); }}
-            />
-
-            {(selectedGroupId || selectedTagCount > 0) && (
-              <div className="flex flex-wrap items-center gap-2">
-                {selectedGroupId && (
-                  <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                    Group Filter Active
-                  </span>
-                )}
-                {selectedTagCount > 0 && (
-                  <span className="inline-flex items-center rounded-full bg-accent px-2 py-0.5 text-xs text-secondary">
-                    {selectedTagCount} Tag Filter{selectedTagCount > 1 ? "s" : ""}
-                  </span>
-                )}
-              </div>
-            )}
-
-            <div className="rounded-lg border border-border bg-card">
-              <button
-                type="button"
-                onClick={() => setTagFiltersExpanded((open) => !open)}
-                className="w-full px-3 py-2.5 flex items-center justify-between text-sm font-medium hover:bg-accent/40 transition-colors rounded-lg"
-              >
-                <span className="inline-flex items-center gap-2 text-foreground">
-                  <SlidersHorizontal size={14} />
-                  Advanced Tag Filters
-                </span>
-                <span className="inline-flex items-center gap-2 text-secondary">
-                  {selectedTagCount > 0 && (
-                    <span className="inline-flex items-center rounded-full bg-accent px-1.5 py-0.5 text-[11px] leading-none">
-                      {selectedTagCount}
-                    </span>
-                  )}
-                  {tagFiltersExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                </span>
-              </button>
-
-              {tagFiltersExpanded && (
-                <div className="border-t border-border px-3 py-3">
-                  {(selectedAiTags.length > 0 || selectedUserTags.length > 0) && (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {selectedAiTags.map((tag) => (
-                        <span key={`selected-ai-${tag}`} className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                          {tag}
-                        </span>
-                      ))}
-                      {selectedUserTags.map((tag) => (
-                        <span key={`selected-user-${tag}`} className="inline-flex items-center rounded-full bg-accent px-2 py-0.5 text-xs text-secondary">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <TagSidebar
-                    selectedAiTags={selectedAiTags}
-                    selectedUserTags={selectedUserTags}
-                    onAiTagsChange={handleAiTagsChange}
-                    onUserTagsChange={handleUserTagsChange}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Batch actions */}
+        <section className="space-y-4 min-w-0">
           {entries.length > 0 && (
             <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
               <label className="inline-flex items-center gap-2 text-sm text-secondary">
@@ -296,6 +412,27 @@ export default function LibraryPage() {
 
               <div className="flex items-center gap-3">
                 <span className="text-sm text-secondary">{selectedCount} selected</span>
+                <select
+                  value={targetGroupId}
+                  onChange={(e) => setTargetGroupId(e.target.value)}
+                  className="h-8 min-w-[170px] rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  aria-label="Select target group"
+                >
+                  <option value="">Target group...</option>
+                  {groupOptions.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleImportToGroup}
+                  disabled={!groupImportState.canImport || addEntriesToGroup.isPending}
+                  title={groupImportState.reason}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-1.5 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-900/40 dark:text-blue-300 dark:hover:bg-blue-950/20"
+                >
+                  {addEntriesToGroup.isPending ? "Importing..." : "Import to selected group"}
+                </button>
                 <button
                   onClick={handleBatchDelete}
                   disabled={selectedCount === 0 || batchDeleteEntries.isPending}
@@ -315,8 +452,14 @@ export default function LibraryPage() {
                 : "Failed to batch delete entries"}
             </p>
           )}
+          {addEntriesToGroup.error && (
+            <p className="text-sm text-danger">
+              {addEntriesToGroup.error instanceof Error
+                ? addEntriesToGroup.error.message
+                : "Failed to import entries to group"}
+            </p>
+          )}
 
-          {/* Entries grid */}
           {isLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {[...Array(6)].map((_, i) => (
@@ -324,7 +467,7 @@ export default function LibraryPage() {
               ))}
             </div>
           ) : entries.length === 0 ? (
-            <div className="text-center py-20">
+            <div className="rounded-xl border border-border bg-card py-20 text-center">
               <p className="text-secondary">No entries yet</p>
               <button
                 onClick={() => setIngestOpen(true)}
@@ -348,7 +491,6 @@ export default function LibraryPage() {
             </div>
           )}
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2">
               <button
@@ -379,13 +521,11 @@ export default function LibraryPage() {
         </section>
       </div>
 
-      {/* Ingest Dialog */}
       <IngestDialog open={ingestOpen} onClose={() => setIngestOpen(false)} />
     </div>
   );
 }
 
-// Type helper to avoid importing from prisma in client component
 type EntryCardEntry = {
   id: string;
   title?: string | null;

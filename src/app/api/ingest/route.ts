@@ -19,6 +19,7 @@ import {
 import { setServerConfig } from "@/lib/gemini";
 import { isDynamicSummaryEnabled } from "@/config/flags";
 import { buildConfidenceScore } from "@/lib/ai/agent/confidence";
+import { isLegacyClassifierFallbackEnabled } from "@/lib/ai/fallback-policy";
 import {
   isRetriableAgentError,
   isRetriableParseError,
@@ -105,7 +106,7 @@ function normalizePracticeTaskFromLegacyResult(
 }
 
 function shouldAllowLegacyClassifierFallback(): boolean {
-  return process.env.ALLOW_CLASSIFIER_FALLBACK === "true";
+  return isLegacyClassifierFallbackEnabled(process.env.ALLOW_CLASSIFIER_FALLBACK);
 }
 
 async function updateEntryProcessStatus(
@@ -392,7 +393,16 @@ async function asyncProcess(
           "AI_PROCESSING",
           "主流程暂不可用，正在使用兼容模式..."
         );
-        const fallbackResult = await classifyAndExtract(content);
+        const fallbackResult = await runWithProgressRetry({
+          label: "兼容模式分析",
+          attempts: 3,
+          baseDelayMs: 1500,
+          isRetriable: isRetriableAgentError,
+          onProgress: async (message) => {
+            await updateEntryProcessStatus(entryId, "AI_PROCESSING", message);
+          },
+          operation: async () => classifyAndExtract(content),
+        });
         decision = buildDecisionFromClassifier(fallbackResult);
         const repaired = await validateAndRepairDecision(decision, {
           contentLength: content.length,

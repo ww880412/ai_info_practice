@@ -11,6 +11,15 @@ interface QualityDimensions {
   difficulty: { value: string; label: string };
 }
 
+function summarizeChangedKeys(value: unknown): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return "modified: -";
+  }
+
+  const keys = Object.keys(value as Record<string, unknown>);
+  return keys.length > 0 ? `modified: ${keys.join(", ")}` : "modified: -";
+}
+
 // 从 Entry 字段构建 AI 评估
 function buildAIAssessment(entry: {
   sourceTrust?: string | null;
@@ -101,7 +110,7 @@ export async function GET(
       id: h.id,
       changedAt: h.createdAt.toISOString(),
       changes: [
-        `modified: ${Object.keys(h.newJson as object).join(', ')}`,
+        summarizeChangedKeys(h.newJson),
       ],
     }));
 

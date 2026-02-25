@@ -9,6 +9,7 @@ import { StepTracker } from "@/components/practice/StepTracker";
 import { ReasoningTraceView } from "@/components/agent/ReasoningTraceView";
 import { DynamicSummary } from "@/components/entry/DynamicSummary";
 import { MetadataPanel } from "@/components/entry/MetadataPanel";
+import { QualityPanel } from "@/components/entry/QualityPanel";
 import {
   ArrowLeft,
   ExternalLink,
@@ -278,7 +279,7 @@ export default function EntryDetailPage() {
               <MetadataPanel
                 summaryStructure={entry.summaryStructure}
                 coreSummary={entry.coreSummary}
-                keyPoints={entry.keyPointsNew}
+                keyPoints={entry.keyPointsNew ?? entry.keyPoints}
                 boundaries={entry.boundaries}
                 hasPracticeTask={!!entry.practiceTask}
                 hasRelatedEntries={!!relatedData?.relatedEntries?.length}
@@ -515,24 +516,7 @@ export default function EntryDetailPage() {
             </div>
           )}
 
-          {/* Quality Tab - Phase 1 placeholder */}
-          {activeTab === "quality" && (
-            <div className="border border-border rounded-lg p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Gauge size={16} className="text-primary" />
-                <h3 className="text-sm font-semibold">Quality Assessment</h3>
-              </div>
-              <p className="text-xs text-secondary">
-                Quality assessment panel is coming in Phase 2. This feature will provide:
-              </p>
-              <ul className="text-xs text-secondary space-y-1 list-disc list-inside">
-                <li>5-dimension quality evaluation (source trust, timeliness, completeness, content form, difficulty)</li>
-                <li>Overall confidence score</li>
-                <li>Manual override capability</li>
-                <li>Adjustment history tracking</li>
-              </ul>
-            </div>
-          )}
+          {activeTab === "quality" && <QualityPanel entryId={id} />}
         </div>
       )}
 

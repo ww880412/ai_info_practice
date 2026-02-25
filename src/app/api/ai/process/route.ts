@@ -16,6 +16,7 @@ import {
 } from "@/lib/ai/agent/decision-repair";
 import { isDynamicSummaryEnabled } from "@/config/flags";
 import { buildConfidenceScore } from "@/lib/ai/agent/confidence";
+import { isLegacyClassifierFallbackEnabled } from "@/lib/ai/fallback-policy";
 import {
   isRetriableAgentError,
   runWithProgressRetry,
@@ -24,7 +25,7 @@ import type { ParseResult } from "@/lib/parser";
 import type { Prisma, ProcessStatus } from "@prisma/client";
 
 function shouldAllowLegacyClassifierFallback(): boolean {
-  return process.env.ALLOW_CLASSIFIER_FALLBACK === "true";
+  return isLegacyClassifierFallbackEnabled(process.env.ALLOW_CLASSIFIER_FALLBACK);
 }
 
 function buildDecisionFromClassifier(
@@ -175,8 +176,8 @@ export async function POST(request: NextRequest) {
 
       decision = await runWithProgressRetry({
         label: "AI重处理",
-        attempts: 3,
-        baseDelayMs: 1500,
+        attempts: 5,
+        baseDelayMs: 2000,
         heartbeatIntervalMs: 10_000,
         formatHeartbeat: ({ attempt, attempts, elapsedMs }) =>
           `AI重处理进行中（${attempt}/${attempts}，已运行 ${Math.round(
@@ -227,7 +228,17 @@ export async function POST(request: NextRequest) {
         "AI_PROCESSING",
         "主流程暂不可用，正在使用兼容模式..."
       );
-      const fallback = buildDecisionFromClassifier(await classifyAndExtract(content));
+      const fallbackClassifyResult = await runWithProgressRetry({
+        label: "兼容模式分析",
+        attempts: 3,
+        baseDelayMs: 1500,
+        isRetriable: isRetriableAgentError,
+        onProgress: async (message) => {
+          await updateProcessStatus(targetEntryId, "AI_PROCESSING", message);
+        },
+        operation: async () => classifyAndExtract(content),
+      });
+      const fallback = buildDecisionFromClassifier(fallbackClassifyResult);
       const repaired = await validateAndRepairDecision(fallback, {
         contentLength: content.length,
         maxEnglishRatio: getMaxDecisionEnglishRatio(),
