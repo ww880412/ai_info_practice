@@ -18,7 +18,10 @@ export type SummaryStructureType =
   | 'tool-feature-comparison'
   | 'background-result-insight'
   | 'argument-evidence-condition'
-  | 'generic';
+  | 'generic'
+  | 'api-reference'
+  | 'comparison-matrix'
+  | 'timeline-evolution';
 
 export interface KeyPointsData {
   core: string[];
@@ -45,6 +48,9 @@ import { ToolFeatureComparison } from './ToolFeatureComparison';
 import { BackgroundResultInsight } from './BackgroundResultInsight';
 import { ArgumentEvidenceCondition } from './ArgumentEvidenceCondition';
 import { GenericSummary } from './GenericSummary';
+import { ApiReference } from './ApiReference';
+import { ComparisonMatrix } from './ComparisonMatrix';
+import { TimelineEvolution } from './TimelineEvolution';
 
 // Difficulty colors
 const difficultyColors: Record<string, string> = {
@@ -264,6 +270,126 @@ export function DynamicSummary({
     };
   };
 
+  const parseApiReference = (value: unknown) => {
+    const record = toObject(value);
+    if (!record) return null;
+
+    const parameters = Array.isArray(record.parameters)
+      ? record.parameters.map((p) => {
+          const param = toObject(p);
+          if (!param) return null;
+          return {
+            name: toString(param.name),
+            type: toString(param.type),
+            required: Boolean(param.required),
+            description: toString(param.description),
+          };
+        }).filter((p): p is NonNullable<typeof p> => p !== null)
+      : undefined;
+
+    const examples = Array.isArray(record.examples)
+      ? record.examples.map((e) => {
+          const example = toObject(e);
+          if (!example) return null;
+          return {
+            title: toString(example.title),
+            code: toString(example.code),
+            language: toString(example.language) || undefined,
+          };
+        }).filter((e): e is NonNullable<typeof e> => e !== null)
+      : undefined;
+
+    const errorCodes = Array.isArray(record.errorCodes)
+      ? record.errorCodes.map((ec) => {
+          const errorCode = toObject(ec);
+          if (!errorCode) return null;
+          return {
+            code: toString(errorCode.code),
+            description: toString(errorCode.description),
+          };
+        }).filter((ec): ec is NonNullable<typeof ec> => ec !== null)
+      : undefined;
+
+    return {
+      endpoint: toString(record.endpoint) || undefined,
+      parameters,
+      returnValue: toString(record.returnValue) || undefined,
+      examples,
+      errorCodes,
+    };
+  };
+
+  const parseComparisonMatrix = (value: unknown) => {
+    const record = toObject(value);
+    if (!record) return null;
+
+    const items = Array.isArray(record.items)
+      ? record.items.map((i) => {
+          const item = toObject(i);
+          if (!item) return null;
+          return {
+            name: toString(item.name),
+            description: toString(item.description) || undefined,
+          };
+        }).filter((i): i is NonNullable<typeof i> => i !== null)
+      : [];
+
+    const dimensions = toStringArray(record.dimensions);
+
+    const matrix = toObject(record.matrix);
+    const matrixData: Record<string, Record<string, string>> = {};
+    if (matrix) {
+      for (const [key, value] of Object.entries(matrix)) {
+        const innerRecord = toObject(value);
+        if (innerRecord) {
+          matrixData[key] = {};
+          for (const [innerKey, innerValue] of Object.entries(innerRecord)) {
+            matrixData[key][innerKey] = toString(innerValue);
+          }
+        }
+      }
+    }
+
+    if (items.length === 0 || dimensions.length === 0) return null;
+
+    return {
+      items,
+      dimensions,
+      matrix: matrixData,
+      recommendation: toString(record.recommendation) || undefined,
+    };
+  };
+
+  const parseTimelineEvolution = (value: unknown) => {
+    const record = toObject(value);
+    if (!record) return null;
+
+    const events = Array.isArray(record.events)
+      ? record.events.map((e) => {
+          const event = toObject(e);
+          if (!event) return null;
+          const significance = toString(event.significance);
+          return {
+            date: toString(event.date),
+            version: toString(event.version) || undefined,
+            title: toString(event.title),
+            description: toString(event.description),
+            significance: (['major', 'minor', 'patch'].includes(significance)
+              ? significance as 'major' | 'minor' | 'patch'
+              : undefined),
+          };
+        }).filter((e): e is NonNullable<typeof e> => e !== null)
+      : [];
+
+    if (events.length === 0) return null;
+
+    return {
+      events,
+      currentStatus: toString(record.currentStatus) || undefined,
+      futureOutlook: toString(record.futureOutlook) || undefined,
+    };
+  };
+
   // Render appropriate component based on type
   const renderStructure = () => {
     switch (type) {
@@ -286,6 +412,18 @@ export function DynamicSummary({
       case 'argument-evidence-condition': {
         const data = parseArgumentEvidenceCondition(fields);
         return data ? <ArgumentEvidenceCondition data={data} /> : null;
+      }
+      case 'api-reference': {
+        const data = parseApiReference(fields);
+        return data ? <ApiReference data={data} /> : null;
+      }
+      case 'comparison-matrix': {
+        const data = parseComparisonMatrix(fields);
+        return data ? <ComparisonMatrix data={data} /> : null;
+      }
+      case 'timeline-evolution': {
+        const data = parseTimelineEvolution(fields);
+        return data ? <TimelineEvolution data={data} /> : null;
       }
       case 'generic':
       default: {

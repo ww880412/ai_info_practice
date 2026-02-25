@@ -433,31 +433,87 @@ async function asyncProcess(
       0.6
     );
 
-    await prisma.entry.update({
-      where: { id: entryId },
-      data: {
-        title: title || undefined,
-        contentType: decision.contentType,
-        techDomain: decision.techDomain,
-        aiTags: decision.aiTags,
-        coreSummary: decision.coreSummary,
-        keyPoints: decision.keyPoints,
-        practiceValue: decision.practiceValue,
-        ...(dynamicSummaryEnabled
-          ? {
-              keyPointsNew: decision.keyPointsNew as unknown as Prisma.InputJsonValue,
-              boundaries: decision.boundaries as unknown as Prisma.InputJsonValue,
-              summaryStructure:
-                decision.summaryStructure as unknown as Prisma.InputJsonValue,
-              confidence: computedConfidence,
-              difficulty: decision.difficulty,
-              sourceTrust: decision.sourceTrust,
-              timeliness: decision.timeliness,
-              contentForm: decision.contentForm,
-            }
-          : {}),
-        extractedMetadata: decision.extractedMetadata as unknown as Prisma.InputJsonValue,
-      },
+    // B2.1: Dual-write to both Entry (old fields) and new split tables
+    await prisma.$transaction(async (tx) => {
+      // Update Entry with old fields (backward compat)
+      await tx.entry.update({
+        where: { id: entryId },
+        data: {
+          title: title || undefined,
+          contentType: decision.contentType,
+          techDomain: decision.techDomain,
+          aiTags: decision.aiTags,
+          coreSummary: decision.coreSummary,
+          keyPoints: decision.keyPoints,
+          practiceValue: decision.practiceValue,
+          ...(dynamicSummaryEnabled
+            ? {
+                keyPointsNew: decision.keyPointsNew as unknown as Prisma.InputJsonValue,
+                boundaries: decision.boundaries as unknown as Prisma.InputJsonValue,
+                summaryStructure:
+                  decision.summaryStructure as unknown as Prisma.InputJsonValue,
+                confidence: computedConfidence,
+                difficulty: decision.difficulty,
+                sourceTrust: decision.sourceTrust,
+                timeliness: decision.timeliness,
+                contentForm: decision.contentForm,
+              }
+            : {}),
+          extractedMetadata: decision.extractedMetadata as unknown as Prisma.InputJsonValue,
+        },
+      });
+
+      // Write to EntryAIResult (new table)
+      await tx.entryAIResult.upsert({
+        where: { entryId },
+        create: {
+          entryId,
+          contentType: decision.contentType,
+          techDomain: decision.techDomain,
+          aiTags: decision.aiTags,
+          coreSummary: decision.coreSummary,
+          keyPoints: decision.keyPoints,
+          practiceValue: decision.practiceValue,
+          summaryStructure: decision.summaryStructure as unknown as Prisma.InputJsonValue,
+          keyPointsNew: decision.keyPointsNew as unknown as Prisma.InputJsonValue,
+          boundaries: decision.boundaries as unknown as Prisma.InputJsonValue,
+          confidence: computedConfidence,
+          extractedMetadata: decision.extractedMetadata as unknown as Prisma.InputJsonValue,
+        },
+        update: {
+          contentType: decision.contentType,
+          techDomain: decision.techDomain,
+          aiTags: decision.aiTags,
+          coreSummary: decision.coreSummary,
+          keyPoints: decision.keyPoints,
+          practiceValue: decision.practiceValue,
+          summaryStructure: decision.summaryStructure as unknown as Prisma.InputJsonValue,
+          keyPointsNew: decision.keyPointsNew as unknown as Prisma.InputJsonValue,
+          boundaries: decision.boundaries as unknown as Prisma.InputJsonValue,
+          confidence: computedConfidence,
+          extractedMetadata: decision.extractedMetadata as unknown as Prisma.InputJsonValue,
+        },
+      });
+
+      // Write to EntryEvaluation (new table) if dynamic summary enabled
+      if (dynamicSummaryEnabled) {
+        await tx.entryEvaluation.upsert({
+          where: { entryId },
+          create: {
+            entryId,
+            difficulty: decision.difficulty,
+            contentForm: decision.contentForm,
+            timeliness: decision.timeliness,
+            sourceTrust: decision.sourceTrust,
+          },
+          update: {
+            difficulty: decision.difficulty,
+            contentForm: decision.contentForm,
+            timeliness: decision.timeliness,
+            sourceTrust: decision.sourceTrust,
+          },
+        });
+      }
     });
 
     // Step 3: Practice conversion (L3) - actionable only

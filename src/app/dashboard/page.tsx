@@ -25,6 +25,9 @@ interface DashboardStats {
     filterTags: string[];
   }[];
   difficultyStats: { EASY: number; MEDIUM: number; HARD: number; unknown: number };
+  knowledgeStatusCounts: Record<string, number>;
+  toReviewCount: number;
+  weeklyTrend: Array<{ date: string; count: number }>;
 }
 
 function timeAgo(dateStr: string): string {
@@ -122,6 +125,60 @@ export default function DashboardPage() {
             Failed
           </div>
           <div className="text-3xl font-bold text-foreground">{stats.failed}</div>
+        </div>
+      </div>
+
+      {/* B2.5: Action cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* To Review action card */}
+        <Link
+          href="/library?knowledgeStatus=TO_REVIEW"
+          className="bg-card border border-border rounded-lg p-4 hover:bg-accent transition-colors"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-secondary text-xs mb-1">To Review</div>
+              <div className="text-2xl font-bold text-foreground">{stats.toReviewCount}</div>
+              <div className="text-xs text-secondary mt-1">Click to review entries</div>
+            </div>
+            <div className="text-4xl">📋</div>
+          </div>
+        </Link>
+
+        {/* Knowledge status distribution */}
+        <div className="bg-card border border-border rounded-lg p-4">
+          <div className="text-secondary text-xs mb-3">Knowledge Status</div>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(stats.knowledgeStatusCounts).map(([status, count]) => (
+              <Link
+                key={status}
+                href={`/library?knowledgeStatus=${status}`}
+                className="inline-flex items-center gap-1 px-2 py-1 bg-accent rounded text-xs hover:bg-accent/80 transition-colors"
+              >
+                <span className="text-foreground">{status}</span>
+                <span className="text-secondary">{count}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* B2.5: Weekly trend */}
+      <div className="bg-card border border-border rounded-lg p-5">
+        <h2 className="text-sm font-semibold text-foreground mb-4">Weekly Trend</h2>
+        <div className="space-y-2">
+          {stats.weeklyTrend.map(({ date, count }) => (
+            <div key={date} className="flex items-center gap-3">
+              <span className="text-xs text-secondary w-20">{date}</span>
+              <div className="flex-1 h-6 bg-accent rounded overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 rounded transition-all"
+                  style={{ width: count > 0 ? `${Math.min((count / Math.max(...stats.weeklyTrend.map(t => t.count))) * 100, 100)}%` : "0%" }}
+                />
+              </div>
+              <span className="text-xs text-foreground font-medium w-8 text-right">{count}</span>
+            </div>
+          ))}
         </div>
       </div>
 

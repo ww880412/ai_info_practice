@@ -30,7 +30,10 @@ export type SummaryStructureType =
   | "tool-feature-comparison"
   | "background-result-insight"
   | "argument-evidence-condition"
-  | "generic";
+  | "generic"
+  | "api-reference"
+  | "comparison-matrix"
+  | "timeline-evolution";
 
 export interface NormalizedSummaryStructure {
   type: SummaryStructureType;
@@ -124,6 +127,9 @@ const SUMMARY_STRUCTURE_TYPES: SummaryStructureType[] = [
   "background-result-insight",
   "argument-evidence-condition",
   "generic",
+  "api-reference",
+  "comparison-matrix",
+  "timeline-evolution",
 ];
 
 function toStringValue(value: unknown): string {

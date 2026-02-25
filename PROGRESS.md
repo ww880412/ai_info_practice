@@ -2,16 +2,17 @@
 
 > 里程碑级状态索引。会话级交接细节记录在 `PROGRESS.log`。
 
-## 📍 当前状态（2026-02-24）
+## 📍 当前状态（2026-02-25）
 
 ### 活跃分支
-- `main`（主线，已合并两个功能分支）
+- `main`（主线，Batch 1 已合并）
 
 ### 本次完成
-- ✅ 合并两个 PR 到 main（frontend-hierarchy + agent-transparency）
-- ✅ 新增单元测试 19 个（sanitize + deduplication）
-- ✅ 新增架构文档（SYSTEM / API / DATA_MODEL）
-- ✅ 更新 PROJECT_STATUS.md
+- ✅ Batch 1 系统性升级（B1.1-B1.4），21 文件 +1795/-91 行
+- ✅ KnowledgeStatus 生命周期（PENDING→TO_REVIEW→ACTIVE→ARCHIVED/DEPRECATED）
+- ✅ Entry 详情页 4→6 Tab 重构
+- ✅ AI 差异化提取（extractedMetadata）
+- ✅ 数据库 schema 已同步
 
 ---
 
@@ -30,6 +31,7 @@
 |------|------|---------|---------|---------|---------|------|
 | 前端层级管理 | codex/frontend-hierarchy | ✅ 标签侧边栏 | ✅ 分组管理 | ✅ 智能排序 | ✅ Dashboard | ✅ 已合并 |
 | Agent 透明化 | codex/agent-transparency | ✅ 元数据面板 | ✅ 质量评估 | ✅ 推理增强 | ✅ 处理日志 | ✅ 已合并 |
+| 系统性升级 Batch 1 | codex/batch1-systematic-upgrade | ✅ 状态模型 | ✅ 提取增强 | ✅ 详情页重构 | ✅ 文档修正 | ✅ 已合并 |
 
 ---
 
@@ -50,8 +52,9 @@
 
 ## 🔜 项目待办
 
-- 无重大待办事项
+- Batch 2 (P1): 数据模型拆分、Pipeline 工具启用、文档修正、前端操作增强
+- Batch 3 (P2): UI 组件、排序、批量导入、全局搜索
 
 ---
 
-*最后更新: 2026-02-24*
+*最后更新: 2026-02-25*

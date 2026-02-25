@@ -11,6 +11,9 @@ import { DynamicSummary } from "@/components/entry/DynamicSummary";
 import { MetadataPanel } from "@/components/entry/MetadataPanel";
 import { QualityPanel } from "@/components/entry/QualityPanel";
 import { StatusActions } from "@/components/entry/StatusActions";
+import { InlineEdit } from "@/components/entry/InlineEdit";
+import { TagEditor } from "@/components/entry/TagEditor";
+import { NotePanel } from "@/components/entry/NotePanel";
 import {
   ArrowLeft,
   ExternalLink,
@@ -102,6 +105,22 @@ export default function EntryDetailPage() {
     },
   });
 
+  // B2.4: Update entry mutation
+  const updateEntry = useMutation({
+    mutationFn: async (data: Record<string, unknown>) => {
+      const res = await fetch(`/api/entries/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Update failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["entry", id] });
+    },
+  });
+
   const generateSmartSummary = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/ai/smart-summary", {
@@ -184,7 +203,14 @@ export default function EntryDetailPage() {
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <SourceIcon size={18} className="text-secondary" />
-          <h1 className="text-xl font-bold">{entry.title || "Untitled"}</h1>
+          {/* B2.4: Inline editable title */}
+          <InlineEdit
+            value={entry.title || "Untitled"}
+            onSave={async (newTitle) => {
+              await updateEntry.mutateAsync({ title: newTitle });
+            }}
+            className="text-xl font-bold flex-1"
+          />
         </div>
 
         {/* Source link */}
@@ -295,6 +321,23 @@ export default function EntryDetailPage() {
                     </div>
                   </div>
                 )}
+
+                {/* B2.4: User Tags Editor */}
+                <div>
+                  <p className="text-xs font-medium text-secondary mb-2">User Tags</p>
+                  <TagEditor
+                    tags={entry.userTags || []}
+                    onSave={async (newTags) => {
+                      await updateEntry.mutateAsync({ userTags: newTags });
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* B2.4: Notes Panel */}
+              <div className="border border-border rounded-lg p-4">
+                <p className="text-xs font-medium text-secondary mb-3">Notes</p>
+                <NotePanel entryId={id} />
               </div>
 
               {/* Metadata Panel */}

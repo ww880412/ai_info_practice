@@ -18,7 +18,16 @@ export async function GET(request: NextRequest) {
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const [total, weekNew, processing, failed, recentEntries, allEntries] = await Promise.all([
+    const [
+      total,
+      weekNew,
+      processing,
+      failed,
+      recentEntries,
+      allEntries,
+      knowledgeStatusCounts,
+      toReviewCount,
+    ] = await Promise.all([
       prisma.entry.count(),
       prisma.entry.count({ where: { createdAt: { gte: weekAgo } } }),
       prisma.entry.count({ where: { processStatus: { in: ["PENDING", "PARSING", "AI_PROCESSING"] } } }),
@@ -31,6 +40,13 @@ export async function GET(request: NextRequest) {
       prisma.entry.findMany({
         select: { aiTags: true, difficulty: true },
       }),
+      // B2.5: Knowledge status distribution
+      prisma.entry.groupBy({
+        by: ["knowledgeStatus"],
+        _count: true,
+      }),
+      // B2.5: To review count
+      prisma.entry.count({ where: { knowledgeStatus: "TO_REVIEW" } }),
     ]);
 
     const aiTagCounts = new Map<string, number>();
@@ -52,8 +68,45 @@ export async function GET(request: NextRequest) {
       else difficultyStats.unknown++;
     }
 
+    // B2.5: Weekly trend (last 7 days)
+    const weeklyTrend: Array<{ date: string; count: number }> = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const startOfDay = new Date(date.setHours(0, 0, 0, 0));
+      const endOfDay = new Date(date.setHours(23, 59, 59, 999));
+      const count = await prisma.entry.count({
+        where: {
+          createdAt: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+        },
+      });
+      weeklyTrend.push({
+        date: startOfDay.toISOString().split("T")[0],
+        count,
+      });
+    }
+
+    // B2.5: Format knowledge status counts
+    const knowledgeStatusMap: Record<string, number> = {};
+    for (const item of knowledgeStatusCounts) {
+      knowledgeStatusMap[item.knowledgeStatus] = item._count;
+    }
+
     return NextResponse.json({
-      data: { total, weekNew, processing, failed, recentEntries, topTags, difficultyStats },
+      data: {
+        total,
+        weekNew,
+        processing,
+        failed,
+        recentEntries,
+        topTags,
+        difficultyStats,
+        knowledgeStatusCounts: knowledgeStatusMap,
+        toReviewCount,
+        weeklyTrend,
+      },
     });
   } catch (error) {
     console.error("Dashboard stats error:", error);

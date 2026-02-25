@@ -75,51 +75,166 @@ toolsRegistry.register({
 // classify_content tool
 toolsRegistry.register({
   name: 'classify_content',
-  description: '对内容进行分类',
+  description: 'Step 1: Classify content and determine structure type',
   parameters: z.object({
     content: z.string().optional(),
+    title: z.string().optional(),
+    sourceType: z.string().optional(),
   }),
   handler: async (params, context: AgentContext) => {
     const model = getGeminiModel();
     const content = getContent(params, context);
+    const title = asString(params.title) ?? asString(context.input.title) ?? '';
+    const sourceType = asString(params.sourceType) ?? asString(context.input.sourceType) ?? 'UNKNOWN';
+
     if (!content) return { success: false, error: 'No content provided for classification' };
-    const prompt = `对以下内容进行分类，返回 JSON 格式：\n\n${content.slice(0, 5000)}\n\n分类维度：contentType, techDomain, aiTags`;
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        return { success: true, data: JSON.parse(jsonMatch[0]) };
-      } catch {
-        // Fall through to raw text
+
+    // Build Step 1 prompt (simplified version for tool)
+    const sampledContent = content.slice(0, 12000);
+    const dimensions = DEFAULT_EVALUATION_DIMENSIONS
+      .filter(d => d.enabled)
+      .map(d => `- ${d.name}: ${d.description}`)
+      .join('\n');
+
+    const prompt = `你是知识结构规划专家，请完成 Step 1：内容分析与结构推理。
+
+输入标题：${title}
+输入来源：${sourceType}
+输入长度：${content.length} 字符
+
+评估维度：
+${dimensions}
+
+内容片段：
+${sampledContent}
+
+输出语言要求：
+- 所有自然语言字段默认使用简体中文。
+- 允许保留必要专业术语（如 RAG、Agent、LLM、API、CLIP、QPS）。
+
+返回严格 JSON（不要 markdown）：
+{
+  "contentType": "TUTORIAL" | "TOOL_RECOMMENDATION" | "TECH_PRINCIPLE" | "CASE_STUDY" | "OPINION",
+  "techDomain": "PROMPT_ENGINEERING" | "AGENT" | "RAG" | "FINE_TUNING" | "DEPLOYMENT" | "OTHER",
+  "aiTags": ["string"],
+  "summaryStructure": {
+    "type": "problem-solution-steps" | "concept-mechanism-flow" | "tool-feature-comparison" | "background-result-insight" | "argument-evidence-condition" | "generic" | "api-reference" | "comparison-matrix" | "timeline-evolution",
+    "reasoning": "string",
+    "fields": {}
+  },
+  "keyPoints": {
+    "core": ["string"],
+    "extended": ["string"]
+  },
+  "boundaries": {
+    "applicable": ["string"],
+    "notApplicable": ["string"]
+  },
+  "confidence": 0.0
+}`;
+
+    try {
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return { success: true, data: parsed };
       }
+      return { success: false, error: 'Failed to parse classification result' };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
-    return { success: true, data: text };
   },
 });
 
 // extract_summary tool
 toolsRegistry.register({
   name: 'extract_summary',
-  description: '提取内容摘要',
+  description: 'Step 2: Extract knowledge based on Step 1 structure',
   parameters: z.object({
     content: z.string().optional(),
-    type: z.enum(['brief', 'detailed', 'tldr']).default('brief'),
+    title: z.string().optional(),
+    sourceType: z.string().optional(),
+    step1Result: z.record(z.string(), z.any()).optional(),
   }),
   handler: async (params, context: AgentContext) => {
     const model = getGeminiModel();
     const content = getContent(params, context);
+    const title = asString(params.title) ?? asString(context.input.title) ?? '';
+    const sourceType = asString(params.sourceType) ?? asString(context.input.sourceType) ?? 'UNKNOWN';
+    const step1Result = asRecord(params.step1Result) ?? {};
+
     if (!content) return { success: false, error: 'No content provided for summary extraction' };
-    const typeMap: Record<string, string> = {
-      brief: '简短摘要',
-      detailed: '详细摘要',
-      tldr: 'TL;DR 要点总结',
-    };
-    const requestedType = asString(params.type);
-    const typeKey = requestedType === 'detailed' || requestedType === 'tldr' ? requestedType : 'brief';
-    const prompt = `提取以下内容的${typeMap[typeKey]}：\n\n${content.slice(0, 5000)}`;
-    const result = await model.generateContent(prompt);
-    return { success: true, data: result.response.text() };
+
+    const contentSnapshot = content.slice(0, 90000);
+    const step1Json = JSON.stringify(step1Result, null, 2);
+    const contentType = asString(step1Result.contentType);
+
+    let extractionHints = '';
+    if (contentType === 'TUTORIAL') {
+      extractionHints = `
+特别提取要求（TUTORIAL）：
+- extractedMetadata.codeExamples: 提取代码示例（language, code, description）
+- extractedMetadata.references: 提取参考链接（官方文档、相关博客等）`;
+    } else if (contentType === 'TOOL_RECOMMENDATION') {
+      extractionHints = `
+特别提取要求（TOOL_RECOMMENDATION）：
+- extractedMetadata.versionInfo: 提取工具版本信息（tool, version, releaseDate）
+- extractedMetadata.references: 提取官方链接和相关资源`;
+    }
+
+    const prompt = `你是知识提取专家，请执行 Step 2：基于 Step 1 的结构规划提取完整结果。
+
+Step 1 结果：
+${step1Json}
+
+输入标题：${title}
+输入来源：${sourceType}
+原始内容长度：${content.length} 字符
+${extractionHints}
+
+内容：
+${contentSnapshot}
+
+输出语言要求：
+- 所有自然语言字段默认使用简体中文。
+- 允许保留必要专业术语（如 RAG、Agent、LLM、API、CLIP、QPS）。
+
+summaryStructure.type 选择指南：
+- "api-reference": API 文档、SDK 参考、函数/方法文档
+- "comparison-matrix": 工具对比、框架比较、技术评估
+- "timeline-evolution": 版本历史、技术演进、发布说明
+
+返回严格 JSON（不要 markdown）：
+{
+  "coreSummary": "string",
+  "practiceValue": "KNOWLEDGE" | "ACTIONABLE",
+  "practiceReason": "string",
+  "practiceTask": null | { "title": "string", "summary": "string", "difficulty": "EASY" | "MEDIUM" | "HARD", "estimatedTime": "string", "prerequisites": ["string"], "steps": [{ "order": 1, "title": "string", "description": "string" }] },
+  "difficulty": "EASY" | "MEDIUM" | "HARD",
+  "sourceTrust": "HIGH" | "MEDIUM" | "LOW",
+  "timeliness": "RECENT" | "OUTDATED" | "CLASSIC",
+  "contentForm": "TEXTUAL" | "CODE_HEAVY" | "VISUAL" | "MULTIMODAL",
+  "summaryStructure": { "type": "...", "reasoning": "string", "fields": {} },
+  "keyPoints": { "core": ["string"], "extended": ["string"] },
+  "boundaries": { "applicable": ["string"], "notApplicable": ["string"] },
+  "confidence": 0.0,
+  "extractedMetadata": {}
+}`;
+
+    try {
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return { success: true, data: parsed };
+      }
+      return { success: false, error: 'Failed to parse extraction result' };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
   },
 });
 
@@ -190,6 +305,98 @@ toolsRegistry.register({
     const data = asRecord(params.data) ?? {};
     // 实际存储逻辑由 Agent 引擎处理
     return { success: true, data: { stored: true, data } };
+  },
+});
+
+// extract_code tool (for TUTORIAL content)
+toolsRegistry.register({
+  name: 'extract_code',
+  description: 'Extract code examples from TUTORIAL content',
+  parameters: z.object({
+    content: z.string().optional(),
+  }),
+  handler: async (params, context: AgentContext) => {
+    const model = getGeminiModel();
+    const content = getContent(params, context);
+    if (!content) return { success: false, error: 'No content provided for code extraction' };
+
+    const prompt = `从以下教程内容中提取代码示例。返回 JSON 格式：
+
+内容：
+${content.slice(0, 20000)}
+
+返回格式：
+{
+  "codeExamples": [
+    {
+      "language": "string (e.g., python, javascript, bash)",
+      "code": "string (actual code)",
+      "description": "string (what this code does)",
+      "runnable": boolean (can this code be run directly?)
+    }
+  ]
+}`;
+
+    try {
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return { success: true, data: parsed };
+      }
+      return { success: false, error: 'Failed to parse code extraction result' };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  },
+});
+
+// extract_version tool (for TOOL_RECOMMENDATION content)
+toolsRegistry.register({
+  name: 'extract_version',
+  description: 'Extract version info and alternatives from TOOL_RECOMMENDATION content',
+  parameters: z.object({
+    content: z.string().optional(),
+  }),
+  handler: async (params, context: AgentContext) => {
+    const model = getGeminiModel();
+    const content = getContent(params, context);
+    if (!content) return { success: false, error: 'No content provided for version extraction' };
+
+    const prompt = `从以下工具推荐内容中提取版本信息和替代方案。返回 JSON 格式：
+
+内容：
+${content.slice(0, 20000)}
+
+返回格式：
+{
+  "versionInfo": {
+    "tool": "string (tool name)",
+    "version": "string (current version)",
+    "releaseDate": "string (optional)",
+    "compatibility": ["string (compatible platforms/versions)"]
+  },
+  "alternatives": [
+    {
+      "name": "string",
+      "comparison": "string (how it compares to main tool)"
+    }
+  ]
+}`;
+
+    try {
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return { success: true, data: parsed };
+      }
+      return { success: false, error: 'Failed to parse version extraction result' };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
   },
 });
 

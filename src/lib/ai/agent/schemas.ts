@@ -35,6 +35,9 @@ export const SummaryStructureTypeSchema = z.enum([
   'background-result-insight',
   'argument-evidence-condition',
   'generic',
+  'api-reference',
+  'comparison-matrix',
+  'timeline-evolution',
 ]);
 
 export type SummaryStructureType = z.infer<typeof SummaryStructureTypeSchema>;
@@ -88,6 +91,54 @@ const GenericSchema = z.object({
   keyPoints: z.array(z.string()).optional(),
 });
 
+// API Reference schema
+const ApiReferenceSchema = z.object({
+  type: z.literal('api-reference'),
+  endpoint: z.string().optional(),
+  parameters: z.array(z.object({
+    name: z.string(),
+    type: z.string(),
+    required: z.boolean(),
+    description: z.string(),
+  })).optional(),
+  returnValue: z.string().optional(),
+  examples: z.array(z.object({
+    title: z.string(),
+    code: z.string(),
+    language: z.string().optional(),
+  })).optional(),
+  errorCodes: z.array(z.object({
+    code: z.string(),
+    description: z.string(),
+  })).optional(),
+});
+
+// Comparison Matrix schema
+const ComparisonMatrixSchema = z.object({
+  type: z.literal('comparison-matrix'),
+  items: z.array(z.object({
+    name: z.string(),
+    description: z.string().optional(),
+  })),
+  dimensions: z.array(z.string()),
+  matrix: z.record(z.string(), z.record(z.string(), z.string())),
+  recommendation: z.string().optional(),
+});
+
+// Timeline Evolution schema
+const TimelineEvolutionSchema = z.object({
+  type: z.literal('timeline-evolution'),
+  events: z.array(z.object({
+    date: z.string(),
+    version: z.string().optional(),
+    title: z.string(),
+    description: z.string(),
+    significance: z.enum(['major', 'minor', 'patch']).optional(),
+  })),
+  currentStatus: z.string().optional(),
+  futureOutlook: z.string().optional(),
+});
+
 // Map type to schema
 const SummaryStructureFieldsSchemaMap: Record<SummaryStructureType, z.ZodType> = {
   'problem-solution-steps': ProblemSolutionStepsSchema,
@@ -96,6 +147,9 @@ const SummaryStructureFieldsSchemaMap: Record<SummaryStructureType, z.ZodType> =
   'background-result-insight': BackgroundResultInsightSchema,
   'argument-evidence-condition': ArgumentEvidenceConditionSchema,
   'generic': GenericSchema,
+  'api-reference': ApiReferenceSchema,
+  'comparison-matrix': ComparisonMatrixSchema,
+  'timeline-evolution': TimelineEvolutionSchema,
 };
 
 // Main summary structure schema
@@ -139,6 +193,12 @@ export function getRequiredFields(type: SummaryStructureType): string[] {
       return ['background', 'result', 'insights'];
     case 'argument-evidence-condition':
       return ['argument', 'evidence'];
+    case 'api-reference':
+      return ['endpoint'];
+    case 'comparison-matrix':
+      return ['items', 'dimensions', 'matrix'];
+    case 'timeline-evolution':
+      return ['events'];
     case 'generic':
       return ['summary'];
     default:

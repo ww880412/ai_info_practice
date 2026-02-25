@@ -17,6 +17,22 @@ function asStringRecord(value: unknown): Record<string, string> {
   ) as Record<string, string>;
 }
 
+/**
+ * Route to appropriate tool pipeline based on contentType
+ * Returns array of tool names to execute in sequence
+ */
+export function selectToolPipeline(contentType: string): string[] {
+  switch (contentType) {
+    case 'TUTORIAL':
+      return ['classify_content', 'extract_code', 'extract_summary'];
+    case 'TOOL_RECOMMENDATION':
+      return ['classify_content', 'extract_version', 'extract_summary'];
+    default:
+      // Default pipeline for other content types
+      return ['classify_content', 'extract_summary'];
+  }
+}
+
 toolsRegistry.register({
   name: 'route_to_strategy',
   description: '根据评估结果选择处理策略',

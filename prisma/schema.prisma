@@ -82,6 +82,12 @@ model Entry {
   // Groups (many:many)
   groups Group[] @relation("EntryGroups")
 
+  // New relations (B2.1)
+  aiResult EntryAIResult?
+  evaluation EntryEvaluation?
+  smartSummaryRelation EntrySmartSummary?
+  notes EntryNote[]
+
   @@index([processStatus])
   @@index([knowledgeStatus])
   @@index([knowledgeStatus, reviewedAt])
@@ -333,4 +339,71 @@ model AgentConfig {
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─────────────── Entry Split Tables (B2.1) ───────────────
+
+model EntryAIResult {
+  id        String   @id @default(cuid())
+  entryId   String   @unique
+  entry     Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  contentType       ContentType?
+  techDomain        TechDomain?
+  aiTags            String[]
+  coreSummary       String?
+  keyPoints         String[]
+  practiceValue     PracticeValue?
+  summaryStructure  Json?
+  keyPointsNew      Json?
+  boundaries        Json?
+  confidence        Float?
+  extractedMetadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([entryId])
+}
+
+model EntryEvaluation {
+  id        String   @id @default(cuid())
+  entryId   String   @unique
+  entry     Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  difficulty      Difficulty?
+  contentForm     ContentForm?
+  timeliness      Timeliness?
+  sourceTrust     TrustLevel?
+  qualityOverride Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([entryId])
+}
+
+model EntrySmartSummary {
+  id        String   @id @default(cuid())
+  entryId   String   @unique
+  entry     Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  smartSummary String? @db.Text
+  keyInsights  String[]
+  tldr         String?
+  generatedAt  DateTime @default(now())
+
+  @@index([entryId])
+}
+
+model EntryNote {
+  id        String   @id @default(cuid())
+  entryId   String
+  entry     Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  content   String @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([entryId])
 }

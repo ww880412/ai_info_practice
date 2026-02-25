@@ -124,6 +124,10 @@ export async function GET(request: NextRequest) {
               steps: { orderBy: { order: "asc" } },
             },
           },
+          // B2.1: Include new split tables
+          aiResult: true,
+          evaluation: true,
+          smartSummaryRelation: true,
         },
         orderBy,
         skip: (page - 1) * pageSize,

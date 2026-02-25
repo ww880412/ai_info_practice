@@ -31,14 +31,34 @@ export async function POST(request: NextRequest) {
 
     const smartSummary = await generateSmartSummary(content);
 
-    // Save to entry
-    await prisma.entry.update({
-      where: { id: entryId },
-      data: {
-        smartSummary: smartSummary.conciseSummary,
-        keyInsights: smartSummary.keyInsights,
-        tldr: smartSummary["tl;DR"],
-      },
+    // B2.1: Dual-write to both Entry (old fields) and EntrySmartSummary (new table)
+    await prisma.$transaction(async (tx) => {
+      // Update Entry with old fields (backward compat)
+      await tx.entry.update({
+        where: { id: entryId },
+        data: {
+          smartSummary: smartSummary.conciseSummary,
+          keyInsights: smartSummary.keyInsights,
+          tldr: smartSummary["tl;DR"],
+        },
+      });
+
+      // Write to EntrySmartSummary (new table)
+      await tx.entrySmartSummary.upsert({
+        where: { entryId },
+        create: {
+          entryId,
+          smartSummary: smartSummary.conciseSummary,
+          keyInsights: smartSummary.keyInsights,
+          tldr: smartSummary["tl;DR"],
+        },
+        update: {
+          smartSummary: smartSummary.conciseSummary,
+          keyInsights: smartSummary.keyInsights,
+          tldr: smartSummary["tl;DR"],
+          generatedAt: new Date(),
+        },
+      });
     });
 
     return NextResponse.json(smartSummary);

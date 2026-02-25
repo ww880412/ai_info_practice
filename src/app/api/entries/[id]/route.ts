@@ -19,6 +19,11 @@ export async function GET(
             steps: { orderBy: { order: "asc" } },
           },
         },
+        // B2.1: Include new split tables
+        aiResult: true,
+        evaluation: true,
+        smartSummaryRelation: true,
+        notes: { orderBy: { createdAt: "desc" } },
       },
     });
 
@@ -35,6 +40,7 @@ export async function GET(
 
 /**
  * PATCH /api/entries/[id] - Update entry (user corrections).
+ * B2.1: Routes updates to appropriate tables based on field type.
  */
 export async function PATCH(
   request: NextRequest,
@@ -44,33 +50,89 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
-    // Only allow updating specific fields
-    const allowedFields = [
-      "title",
-      "contentType",
-      "techDomain",
-      "practiceValue",
-      "userTags",
-      "smartSummary",
-      "keyInsights",
-      "tldr",
-    ];
-    const updateData: Record<string, unknown> = {};
-    for (const field of allowedFields) {
-      if (body[field] !== undefined) {
-        updateData[field] = body[field];
+    // Categorize fields by target table
+    const entryFields = ["title", "userTags"];
+    const aiResultFields = ["contentType", "techDomain", "practiceValue"];
+    const smartSummaryFields = ["smartSummary", "keyInsights", "tldr"];
+
+    const entryUpdate: Record<string, unknown> = {};
+    const aiResultUpdate: Record<string, unknown> = {};
+    const smartSummaryUpdate: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(body)) {
+      if (entryFields.includes(key)) {
+        entryUpdate[key] = value;
+      } else if (aiResultFields.includes(key)) {
+        aiResultUpdate[key] = value;
+      } else if (smartSummaryFields.includes(key)) {
+        smartSummaryUpdate[key] = value;
       }
     }
 
-    const entry = await prisma.entry.update({
+    // Execute updates in transaction
+    await prisma.$transaction(async (tx) => {
+      // Update Entry table
+      if (Object.keys(entryUpdate).length > 0) {
+        await tx.entry.update({
+          where: { id },
+          data: entryUpdate,
+        });
+      }
+
+      // Update EntryAIResult table (dual-write to Entry for backward compat)
+      if (Object.keys(aiResultUpdate).length > 0) {
+        await tx.entry.update({
+          where: { id },
+          data: aiResultUpdate,
+        });
+        await tx.entryAIResult.update({
+          where: { entryId: id },
+          data: aiResultUpdate,
+        }).catch(() => {
+          // If EntryAIResult doesn't exist yet, create it
+          return tx.entryAIResult.create({
+            data: {
+              entryId: id,
+              ...aiResultUpdate,
+            },
+          });
+        });
+      }
+
+      // Update EntrySmartSummary table (dual-write to Entry for backward compat)
+      if (Object.keys(smartSummaryUpdate).length > 0) {
+        await tx.entry.update({
+          where: { id },
+          data: smartSummaryUpdate,
+        });
+        await tx.entrySmartSummary.update({
+          where: { entryId: id },
+          data: smartSummaryUpdate,
+        }).catch(() => {
+          // If EntrySmartSummary doesn't exist yet, create it
+          return tx.entrySmartSummary.create({
+            data: {
+              entryId: id,
+              ...smartSummaryUpdate,
+            },
+          });
+        });
+      }
+    });
+
+    // Fetch updated entry with all relations
+    const entry = await prisma.entry.findUnique({
       where: { id },
-      data: updateData,
       include: {
         practiceTask: {
           include: {
             steps: { orderBy: { order: "asc" } },
           },
         },
+        aiResult: true,
+        evaluation: true,
+        smartSummaryRelation: true,
+        notes: { orderBy: { createdAt: "desc" } },
       },
     });
 

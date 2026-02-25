@@ -87,30 +87,42 @@ src/
 │   │   ├── ingest/       # 内容入库
 │   │   ├── entries/      # 条目 CRUD
 │   │   ├── practice/     # 练习任务
+│   │   ├── groups/       # 分组管理
+│   │   ├── agent/        # Agent 配置
 │   │   ├── config/       # 配置验证
-│   │   └── ai/           # AI 处理 (smart-summary, related)
+│   │   ├── upload/       # 文件上传
+│   │   ├── dashboard/    # 仪表盘统计
+│   │   ├── tags/         # 标签统计
+│   │   └── ai/           # AI 处理 (smart-summary, related, process)
 │   ├── library/          # 知识库页面
 │   ├── practice/         # 练习队列页面
 │   ├── entry/[id]/      # 条目详情页
 │   └── settings/        # 设置页面
 ├── components/           # React 组件
 │   ├── library/        # 知识库组件
-│   ├── practice/        # 练习组件
-│   └── common/          # 公共组件
+│   ├── practice/       # 练习组件
+│   ├── entry/          # 条目详情组件
+│   ├── agent/          # Agent 组件
+│   ├── ingest/         # 入库组件
+│   └── common/         # 公共组件
 ├── hooks/               # 自定义 Hooks
 │   ├── useEntries.ts   # 条目管理
 │   ├── useIngest.ts    # 入库逻辑
+│   ├── useGroups.ts    # 分组管理
+│   ├── useEntryStatus.ts  # 条目状态
 │   └── usePracticeQueue.ts
 ├── lib/                 # 核心库
 │   ├── ai/             # AI 处理模块
 │   │   ├── agent/     # ReAct Agent 引擎
 │   │   │   ├── engine.ts           # Agent 核心引擎
 │   │   │   ├── builtin-tools.ts    # 内置工具集
+│   │   │   ├── tools.ts            # 工具定义
 │   │   │   ├── route-strategy.ts   # 路由策略
 │   │   │   ├── schemas.ts          # Zod 验证模式
 │   │   │   ├── types.ts            # Agent 类型定义
 │   │   │   ├── ingest-contract.ts  # 入库契约
 │   │   │   ├── config.ts           # Agent 配置
+│   │   │   ├── get-config.ts       # 配置获取
 │   │   │   ├── confidence.ts       # 置信度计算
 │   │   │   └── decision-repair.ts  # 决策修复
 │   │   ├── classifier.ts           # 内容分类（遗留）
@@ -118,13 +130,40 @@ src/
 │   │   ├── deduplication.ts        # 去重检测
 │   │   ├── smartSummary.ts         # 智能摘要
 │   │   ├── associationDiscovery.ts # 关联发现
-│   │   └── fallback-policy.ts      # 降级策略
+│   │   ├── fallback-policy.ts      # 降级策略
+│   │   └── prompts.ts              # AI 提示词
 │   ├── parser/         # 内容解析
-│   │   ├── github.ts
-│   │   ├── webpage.ts
-│   │   └── pdf.ts
+│   │   ├── index.ts    # 统一解析入口
+│   │   ├── github.ts   # GitHub 解析
+│   │   ├── webpage.ts  # 网页解析
+│   │   ├── pdf.ts      # PDF 解析
+│   │   ├── pdf-text.ts # PDF 文本提取
+│   │   ├── text.ts     # 纯文本解析
+│   │   ├── ocr.ts      # OCR 识别
+│   │   ├── image-multimodal.ts  # 图片多模态
+│   │   ├── strategy.ts # 解析策略
+│   │   ├── registry.ts # 解析器注册
+│   │   ├── logger.ts   # 解析日志
+│   │   └── parse-with-log.ts  # 带日志解析
+│   ├── entries/        # 条目处理
+│   │   ├── bulk-delete.ts      # 批量删除
+│   │   ├── delete.ts           # 删除逻辑
+│   │   ├── tag-filter.ts       # 标签过滤
+│   │   └── knowledge-status.ts # 知识状态
+│   ├── entry/          # 单条目处理
+│   │   └── metadata-display.ts # 元数据展示
+│   ├── library/        # 知识库逻辑
+│   │   ├── group-options.ts    # 分组选项
+│   │   └── group-import.ts     # 分组导入
+│   ├── ingest/         # 入库逻辑
+│   │   ├── queue.ts    # 入库队列
+│   │   └── retry.ts    # 重试机制
+│   ├── trace/          # 追踪系统
+│   │   └── observation.ts      # 观察记录
 │   ├── gemini.ts       # Gemini API 封装
-│   └── prisma.ts       # Prisma Client
+│   ├── prisma.ts       # Prisma Client
+│   ├── sanitize.ts     # 数据清洗
+│   └── tag-aggregation.ts  # 标签聚合
 └── types/              # TypeScript 类型
 ```
 

@@ -162,6 +162,71 @@ export function buildContentSnapshot(content: string, limit = STEP2_INPUT_LIMIT)
   ].join("\n\n");
 }
 
+/**
+ * Build semantic snapshot with intelligent content segmentation
+ * - Short content (<12K): Pass through entirely
+ * - Medium content (12K-50K): Extract first 2 sentences per paragraph, preserve code blocks
+ * - Long content (>50K): Take first 8K + last 4K with truncation marker
+ */
+export function buildSemanticSnapshot(content: string, limit = STEP2_INPUT_LIMIT): string {
+  const SHORT_THRESHOLD = 12_000;
+  const MEDIUM_THRESHOLD = 50_000;
+
+  // Short content: no truncation
+  if (content.length <= SHORT_THRESHOLD) {
+    return content;
+  }
+
+  // Long content: head + tail strategy
+  if (content.length > MEDIUM_THRESHOLD) {
+    const headSize = 8_000;
+    const tailSize = 4_000;
+    const head = content.slice(0, headSize);
+    const tail = content.slice(-tailSize);
+
+    return [
+      head,
+      "\n\n[...truncated middle section...]\n\n",
+      tail,
+    ].join("");
+  }
+
+  // Medium content: semantic paragraph extraction
+  // Split by double newlines (paragraphs)
+  const paragraphs = content.split(/\n\n+/);
+  const result: string[] = [];
+  let currentLength = 0;
+
+  for (const paragraph of paragraphs) {
+    // Check if this is a code block
+    const isCodeBlock = paragraph.trim().startsWith("```");
+
+    if (isCodeBlock) {
+      // Preserve code blocks intact
+      if (currentLength + paragraph.length <= limit) {
+        result.push(paragraph);
+        currentLength += paragraph.length + 2; // +2 for \n\n
+      }
+    } else {
+      // Extract first 2 sentences from text paragraphs
+      const sentences = paragraph.match(/[^.!?]+[.!?]+/g) || [paragraph];
+      const firstTwo = sentences.slice(0, 2).join(" ");
+
+      if (currentLength + firstTwo.length <= limit) {
+        result.push(firstTwo);
+        currentLength += firstTwo.length + 2;
+      }
+    }
+
+    // Stop if we've reached the limit
+    if (currentLength >= limit) {
+      break;
+    }
+  }
+
+  return result.join("\n\n");
+}
+
 export function parseAgentResponse(response: string): ParsedAgentResponse {
   const thoughtMatch = response.match(/THINK:\s*([\s\S]*?)(?=\n(?:ACTION|REASONING|OBSERVATION|FINAL):|$)/);
   const actionMatch = response.match(/ACTION:\s*([a-zA-Z0-9_]+)\s*([\s\S]*?)(?=\n(?:REASONING|OBSERVATION|FINAL):|$)/);
@@ -293,7 +358,7 @@ export class ReActAgent {
   }
 
   private buildStep1Prompt(input: ParseResult): string {
-    const sampledContent = buildContentSnapshot(input.content, STEP1_INPUT_LIMIT);
+    const sampledContent = buildSemanticSnapshot(input.content, STEP1_INPUT_LIMIT);
     const enabledDimensions = this.config.evaluationDimensions
       .filter((dimension) => dimension.enabled)
       .map((dimension) => `- ${dimension.name}: ${dimension.description}`)
@@ -328,7 +393,7 @@ ${sampledContent}
   "techDomain": "PROMPT_ENGINEERING" | "AGENT" | "RAG" | "FINE_TUNING" | "DEPLOYMENT" | "OTHER",
   "aiTags": ["string"],
   "summaryStructure": {
-    "type": "problem-solution-steps" | "concept-mechanism-flow" | "tool-feature-comparison" | "background-result-insight" | "argument-evidence-condition" | "generic",
+    "type": "problem-solution-steps" | "concept-mechanism-flow" | "tool-feature-comparison" | "background-result-insight" | "argument-evidence-condition" | "generic" | "api-reference" | "comparison-matrix" | "timeline-evolution",
     "reasoning": "string",
     "fields": {}
   },
@@ -348,7 +413,7 @@ ${sampledContent}
     input: ParseResult,
     step1: Record<string, unknown>
   ): string {
-    const contentSnapshot = buildContentSnapshot(input.content, STEP2_INPUT_LIMIT);
+    const contentSnapshot = buildSemanticSnapshot(input.content, STEP2_INPUT_LIMIT);
     const step1Json = JSON.stringify(step1, null, 2);
     const contentType = step1.contentType as string | undefined;
 
@@ -403,6 +468,11 @@ ${contentSnapshot}
 - 允许保留必要专业术语（如 RAG、Agent、LLM、API、CLIP、QPS）。
 - 不要输出整句英文描述。
 
+summaryStructure.type 选择指南：
+- "api-reference": API 文档、SDK 参考、函数/方法文档
+- "comparison-matrix": 工具对比、框架比较、技术评估
+- "timeline-evolution": 版本历史、技术演进、发布说明
+
 返回严格 JSON（不要 markdown）：
 {
   "coreSummary": "string",
@@ -423,7 +493,7 @@ ${contentSnapshot}
   "timeliness": "RECENT" | "OUTDATED" | "CLASSIC",
   "contentForm": "TEXTUAL" | "CODE_HEAVY" | "VISUAL" | "MULTIMODAL",
   "summaryStructure": {
-    "type": "problem-solution-steps" | "concept-mechanism-flow" | "tool-feature-comparison" | "background-result-insight" | "argument-evidence-condition" | "generic",
+    "type": "problem-solution-steps" | "concept-mechanism-flow" | "tool-feature-comparison" | "background-result-insight" | "argument-evidence-condition" | "generic" | "api-reference" | "comparison-matrix" | "timeline-evolution",
     "reasoning": "string",
     "fields": {}
   },
