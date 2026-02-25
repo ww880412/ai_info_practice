@@ -5,14 +5,18 @@
 ## 📍 当前状态（2026-02-25）
 
 ### 活跃分支
-- `main`（主线，Batch 1 已合并）
+- `main`（主线，Batch 2 已合并）
 
 ### 本次完成
-- ✅ Batch 1 系统性升级（B1.1-B1.4），21 文件 +1795/-91 行
-- ✅ KnowledgeStatus 生命周期（PENDING→TO_REVIEW→ACTIVE→ARCHIVED/DEPRECATED）
-- ✅ Entry 详情页 4→6 Tab 重构
-- ✅ AI 差异化提取（extractedMetadata）
-- ✅ 数据库 schema 已同步
+- ✅ Batch 2 系统性升级（B2.1-B2.7），27 文件 +1936/-104 行
+- ✅ Entry God Model 拆分为 4 个子表（EntryAIResult, EntryEvaluation, EntrySmartSummary, EntryNote）
+- ✅ Pipeline 工具系统启用（classify/extract/code/version 工具）
+- ✅ 前端用户操作增强（InlineEdit, TagEditor, NotePanel）
+- ✅ Dashboard 行动导向（待审阅入口、状态分布、周趋势）
+- ✅ 语义内容截断替代头中尾采样
+- ✅ 3 种新摘要结构类型（api-reference, comparison-matrix, timeline-evolution）
+- ✅ 文档修正（CLAUDE.md 目录结构、docs 索引、架构文档）
+- ✅ 数据库 schema 已同步，19 条数据已迁移
 
 ---
 
@@ -32,6 +36,7 @@
 | 前端层级管理 | codex/frontend-hierarchy | ✅ 标签侧边栏 | ✅ 分组管理 | ✅ 智能排序 | ✅ Dashboard | ✅ 已合并 |
 | Agent 透明化 | codex/agent-transparency | ✅ 元数据面板 | ✅ 质量评估 | ✅ 推理增强 | ✅ 处理日志 | ✅ 已合并 |
 | 系统性升级 Batch 1 | codex/batch1-systematic-upgrade | ✅ 状态模型 | ✅ 提取增强 | ✅ 详情页重构 | ✅ 文档修正 | ✅ 已合并 |
+| 系统性升级 Batch 2 | codex/batch2-systematic-upgrade | ✅ 模型拆分 | ✅ Pipeline 工具 | ✅ 前端增强 | ✅ 文档修正 | ✅ 已合并 |
 
 ---
 
@@ -52,8 +57,7 @@
 
 ## 🔜 项目待办
 
-- Batch 2 (P1): 数据模型拆分、Pipeline 工具启用、文档修正、前端操作增强
-- Batch 3 (P2): UI 组件、排序、批量导入、全局搜索
+- Batch 3 (P2): UI 组件、排序、批量导入、全局搜索、Prompt 整理、Parser 增强、版本化、文档归档
 
 ---
 
