@@ -15,4 +15,5 @@ export {
   PracticeStatus,
   StepStatus,
   Difficulty,
+  KnowledgeStatus,
 } from "@prisma/client";

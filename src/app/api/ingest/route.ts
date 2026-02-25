@@ -456,6 +456,7 @@ async function asyncProcess(
               contentForm: decision.contentForm,
             }
           : {}),
+        extractedMetadata: decision.extractedMetadata as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -505,8 +506,15 @@ async function asyncProcess(
       }
     }
 
-    // Mark as done
-    await updateEntryProcessStatus(entryId, "DONE", null);
+    // Mark as done and transition to TO_REVIEW
+    await prisma.entry.update({
+      where: { id: entryId },
+      data: {
+        processStatus: "DONE",
+        processError: null,
+        knowledgeStatus: "TO_REVIEW",
+      },
+    });
   } catch (error) {
     console.error("Async processing error:", error);
     await updateEntryProcessStatus(

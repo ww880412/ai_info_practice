@@ -3,7 +3,7 @@
 > AI 知识管理系统 - 智能知识收集、处理与实践跟踪
 
 ## 🧭 阶段治理定义（Phase Governance）
-- **Phase 1**：规划中（知识库核心功能）
+- **项目阶段**：Phase 1-4 已完成（知识库核心功能、AI 处理管道、练习系统、关联发现），当前处于系统性升级阶段
 - **阶段状态单点真理**：以 `PROGRESS.md` 与 `docs/PROJECT_STATUS.md` 为准；`CLAUDE.md` 仅承载治理规则，不再作为动态阶段状态来源。
 
 ## 🐳 Docker 运行环境规范
@@ -76,7 +76,7 @@ git status  # 应显示 "working tree clean"
 - **后端**: Next.js App Router API Routes
 - **数据库**: PostgreSQL 15 + Prisma 5.22.0
 - **AI**: Google Gemini API
--**: Docker **部署 + docker-compose
+- **部署**: Docker + docker-compose
 
 ## 目录结构
 
@@ -103,12 +103,22 @@ src/
 │   └── usePracticeQueue.ts
 ├── lib/                 # 核心库
 │   ├── ai/             # AI 处理模块
-│   │   ├── classifier.ts     # L1 分类
-│   │   ├── extractor.ts      # L2 提取
-│   │   ├── practiceConverter.ts  # L3 练习转换
-│   │   ├── deduplication.ts # 去重检测
-│   │   ├── smartSummary.ts  # 智能摘要
-│   │   └── associationDiscovery.ts # 关联发现
+│   │   ├── agent/     # ReAct Agent 引擎
+│   │   │   ├── engine.ts           # Agent 核心引擎
+│   │   │   ├── builtin-tools.ts    # 内置工具集
+│   │   │   ├── route-strategy.ts   # 路由策略
+│   │   │   ├── schemas.ts          # Zod 验证模式
+│   │   │   ├── types.ts            # Agent 类型定义
+│   │   │   ├── ingest-contract.ts  # 入库契约
+│   │   │   ├── config.ts           # Agent 配置
+│   │   │   ├── confidence.ts       # 置信度计算
+│   │   │   └── decision-repair.ts  # 决策修复
+│   │   ├── classifier.ts           # 内容分类（遗留）
+│   │   ├── practiceConverter.ts    # 练习转换（遗留）
+│   │   ├── deduplication.ts        # 去重检测
+│   │   ├── smartSummary.ts         # 智能摘要
+│   │   ├── associationDiscovery.ts # 关联发现
+│   │   └── fallback-policy.ts      # 降级策略
 │   ├── parser/         # 内容解析
 │   │   ├── github.ts
 │   │   ├── webpage.ts
@@ -123,12 +133,20 @@ src/
 ```
 输入 (LINK/TEXT/PDF)
     ↓
-L1 分类 (contentType, techDomain, aiTags)
+Parser 解析 (提取原始内容)
     ↓
-L2 提取 (coreSummary, keyPoints, practiceValue)
+ReAct Agent 两步推理
+    ├── Step 1: 快速分类 (contentType, techDomain, aiTags, summaryStructure)
+    └── Step 2: 深度分析 (coreSummary, keyPoints, boundaries, practiceTask)
     ↓
-L3 练习转换 (practiceTask → steps) [仅 ACTIONABLE 内容]
+输出: NormalizedAgentIngestDecision (统一契约)
 ```
+
+核心特性：
+- 基于 ReAct 模式的 Agent 引擎 (src/lib/ai/agent/engine.ts)
+- 两步推理：Step 1 快速分类 + Step 2 深度提取
+- 内置工具集：去重检测、关联发现、智能摘要
+- 置信度评估与决策修复机制
 
 ## 开发规范
 

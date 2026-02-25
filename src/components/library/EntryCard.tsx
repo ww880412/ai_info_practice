@@ -70,6 +70,7 @@ interface EntryCardProps {
     techDomain?: string | null;
     coreSummary?: string | null;
     practiceValue?: string | null;
+    knowledgeStatus?: string;
     aiTags: string[];
     userTags: string[];
     createdAt: string;
@@ -96,7 +97,13 @@ export function EntryCard({
   return (
     <div
       onClick={() => onClick(entry.id)}
-      className="bg-card border border-border rounded-lg p-4 hover:border-primary/50 hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-200"
+      className={`bg-card border rounded-lg p-4 hover:border-primary/50 hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-200 ${
+        entry.knowledgeStatus === "TO_REVIEW"
+          ? "border-yellow-300 dark:border-yellow-700"
+          : entry.knowledgeStatus === "DEPRECATED"
+            ? "border-red-300 dark:border-red-700"
+            : "border-border"
+      }`}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -136,6 +143,16 @@ export function EntryCard({
 
       {/* Tags */}
       <div className="flex flex-wrap gap-1.5">
+        {entry.knowledgeStatus === "TO_REVIEW" && (
+          <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 font-medium">
+            To Review
+          </span>
+        )}
+        {entry.knowledgeStatus === "DEPRECATED" && (
+          <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 font-medium">
+            Deprecated
+          </span>
+        )}
         {entry.contentType && (
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${contentTypeColors[entry.contentType] || "bg-accent text-secondary"}`}>
             {contentTypeLabels[entry.contentType] || entry.contentType}

@@ -88,6 +88,7 @@ export default function LibraryPage() {
   const [contentType, setContentType] = useState("");
   const [techDomain, setTechDomain] = useState("");
   const [practiceValue, setPracticeValue] = useState("");
+  const [knowledgeStatus, setKnowledgeStatus] = useState("");
   const [isPanelStackVisible, setIsPanelStackVisible] = useState(false);
   const [groupsExpanded, setGroupsExpanded] = useState(true);
   const [tagsExpanded, setTagsExpanded] = useState(true);
@@ -124,6 +125,7 @@ export default function LibraryPage() {
     contentType: contentType || undefined,
     techDomain: techDomain || undefined,
     practiceValue: practiceValue || undefined,
+    knowledgeStatus: knowledgeStatus || undefined,
     aiTagsAny: selectedAiTags.length > 0 ? selectedAiTags : undefined,
     userTagsAny: selectedUserTags.length > 0 ? selectedUserTags : undefined,
   });
@@ -292,6 +294,80 @@ export default function LibraryPage() {
             setSelectedIds([]);
           }}
         />
+
+        {/* Knowledge Status Filter Tabs */}
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <button
+            onClick={() => {
+              setKnowledgeStatus("");
+              setPage(1);
+              setSelectedIds([]);
+            }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-colors ${
+              !knowledgeStatus
+                ? "bg-primary text-white"
+                : "bg-accent text-secondary hover:bg-accent/80"
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => {
+              setKnowledgeStatus("TO_REVIEW");
+              setPage(1);
+              setSelectedIds([]);
+            }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-colors ${
+              knowledgeStatus === "TO_REVIEW"
+                ? "bg-yellow-600 text-white dark:bg-yellow-700"
+                : "bg-yellow-100 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:hover:bg-yellow-900/50"
+            }`}
+          >
+            To Review
+          </button>
+          <button
+            onClick={() => {
+              setKnowledgeStatus("ACTIVE");
+              setPage(1);
+              setSelectedIds([]);
+            }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-colors ${
+              knowledgeStatus === "ACTIVE"
+                ? "bg-green-600 text-white dark:bg-green-700"
+                : "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+            }`}
+          >
+            Active
+          </button>
+          <button
+            onClick={() => {
+              setKnowledgeStatus("ARCHIVED");
+              setPage(1);
+              setSelectedIds([]);
+            }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-colors ${
+              knowledgeStatus === "ARCHIVED"
+                ? "bg-blue-600 text-white dark:bg-blue-700"
+                : "bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+            }`}
+          >
+            Archived
+          </button>
+          <button
+            onClick={() => {
+              setKnowledgeStatus("DEPRECATED");
+              setPage(1);
+              setSelectedIds([]);
+            }}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap transition-colors ${
+              knowledgeStatus === "DEPRECATED"
+                ? "bg-red-600 text-white dark:bg-red-700"
+                : "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+            }`}
+          >
+            Deprecated
+          </button>
+        </div>
 
         {(selectedGroupId || selectedTagCount > 0) && (
           <div className="flex flex-wrap items-center gap-2">

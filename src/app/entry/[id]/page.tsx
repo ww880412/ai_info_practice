@@ -10,6 +10,7 @@ import { ReasoningTraceView } from "@/components/agent/ReasoningTraceView";
 import { DynamicSummary } from "@/components/entry/DynamicSummary";
 import { MetadataPanel } from "@/components/entry/MetadataPanel";
 import { QualityPanel } from "@/components/entry/QualityPanel";
+import { StatusActions } from "@/components/entry/StatusActions";
 import {
   ArrowLeft,
   ExternalLink,
@@ -56,11 +57,13 @@ const techDomainLabels: Record<string, string> = {
 };
 
 // Tab types
-type TabType = "overview" | "summary" | "trace" | "quality";
+type TabType = "overview" | "summary" | "practice" | "related" | "trace" | "quality";
 
 const tabs: { id: TabType; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
   { id: "overview", label: "Overview", icon: Info },
   { id: "summary", label: "Summary", icon: FileTextIcon },
+  { id: "practice", label: "Practice", icon: Brain },
+  { id: "related", label: "Related", icon: Sparkles },
   { id: "trace", label: "Trace", icon: Activity },
   { id: "quality", label: "Quality", icon: Gauge },
 ];
@@ -251,34 +254,53 @@ export default function EntryDetailPage() {
           {/* Overview Tab */}
           {activeTab === "overview" && (
             <>
+              {/* Status Actions */}
+              <StatusActions entryId={id} currentStatus={entry.knowledgeStatus} />
+
               {/* Tags */}
-              <div className="flex flex-wrap gap-2">
-                {entry.contentType && (
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-accent text-secondary font-medium">
-                    {contentTypeLabels[entry.contentType] || entry.contentType}
-                  </span>
-                )}
-                {entry.techDomain && (
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium">
-                    {techDomainLabels[entry.techDomain] || entry.techDomain}
-                  </span>
-                )}
-                {entry.practiceValue === "ACTIONABLE" && (
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-medium">
-                    Actionable
-                  </span>
-                )}
-                {entry.practiceValue === "KNOWLEDGE" && (
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-medium">
-                    Knowledge
-                  </span>
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {entry.contentType && (
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-accent text-secondary font-medium">
+                      {contentTypeLabels[entry.contentType] || entry.contentType}
+                    </span>
+                  )}
+                  {entry.techDomain && (
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium">
+                      {techDomainLabels[entry.techDomain] || entry.techDomain}
+                    </span>
+                  )}
+                  {entry.practiceValue === "ACTIONABLE" && (
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-medium">
+                      Actionable
+                    </span>
+                  )}
+                  {entry.practiceValue === "KNOWLEDGE" && (
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-medium">
+                      Knowledge
+                    </span>
+                  )}
+                </div>
+
+                {/* AI Tags */}
+                {entry.aiTags?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-secondary mb-2">AI Tags</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {entry.aiTags.map((tag: string) => (
+                        <span key={tag} className="text-xs px-2 py-0.5 rounded bg-accent text-secondary">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
 
               {/* Metadata Panel */}
               <MetadataPanel
                 summaryStructure={entry.summaryStructure}
-                coreSummary={entry.coreSummary}
+                coreSummary={null}
                 keyPoints={entry.keyPointsNew ?? entry.keyPoints}
                 boundaries={entry.boundaries}
                 hasPracticeTask={!!entry.practiceTask}
@@ -291,29 +313,6 @@ export default function EntryDetailPage() {
           {/* Summary Tab */}
           {activeTab === "summary" && (
             <>
-              {/* Core summary */}
-              {entry.coreSummary && (
-                <div className="bg-accent p-4 rounded-lg">
-                  <p className="text-xs font-medium text-secondary mb-1">Core Summary</p>
-                  <p className="text-sm">{entry.coreSummary}</p>
-                </div>
-              )}
-
-              {/* Key points */}
-              {entry.keyPoints?.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-secondary mb-2">Key Points</p>
-                  <ul className="space-y-1">
-                    {entry.keyPoints.map((point: string, i: number) => (
-                      <li key={i} className="flex items-start gap-2 text-sm">
-                        <span className="text-primary mt-0.5">•</span>
-                        {point}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
               {/* Dynamic Summary */}
               {(entry.summaryStructure || entry.keyPointsNew || entry.boundaries || entry.confidence) && (
                 <div className="border border-border rounded-lg p-4 space-y-3">
@@ -328,22 +327,35 @@ export default function EntryDetailPage() {
                 </div>
               )}
 
-              {/* AI Tags */}
-              {entry.aiTags?.length > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-secondary mb-2">Tags</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {entry.aiTags.map((tag: string) => (
-                      <span key={tag} className="text-xs px-2 py-0.5 rounded bg-accent text-secondary">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
+              {/* Core summary (fallback if no dynamic summary) */}
+              {!entry.summaryStructure && entry.coreSummary && (
+                <div className="bg-accent p-4 rounded-lg">
+                  <p className="text-xs font-medium text-secondary mb-1">Core Summary</p>
+                  <p className="text-sm">{entry.coreSummary}</p>
                 </div>
               )}
 
-              {/* Practice task */}
-              {entry.practiceTask && (
+              {/* Key points (fallback if no keyPointsNew) */}
+              {!entry.keyPointsNew && entry.keyPoints?.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-secondary mb-2">Key Points</p>
+                  <ul className="space-y-1">
+                    {entry.keyPoints.map((point: string, i: number) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <span className="text-primary mt-0.5">•</span>
+                        {point}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Practice Tab */}
+          {activeTab === "practice" && (
+            <>
+              {entry.practiceTask ? (
                 <div className="border border-border rounded-lg p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-semibold">Practice Task</h3>
@@ -368,8 +380,17 @@ export default function EntryDetailPage() {
 
                   <StepTracker steps={entry.practiceTask.steps} />
                 </div>
+              ) : (
+                <div className="border border-border rounded-lg p-4">
+                  <p className="text-xs text-secondary">No practice task available for this entry.</p>
+                </div>
               )}
+            </>
+          )}
 
+          {/* Related Tab */}
+          {activeTab === "related" && (
+            <>
               {/* Smart Summary */}
               <div className="border border-primary/20 rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between">

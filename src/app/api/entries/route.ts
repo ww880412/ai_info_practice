@@ -6,6 +6,7 @@ import {
   PracticeValue,
   SourceType,
   TechDomain,
+  KnowledgeStatus,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { parseBulkDeleteIds } from "@/lib/entries/bulk-delete";
@@ -27,7 +28,7 @@ function parseEnum<T extends string>(value: string | null, allowed: readonly T[]
  * Query params:
  * - page, pageSize: pagination
  * - q: search text
- * - contentType, techDomain, practiceValue, processStatus, sourceType: exact match filters
+ * - contentType, techDomain, practiceValue, processStatus, sourceType, knowledgeStatus: exact match filters
  * - aiTagsAll: AI tags all match (comma separated)
  * - aiTagsAny: AI tags any match (comma separated)
  * - userTagsAll: user tags all match (comma separated)
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
     const practiceValue = parseEnum(searchParams.get("practiceValue"), Object.values(PracticeValue));
     const processStatus = parseEnum(searchParams.get("processStatus"), Object.values(ProcessStatus));
     const sourceType = parseEnum(searchParams.get("sourceType"), Object.values(SourceType));
+    const knowledgeStatus = parseEnum(searchParams.get("knowledgeStatus"), Object.values(KnowledgeStatus));
 
     // Tag filters
     const aiTagsAll = searchParams.get("aiTagsAll");
@@ -83,6 +85,7 @@ export async function GET(request: NextRequest) {
     if (practiceValue) where.practiceValue = practiceValue;
     if (processStatus) where.processStatus = processStatus;
     if (sourceType) where.sourceType = sourceType;
+    if (knowledgeStatus) where.knowledgeStatus = knowledgeStatus;
     if (groupId) {
       where.groups = { some: { id: groupId } };
     }

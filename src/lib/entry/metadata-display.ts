@@ -31,7 +31,6 @@ interface BuildMetadataRowsInput {
 }
 
 const FIELD_DEFS: Array<{ key: string; label: string }> = [
-  { key: "coreSummary", label: "Core Summary" },
   { key: "keyPoints", label: "Key Points" },
   { key: "summaryStructure", label: "Summary Structure" },
   { key: "boundaries", label: "Boundaries" },
@@ -79,15 +78,6 @@ function getFieldValue(
   structure?: SummaryStructure
 ): string | null {
   switch (key) {
-    case "coreSummary": {
-      const summaryCandidate = firstNonEmptyString([
-        fields.summary,
-        fields.coreSummary,
-        input.coreSummary,
-      ]);
-      return summaryCandidate;
-    }
-
     case "keyPoints": {
       const points = extractKeyPoints(input.keyPoints ?? fields.keyPoints);
       if (points.length === 0) return null;
@@ -175,13 +165,4 @@ function parseBoundaries(value: unknown): { applicableCount: number; notApplicab
     applicableCount,
     notApplicableCount,
   };
-}
-
-function firstNonEmptyString(values: unknown[]): string | null {
-  for (const value of values) {
-    if (typeof value !== "string") continue;
-    const trimmed = value.trim();
-    if (trimmed) return trimmed;
-  }
-  return null;
 }

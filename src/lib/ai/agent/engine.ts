@@ -350,6 +350,35 @@ ${sampledContent}
   ): string {
     const contentSnapshot = buildContentSnapshot(input.content, STEP2_INPUT_LIMIT);
     const step1Json = JSON.stringify(step1, null, 2);
+    const contentType = step1.contentType as string | undefined;
+
+    // Build differentiated extraction instructions based on contentType
+    let extractionHints = "";
+    if (contentType === "TUTORIAL") {
+      extractionHints = `
+特别提取要求（TUTORIAL）：
+- extractedMetadata.codeExamples: 提取代码示例（language, code, description）
+- extractedMetadata.references: 提取参考链接（官方文档、相关博客等）`;
+    } else if (contentType === "TOOL_RECOMMENDATION") {
+      extractionHints = `
+特别提取要求（TOOL_RECOMMENDATION）：
+- extractedMetadata.versionInfo: 提取工具版本信息（tool, version, releaseDate）
+- extractedMetadata.references: 提取官方链接和相关资源`;
+    } else if (contentType === "TECH_PRINCIPLE") {
+      extractionHints = `
+特别提取要求（TECH_PRINCIPLE）：
+- extractedMetadata.references: 提取论文、权威来源链接`;
+    } else if (contentType === "CASE_STUDY") {
+      extractionHints = `
+特别提取要求（CASE_STUDY）：
+- extractedMetadata.author: 提取作者或团队信息
+- extractedMetadata.references: 提取相关案例链接`;
+    } else if (contentType === "OPINION") {
+      extractionHints = `
+特别提取要求（OPINION）：
+- extractedMetadata.author: 提取作者信息
+- extractedMetadata.publishDate: 提取发布日期`;
+    }
 
     return `你是知识提取专家，请执行 Step 2：基于 Step 1 的结构规划提取完整结果。
 
@@ -359,6 +388,7 @@ ${step1Json}
 输入标题：${input.title}
 输入来源：${input.sourceType}
 原始内容长度：${input.content.length} 字符
+${extractionHints}
 
 信息密度要求：
 - 长度 < 5000：core 建议 3-5 条，extended 1-2 条
@@ -405,7 +435,15 @@ ${contentSnapshot}
     "applicable": ["string"],
     "notApplicable": ["string"]
   },
-  "confidence": 0.0
+  "confidence": 0.0,
+  "extractedMetadata": {
+    "author": "string (optional)",
+    "publishDate": "string (optional)",
+    "sourceUrl": "string (optional)",
+    "codeExamples": [{ "language": "string", "code": "string", "description": "string" }] (optional),
+    "references": [{ "title": "string", "url": "string", "type": "official|blog|paper|repo" }] (optional),
+    "versionInfo": { "tool": "string", "version": "string", "releaseDate": "string (optional)" } (optional)
+  }
 }`;
   }
 

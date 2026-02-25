@@ -3,6 +3,30 @@
  */
 import { z } from 'zod';
 
+// Extracted Metadata schema (B1.4)
+export const ExtractedMetadataSchema = z.object({
+  author: z.string().optional(),
+  publishDate: z.string().optional(),
+  sourceUrl: z.string().optional(),
+  codeExamples: z.array(z.object({
+    language: z.string(),
+    code: z.string(),
+    description: z.string(),
+  })).optional(),
+  references: z.array(z.object({
+    title: z.string(),
+    url: z.string(),
+    type: z.enum(['official', 'blog', 'paper', 'repo']),
+  })).optional(),
+  versionInfo: z.object({
+    tool: z.string(),
+    version: z.string(),
+    releaseDate: z.string().optional(),
+  }).optional(),
+});
+
+export type ExtractedMetadata = z.infer<typeof ExtractedMetadataSchema>;
+
 // Summary structure types
 export const SummaryStructureTypeSchema = z.enum([
   'problem-solution-steps',

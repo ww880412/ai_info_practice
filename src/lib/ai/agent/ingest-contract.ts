@@ -7,6 +7,7 @@ import type {
   Timeliness,
   TrustLevel,
 } from "@prisma/client";
+import type { ExtractedMetadata } from "./schemas";
 
 export interface NormalizedPracticeStep {
   order: number;
@@ -64,6 +65,7 @@ export interface NormalizedAgentIngestDecision {
   practiceValue: PracticeValue;
   practiceReason: string;
   practiceTask: NormalizedPracticeTask | null;
+  extractedMetadata?: ExtractedMetadata;
 }
 
 interface NormalizeAgentDecisionOptions {
@@ -858,5 +860,6 @@ export function normalizeAgentIngestDecision(
     practiceValue,
     practiceReason: toStringValue(record.practiceReason),
     practiceTask,
+    extractedMetadata: toObject(record.extractedMetadata) as ExtractedMetadata | undefined,
   };
 }

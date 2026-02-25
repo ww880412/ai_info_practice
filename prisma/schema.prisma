@@ -26,6 +26,15 @@ model Entry {
   processStatus ProcessStatus  @default(PENDING)
   processError  String?
 
+  // Knowledge management status (B1.2)
+  knowledgeStatus KnowledgeStatus @default(PENDING)
+  reviewedAt      DateTime?
+  archivedAt      DateTime?
+  deprecatedReason String?
+
+  // AI extracted metadata (B1.4)
+  extractedMetadata Json?
+
   // L1 classification
   contentType   ContentType?
   techDomain    TechDomain?
@@ -74,6 +83,8 @@ model Entry {
   groups Group[] @relation("EntryGroups")
 
   @@index([processStatus])
+  @@index([knowledgeStatus])
+  @@index([knowledgeStatus, reviewedAt])
   @@index([contentType])
   @@index([techDomain])
   @@index([createdAt])
@@ -227,6 +238,14 @@ enum Difficulty {
   EASY
   MEDIUM
   HARD
+}
+
+enum KnowledgeStatus {
+  PENDING
+  TO_REVIEW
+  ACTIVE
+  ARCHIVED
+  DEPRECATED
 }
 
 enum ContentForm {

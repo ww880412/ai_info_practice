@@ -11,6 +11,7 @@ interface UseEntriesParams {
   techDomain?: string;
   practiceValue?: string;
   sourceType?: string;
+  knowledgeStatus?: string;
   aiTagsAll?: string[];
   aiTagsAny?: string[];
   userTagsAll?: string[];
@@ -28,6 +29,7 @@ export function useEntries(params: UseEntriesParams = {}) {
     techDomain,
     practiceValue,
     sourceType,
+    knowledgeStatus,
     aiTagsAll,
     aiTagsAny,
     userTagsAll,
@@ -47,6 +49,7 @@ export function useEntries(params: UseEntriesParams = {}) {
       if (techDomain) searchParams.set("techDomain", techDomain);
       if (practiceValue) searchParams.set("practiceValue", practiceValue);
       if (sourceType) searchParams.set("sourceType", sourceType);
+      if (knowledgeStatus) searchParams.set("knowledgeStatus", knowledgeStatus);
       if (aiTagsAll && aiTagsAll.length > 0) searchParams.set("aiTagsAll", aiTagsAll.join(","));
       if (aiTagsAny && aiTagsAny.length > 0) searchParams.set("aiTagsAny", aiTagsAny.join(","));
       if (userTagsAll && userTagsAll.length > 0) searchParams.set("userTagsAll", userTagsAll.join(","));
