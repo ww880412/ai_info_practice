@@ -1,9 +1,8 @@
 FROM node:20-alpine AS base
-RUN apk add --no-cache poppler-utils
+RUN apk add --no-cache poppler-utils libc6-compat openssl
 
 # ── Stage 1: Install dependencies ─────────────────────────────────────────
 FROM base AS deps
-RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
