@@ -17,6 +17,8 @@ interface UseEntriesParams {
   userTagsAll?: string[];
   userTagsAny?: string[];
   sort?: "createdAt" | "updatedAt" | "confidence" | "practiceValue" | "difficulty" | "smart";
+  sortBy?: "createdAt" | "updatedAt" | "title";
+  sortOrder?: "asc" | "desc";
 }
 
 export function useEntries(params: UseEntriesParams = {}) {
@@ -35,6 +37,8 @@ export function useEntries(params: UseEntriesParams = {}) {
     userTagsAll,
     userTagsAny,
     sort,
+    sortBy,
+    sortOrder,
   } = params;
 
   return useQuery({
@@ -55,6 +59,8 @@ export function useEntries(params: UseEntriesParams = {}) {
       if (userTagsAll && userTagsAll.length > 0) searchParams.set("userTagsAll", userTagsAll.join(","));
       if (userTagsAny && userTagsAny.length > 0) searchParams.set("userTagsAny", userTagsAny.join(","));
       if (sort) searchParams.set("sort", sort);
+      if (sortBy) searchParams.set("sortBy", sortBy);
+      if (sortOrder) searchParams.set("sortOrder", sortOrder);
 
       const res = await fetch(`/api/entries?${searchParams}`);
       if (!res.ok) throw new Error("Failed to fetch entries");

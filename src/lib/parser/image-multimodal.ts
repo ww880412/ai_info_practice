@@ -1,7 +1,20 @@
 import { generateFromFile } from '../gemini';
-import { PROMPTS } from '../ai/prompts';
 import type { ParseStrategy, ParseInput, ParseResult } from './strategy';
 import { SourceType } from '@prisma/client';
+
+const EXTRACT_FROM_FILE_PROMPT = `提取这个文件/图片中的所有文字内容。
+
+返回格式（严格 JSON，不要添加任何额外文字）：
+{
+  "title": "文档标题（从内容推断）",
+  "content": "提取的完整文字内容（保留原始结构，使用 Markdown 格式）"
+}
+
+要求：
+- 提取所有可见文字，不要遗漏
+- 保留文章结构（标题、段落、列表、代码块等）
+- 如果是截图，识别所有文字内容
+- 不要进行总结或改写，忠实提取原文`;
 
 export class ImageMultimodalStrategy implements ParseStrategy {
   name = 'ImageMultimodalStrategy';
@@ -16,7 +29,7 @@ export class ImageMultimodalStrategy implements ParseStrategy {
     const base64 = buffer.toString('base64');
 
     const result = await generateFromFile<{ title: string; content: string }>(
-      PROMPTS.extractFromFile(),
+      EXTRACT_FROM_FILE_PROMPT,
       { base64, mimeType: input.mimeType || 'image/png' }
     );
 

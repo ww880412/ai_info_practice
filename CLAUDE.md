@@ -269,7 +269,6 @@ docker compose exec app npm run lint
 | `docs/architecture/` | 架构设计文档 |
 | `docs/guides/` | 使用指南和教程 |
 | `docs/plans/` | 实施计划 |
-| `docs/operations/` | 运维文档 |
 | `docs/archive/` | 历史归档 |
 
 **命名规范**：

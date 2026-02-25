@@ -63,7 +63,7 @@ async function main() {
 
       if (hasAIData) {
         await tx.entryAIResult.upsert({
-          where: { entryId: entry.id },
+          where: { entryId_version: { entryId: entry.id, version: 1 } },
           create: {
             entryId: entry.id,
             contentType: entry.contentType,

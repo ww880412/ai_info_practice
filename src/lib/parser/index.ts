@@ -9,6 +9,8 @@ import { TextStrategy } from "./text";
 import { PdfTextStrategy } from "./pdf-text";
 import { OcrStrategy } from "./ocr";
 import { ImageMultimodalStrategy } from "./image-multimodal";
+import { MarkdownStrategy } from "./markdown";
+import { YouTubeStrategy } from "./youtube";
 import type { SourceType } from "@prisma/client";
 import type { ParseInput, ParseResult as StrategyParseResult, ParseStrategy } from "./strategy";
 import { parserRegistry } from "./registry";
@@ -46,6 +48,7 @@ const githubStrategy: ParseStrategy = {
       sourceType: result.sourceType,
       strategy: "github",
       processingTime: 0,
+      metadata: result.metadata,
     };
   },
 };
@@ -67,6 +70,7 @@ const webpageStrategy: ParseStrategy = {
       sourceType: result.sourceType,
       strategy: "webpage",
       processingTime: 0,
+      metadata: result.metadata,
     };
   },
 };
@@ -102,6 +106,9 @@ const pdfStrategy: ParseStrategy = {
  * Order matters: more specific strategies should be registered first
  */
 function initializeRegistry() {
+  // YouTube must be before generic webpage
+  parserRegistry.register(new YouTubeStrategy());
+
   parserRegistry.register(githubStrategy);
   parserRegistry.register(webpageStrategy);
 
@@ -118,6 +125,9 @@ function initializeRegistry() {
   pdfTextStrategy.setFallback(pdfStrategy);
   parserRegistry.register(pdfTextStrategy);
   parserRegistry.register(pdfStrategy);
+
+  // Markdown strategy
+  parserRegistry.register(new MarkdownStrategy());
 
   const textStrategy = new TextStrategy();
   parserRegistry.register(textStrategy);

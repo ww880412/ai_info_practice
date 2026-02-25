@@ -10,12 +10,22 @@ export interface ParseInput {
   size: number;
 }
 
+export interface ParseMetadata {
+  author?: string;
+  publishDate?: string;
+  keywords?: string[];
+  stars?: number;
+  topics?: string[];
+  language?: string;
+}
+
 export interface ParseResult {
   title: string;
   content: string;
   sourceType: SourceType;
   strategy: string;
   processingTime: number;
+  metadata?: ParseMetadata;
 }
 
 export interface ParseStrategy {

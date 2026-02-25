@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Prisma } from "@prisma/client";
 import { prisma } from '@/lib/prisma';
+import { QualityOverrideSchema } from '@/lib/ai/agent/schemas';
 
 // 质量评估维度
 interface QualityDimensions {
@@ -98,7 +99,11 @@ export async function GET(
     const aiAssessment = buildAIAssessment(entry);
 
     // 用户覆盖
-    const override = entry.qualityOverride as Record<string, unknown> | null;
+    let override: Record<string, unknown> | null = null;
+    if (entry.qualityOverride) {
+      const parsed = QualityOverrideSchema.safeParse(entry.qualityOverride);
+      override = parsed.success ? parsed.data : (entry.qualityOverride as Record<string, unknown>);
+    }
 
     // 合并 AI 评估和用户覆盖
     const dimensions = override
@@ -141,6 +146,15 @@ export async function PATCH(
       override: Record<string, unknown>;
       reason?: string;
     };
+
+    // Validate override with Zod
+    const validationResult = QualityOverrideSchema.safeParse(override);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid quality override format', details: validationResult.error.issues },
+        { status: 400 }
+      );
+    }
 
     // 获取当前评估
     const entry = await prisma.entry.findUnique({

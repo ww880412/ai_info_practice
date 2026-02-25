@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/common/Toast";
 
 interface InlineEditProps {
   value: string;
@@ -12,6 +13,7 @@ export function InlineEdit({ value, onSave, className = "" }: InlineEditProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
   const [isSaving, setIsSaving] = useState(false);
+  const { showToast } = useToast();
 
   const handleSave = async () => {
     if (editValue.trim() === value.trim()) {
@@ -25,7 +27,7 @@ export function InlineEdit({ value, onSave, className = "" }: InlineEditProps) {
       setIsEditing(false);
     } catch (error) {
       console.error("Failed to save:", error);
-      alert("Failed to save changes");
+      showToast("error", "Failed to save changes");
     } finally {
       setIsSaving(false);
     }

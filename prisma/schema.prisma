@@ -83,7 +83,7 @@ model Entry {
   groups Group[] @relation("EntryGroups")
 
   // New relations (B2.1)
-  aiResult EntryAIResult?
+  aiResults EntryAIResult[]
   evaluation EntryEvaluation?
   smartSummaryRelation EntrySmartSummary?
   notes EntryNote[]
@@ -345,7 +345,7 @@ model AgentConfig {
 
 model EntryAIResult {
   id        String   @id @default(cuid())
-  entryId   String   @unique
+  entryId   String
   entry     Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
   contentType       ContentType?
@@ -360,10 +360,15 @@ model EntryAIResult {
   confidence        Float?
   extractedMetadata Json?
 
+  version   Int     @default(1)
+  isActive  Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([entryId, version])
   @@index([entryId])
+  @@index([entryId, isActive])
 }
 
 model EntryEvaluation {

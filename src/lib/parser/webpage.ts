@@ -2,11 +2,13 @@
  * Generic webpage parser using cheerio.
  */
 import * as cheerio from "cheerio";
+import type { ParseMetadata } from "./strategy";
 
 interface WebpageParseResult {
   title: string;
   content: string;
   sourceType: "WEBPAGE" | "WECHAT" | "TWITTER";
+  metadata?: ParseMetadata;
 }
 
 export function isWeChatUrl(url: string): boolean {
@@ -15,6 +17,35 @@ export function isWeChatUrl(url: string): boolean {
 
 export function isTwitterUrl(url: string): boolean {
   return url.includes("twitter.com") || url.includes("x.com");
+}
+
+function extractMetadata($: ReturnType<typeof cheerio.load>): ParseMetadata {
+  const metadata: ParseMetadata = {};
+
+  // Extract author
+  const author =
+    $("meta[property='og:author']").attr("content") ||
+    $("meta[name='author']").attr("content") ||
+    $("meta[property='article:author']").attr("content");
+  if (author) metadata.author = author.trim();
+
+  // Extract publish date
+  const publishDate =
+    $("meta[property='article:published_time']").attr("content") ||
+    $("meta[name='date']").attr("content") ||
+    $("meta[property='og:published_time']").attr("content");
+  if (publishDate) metadata.publishDate = publishDate.trim();
+
+  // Extract keywords
+  const keywordsStr = $("meta[name='keywords']").attr("content");
+  if (keywordsStr) {
+    metadata.keywords = keywordsStr
+      .split(",")
+      .map(k => k.trim())
+      .filter(k => k.length > 0);
+  }
+
+  return metadata;
 }
 
 export async function parseWebpage(url: string): Promise<WebpageParseResult> {
@@ -36,6 +67,9 @@ export async function parseWebpage(url: string): Promise<WebpageParseResult> {
 
   const html = await response.text();
   const $ = cheerio.load(html);
+
+  // Extract metadata
+  const metadata = extractMetadata($);
 
   // Remove noise elements
   $("script, style, nav, footer, header, aside, .sidebar, .ads, .comment, .navigation").remove();
@@ -84,5 +118,5 @@ export async function parseWebpage(url: string): Promise<WebpageParseResult> {
     );
   }
 
-  return { title, content, sourceType };
+  return { title, content, sourceType, metadata };
 }

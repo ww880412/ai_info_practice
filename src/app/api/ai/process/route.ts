@@ -23,6 +23,11 @@ import {
 } from "@/lib/ingest/retry";
 import type { ParseResult } from "@/lib/parser";
 import type { Prisma, ProcessStatus } from "@prisma/client";
+import {
+  SummaryStructureSchema,
+  KeyPointsSchema,
+  BoundariesSchema,
+} from "@/lib/ai/agent/schemas";
 
 function shouldAllowLegacyClassifierFallback(): boolean {
   return isLegacyClassifierFallbackEnabled(process.env.ALLOW_CLASSIFIER_FALLBACK);
@@ -261,6 +266,25 @@ export async function POST(request: NextRequest) {
       0.6
     );
 
+    // Validate JSON fields before writing
+    const validatedKeyPointsNew = decision.keyPointsNew
+      ? KeyPointsSchema.safeParse(decision.keyPointsNew).success
+        ? decision.keyPointsNew
+        : { core: [], extended: [] }
+      : { core: [], extended: [] };
+
+    const validatedBoundaries = decision.boundaries
+      ? BoundariesSchema.safeParse(decision.boundaries).success
+        ? decision.boundaries
+        : { applicable: [], notApplicable: [] }
+      : { applicable: [], notApplicable: [] };
+
+    const validatedSummaryStructure = decision.summaryStructure
+      ? SummaryStructureSchema.safeParse(decision.summaryStructure).success
+        ? decision.summaryStructure
+        : { type: "generic", fields: { summary: decision.coreSummary, keyPoints: decision.keyPoints } }
+      : { type: "generic", fields: { summary: decision.coreSummary, keyPoints: decision.keyPoints } };
+
     await prisma.entry.update({
       where: { id: targetEntryId },
       data: {
@@ -272,10 +296,9 @@ export async function POST(request: NextRequest) {
         practiceValue: decision.practiceValue,
         ...(dynamicSummaryEnabled
           ? {
-              keyPointsNew: decision.keyPointsNew as unknown as Prisma.InputJsonValue,
-              boundaries: decision.boundaries as unknown as Prisma.InputJsonValue,
-              summaryStructure:
-                decision.summaryStructure as unknown as Prisma.InputJsonValue,
+              keyPointsNew: validatedKeyPointsNew as unknown as Prisma.InputJsonValue,
+              boundaries: validatedBoundaries as unknown as Prisma.InputJsonValue,
+              summaryStructure: validatedSummaryStructure as unknown as Prisma.InputJsonValue,
               confidence: computedConfidence,
               difficulty: decision.difficulty,
               sourceTrust: decision.sourceTrust,

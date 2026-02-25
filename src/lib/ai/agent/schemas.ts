@@ -205,3 +205,14 @@ export function getRequiredFields(type: SummaryStructureType): string[] {
       return [];
   }
 }
+
+// Quality Override schema (for smartSummary quality control)
+export const QualityOverrideSchema = z.object({
+  reason: z.string(),
+  overriddenBy: z.string().optional(),
+  overriddenAt: z.string().optional(),
+  originalScore: z.number().optional(),
+  newScore: z.number().optional(),
+});
+
+export type QualityOverride = z.infer<typeof QualityOverrideSchema>;

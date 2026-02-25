@@ -20,7 +20,7 @@ export async function GET(
           },
         },
         // B2.1: Include new split tables
-        aiResult: true,
+        aiResults: { where: { isActive: true }, take: 1 },
         evaluation: true,
         smartSummaryRelation: true,
         notes: { orderBy: { createdAt: "desc" } },
@@ -85,17 +85,19 @@ export async function PATCH(
           where: { id },
           data: aiResultUpdate,
         });
-        await tx.entryAIResult.update({
-          where: { entryId: id },
+        await tx.entryAIResult.updateMany({
+          where: { entryId: id, isActive: true },
           data: aiResultUpdate,
-        }).catch(() => {
-          // If EntryAIResult doesn't exist yet, create it
-          return tx.entryAIResult.create({
-            data: {
-              entryId: id,
-              ...aiResultUpdate,
-            },
-          });
+        }).then(async (result) => {
+          if (result.count === 0) {
+            // If no active EntryAIResult exists, create one
+            return tx.entryAIResult.create({
+              data: {
+                entryId: id,
+                ...aiResultUpdate,
+              },
+            });
+          }
         });
       }
 
@@ -129,7 +131,7 @@ export async function PATCH(
             steps: { orderBy: { order: "asc" } },
           },
         },
-        aiResult: true,
+        aiResults: { where: { isActive: true }, take: 1 },
         evaluation: true,
         smartSummaryRelation: true,
         notes: { orderBy: { createdAt: "desc" } },

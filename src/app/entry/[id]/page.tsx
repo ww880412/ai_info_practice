@@ -14,6 +14,7 @@ import { StatusActions } from "@/components/entry/StatusActions";
 import { InlineEdit } from "@/components/entry/InlineEdit";
 import { TagEditor } from "@/components/entry/TagEditor";
 import { NotePanel } from "@/components/entry/NotePanel";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import {
   ArrowLeft,
   ExternalLink,
@@ -78,6 +79,7 @@ export default function EntryDetailPage() {
   const id = params.id as string;
   const { data: entry, isLoading } = useEntry(id);
   const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const reprocess = useMutation({
     mutationFn: async () => {
@@ -595,15 +597,27 @@ export default function EntryDetailPage() {
           Re-process
         </button>
         <button
-          onClick={() => {
-            if (confirm("Delete this entry?")) deleteEntry.mutate();
-          }}
+          onClick={() => setShowDeleteConfirm(true)}
           disabled={deleteEntry.isPending}
           className="px-3 py-1.5 text-sm text-danger border border-danger/30 rounded-lg hover:bg-danger/5 disabled:opacity-50 transition-colors"
         >
           Delete
         </button>
       </div>
+
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        title="Delete Entry"
+        description="Delete this entry? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        danger={true}
+        onConfirm={() => {
+          deleteEntry.mutate();
+          setShowDeleteConfirm(false);
+        }}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

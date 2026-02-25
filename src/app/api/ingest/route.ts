@@ -33,6 +33,11 @@ import {
 import { readFile, unlink } from "fs/promises";
 import { join } from "path";
 import type { Prisma, ProcessStatus, SourceType } from "@prisma/client";
+import {
+  SummaryStructureSchema,
+  KeyPointsSchema,
+  BoundariesSchema,
+} from "@/lib/ai/agent/schemas";
 
 function buildDecisionFromClassifier(
   result: ClassifyAndExtractResult
@@ -433,6 +438,25 @@ async function asyncProcess(
       0.6
     );
 
+    // Validate JSON fields before writing
+    const validatedKeyPointsNew = decision.keyPointsNew
+      ? KeyPointsSchema.safeParse(decision.keyPointsNew).success
+        ? decision.keyPointsNew
+        : { core: [], extended: [] }
+      : { core: [], extended: [] };
+
+    const validatedBoundaries = decision.boundaries
+      ? BoundariesSchema.safeParse(decision.boundaries).success
+        ? decision.boundaries
+        : { applicable: [], notApplicable: [] }
+      : { applicable: [], notApplicable: [] };
+
+    const validatedSummaryStructure = decision.summaryStructure
+      ? SummaryStructureSchema.safeParse(decision.summaryStructure).success
+        ? decision.summaryStructure
+        : { type: "generic", fields: { summary: decision.coreSummary, keyPoints: decision.keyPoints } }
+      : { type: "generic", fields: { summary: decision.coreSummary, keyPoints: decision.keyPoints } };
+
     // B2.1: Dual-write to both Entry (old fields) and new split tables
     await prisma.$transaction(async (tx) => {
       // Update Entry with old fields (backward compat)
@@ -448,10 +472,9 @@ async function asyncProcess(
           practiceValue: decision.practiceValue,
           ...(dynamicSummaryEnabled
             ? {
-                keyPointsNew: decision.keyPointsNew as unknown as Prisma.InputJsonValue,
-                boundaries: decision.boundaries as unknown as Prisma.InputJsonValue,
-                summaryStructure:
-                  decision.summaryStructure as unknown as Prisma.InputJsonValue,
+                keyPointsNew: validatedKeyPointsNew as unknown as Prisma.InputJsonValue,
+                boundaries: validatedBoundaries as unknown as Prisma.InputJsonValue,
+                summaryStructure: validatedSummaryStructure as unknown as Prisma.InputJsonValue,
                 confidence: computedConfidence,
                 difficulty: decision.difficulty,
                 sourceTrust: decision.sourceTrust,
@@ -463,33 +486,37 @@ async function asyncProcess(
         },
       });
 
-      // Write to EntryAIResult (new table)
-      await tx.entryAIResult.upsert({
+      // Write to EntryAIResult (new table) with versioning
+      // First, deactivate old versions
+      await tx.entryAIResult.updateMany({
+        where: { entryId, isActive: true },
+        data: { isActive: false },
+      });
+
+      // Get the latest version number
+      const latestVersion = await tx.entryAIResult.findFirst({
         where: { entryId },
-        create: {
+        orderBy: { version: 'desc' },
+        select: { version: true },
+      });
+
+      const newVersion = (latestVersion?.version ?? 0) + 1;
+
+      // Create new version
+      await tx.entryAIResult.create({
+        data: {
           entryId,
+          version: newVersion,
+          isActive: true,
           contentType: decision.contentType,
           techDomain: decision.techDomain,
           aiTags: decision.aiTags,
           coreSummary: decision.coreSummary,
           keyPoints: decision.keyPoints,
           practiceValue: decision.practiceValue,
-          summaryStructure: decision.summaryStructure as unknown as Prisma.InputJsonValue,
-          keyPointsNew: decision.keyPointsNew as unknown as Prisma.InputJsonValue,
-          boundaries: decision.boundaries as unknown as Prisma.InputJsonValue,
-          confidence: computedConfidence,
-          extractedMetadata: decision.extractedMetadata as unknown as Prisma.InputJsonValue,
-        },
-        update: {
-          contentType: decision.contentType,
-          techDomain: decision.techDomain,
-          aiTags: decision.aiTags,
-          coreSummary: decision.coreSummary,
-          keyPoints: decision.keyPoints,
-          practiceValue: decision.practiceValue,
-          summaryStructure: decision.summaryStructure as unknown as Prisma.InputJsonValue,
-          keyPointsNew: decision.keyPointsNew as unknown as Prisma.InputJsonValue,
-          boundaries: decision.boundaries as unknown as Prisma.InputJsonValue,
+          summaryStructure: validatedSummaryStructure as unknown as Prisma.InputJsonValue,
+          keyPointsNew: validatedKeyPointsNew as unknown as Prisma.InputJsonValue,
+          boundaries: validatedBoundaries as unknown as Prisma.InputJsonValue,
           confidence: computedConfidence,
           extractedMetadata: decision.extractedMetadata as unknown as Prisma.InputJsonValue,
         },

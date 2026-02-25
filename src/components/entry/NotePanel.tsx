@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useEntryNotes } from "@/hooks/useEntryNotes";
+import { useToast } from "@/components/common/Toast";
 
 interface NotePanelProps {
   entryId: string;
@@ -11,6 +12,7 @@ export function NotePanel({ entryId }: NotePanelProps) {
   const { notes, isLoading, createNote } = useEntryNotes(entryId);
   const [noteContent, setNoteContent] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { showToast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +24,7 @@ export function NotePanel({ entryId }: NotePanelProps) {
       setNoteContent("");
     } catch (error) {
       console.error("Failed to create note:", error);
-      alert("Failed to create note");
+      showToast("error", "Failed to create note");
     } finally {
       setIsSubmitting(false);
     }

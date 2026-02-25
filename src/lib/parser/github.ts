@@ -1,11 +1,13 @@
 /**
  * GitHub content parser - fetches README from GitHub repos.
  */
+import type { ParseMetadata } from "./strategy";
 
 interface GitHubParseResult {
   title: string;
   content: string;
   sourceType: "GITHUB";
+  metadata?: ParseMetadata;
 }
 
 function parseGitHubUrl(url: string): { owner: string; repo: string } {
@@ -39,6 +41,18 @@ export async function parseGitHub(url: string): Promise<GitHubParseResult> {
   const repoData = await repoRes.json();
   const title = repoData.full_name + (repoData.description ? ` - ${repoData.description}` : "");
 
+  // Extract metadata
+  const metadata: ParseMetadata = {};
+  if (repoData.stargazers_count !== undefined) {
+    metadata.stars = repoData.stargazers_count;
+  }
+  if (repoData.language) {
+    metadata.language = repoData.language;
+  }
+  if (Array.isArray(repoData.topics) && repoData.topics.length > 0) {
+    metadata.topics = repoData.topics;
+  }
+
   // Fetch README
   const readmeRes = await fetch(
     `https://api.github.com/repos/${owner}/${repo}/readme`,
@@ -57,5 +71,5 @@ export async function parseGitHub(url: string): Promise<GitHubParseResult> {
     content = `Repository: ${repoData.full_name}\nDescription: ${repoData.description || "N/A"}\nStars: ${repoData.stargazers_count}\nLanguage: ${repoData.language || "N/A"}`;
   }
 
-  return { title, content, sourceType: "GITHUB" };
+  return { title, content, sourceType: "GITHUB", metadata };
 }

@@ -33,7 +33,9 @@ function parseEnum<T extends string>(value: string | null, allowed: readonly T[]
  * - aiTagsAny: AI tags any match (comma separated)
  * - userTagsAll: user tags all match (comma separated)
  * - userTagsAny: user tags any match (comma separated)
- * - sort: createdAt | updatedAt | confidence | practiceValue | difficulty | smart
+ * - sort: createdAt | updatedAt | confidence | practiceValue | difficulty | smart (legacy)
+ * - sortBy: createdAt | updatedAt | title (new)
+ * - sortOrder: asc | desc (new, default: desc)
  *
  * Boolean logic (hardcoded):
  * - Same category: All AND Any
@@ -63,6 +65,8 @@ export async function GET(request: NextRequest) {
 
     // Sort
     const sort = searchParams.get("sort") || "createdAt";
+    const sortBy = searchParams.get("sortBy") || "createdAt";
+    const sortOrder = searchParams.get("sortOrder") || "desc";
 
     const where: Prisma.EntryWhereInput = {};
     const andConditions: Prisma.EntryWhereInput[] = [];
@@ -109,11 +113,24 @@ export async function GET(request: NextRequest) {
     // Determine orderBy
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let orderBy: any = { createdAt: "desc" };
+
+    // Support legacy 'sort' parameter for backward compatibility
     if (sort === "updatedAt") orderBy = { updatedAt: "desc" };
     else if (sort === "confidence") orderBy = { confidence: "desc" };
     else if (sort === "practiceValue") orderBy = { practiceValue: "desc" };
     else if (sort === "difficulty") orderBy = { difficulty: "asc" };
     else if (sort === "smart") orderBy = { updatedAt: "desc" };
+
+    // New sortBy/sortOrder parameters take precedence
+    if (sortBy && sortBy !== "createdAt") {
+      const order = sortOrder === "asc" ? "asc" : "desc";
+      if (sortBy === "updatedAt") orderBy = { updatedAt: order };
+      else if (sortBy === "title") orderBy = { title: order };
+      else if (sortBy === "createdAt") orderBy = { createdAt: order };
+    } else if (sortBy === "createdAt") {
+      const order = sortOrder === "asc" ? "asc" : "desc";
+      orderBy = { createdAt: order };
+    }
 
     const [data, total] = await Promise.all([
       prisma.entry.findMany({
@@ -125,7 +142,7 @@ export async function GET(request: NextRequest) {
             },
           },
           // B2.1: Include new split tables
-          aiResult: true,
+          aiResults: { where: { isActive: true }, take: 1 },
           evaluation: true,
           smartSummaryRelation: true,
         },

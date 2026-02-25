@@ -5,6 +5,7 @@ import { useIngest } from "@/hooks/useIngest";
 import { useEntry } from "@/hooks/useEntries";
 import { X, Link2, FileUp, Type, Loader2, CheckCircle2, AlertCircle, TriangleAlert } from "lucide-react";
 import Link from "next/link";
+import { useToast } from "@/components/common/Toast";
 
 type Tab = "link" | "file" | "text";
 
@@ -19,6 +20,8 @@ export function IngestDialog({ open, onClose }: IngestDialogProps) {
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [dismissedSimilarWarning, setDismissedSimilarWarning] = useState(false);
+  const [batchUrls, setBatchUrls] = useState<{ url: string; status: "pending" | "processing" | "success" | "error"; error?: string }[]>([]);
+  const { showToast } = useToast();
 
   const { ingestLink, ingestFile, ingestText, processingId, clearProcessingId, similarEntries } = useIngest();
 
@@ -32,16 +35,52 @@ export function IngestDialog({ open, onClose }: IngestDialogProps) {
   const hasSimilarEntries = (similarEntries?.length ?? 0) > 0;
   const showSimilarWarning = hasSimilarEntries && !dismissedSimilarWarning;
 
-  const handleSubmit = useCallback(() => {
+  const handleSubmit = useCallback(async () => {
     setDismissedSimilarWarning(false);
+
     if (tab === "link" && url.trim()) {
-      ingestLink.mutate({ url: url.trim() });
+      const urls = url.split("\n").map(u => u.trim()).filter(Boolean);
+
+      if (urls.length > 10) {
+        showToast("error", "Maximum 10 URLs allowed");
+        return;
+      }
+
+      if (urls.length > 1) {
+        // Batch mode
+        setBatchUrls(urls.map(u => ({ url: u, status: "pending" })));
+
+        for (let i = 0; i < urls.length; i++) {
+          setBatchUrls(prev => prev.map((item, idx) =>
+            idx === i ? { ...item, status: "processing" } : item
+          ));
+
+          try {
+            await fetch("/api/ingest", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ url: urls[i] }),
+            });
+
+            setBatchUrls(prev => prev.map((item, idx) =>
+              idx === i ? { ...item, status: "success" } : item
+            ));
+          } catch (error) {
+            setBatchUrls(prev => prev.map((item, idx) =>
+              idx === i ? { ...item, status: "error", error: error instanceof Error ? error.message : "Failed" } : item
+            ));
+          }
+        }
+      } else {
+        // Single URL mode
+        ingestLink.mutate({ url: urls[0] });
+      }
     } else if (tab === "file" && file) {
       ingestFile.mutate({ file });
     } else if (tab === "text" && text.trim()) {
       ingestText.mutate({ text: text.trim() });
     }
-  }, [tab, url, file, text, ingestLink, ingestFile, ingestText]);
+  }, [tab, url, file, text, ingestLink, ingestFile, ingestText, showToast]);
 
   const handleCloseWarning = useCallback(() => {
     setDismissedSimilarWarning(true);
@@ -52,6 +91,7 @@ export function IngestDialog({ open, onClose }: IngestDialogProps) {
     setText("");
     setFile(null);
     setDismissedSimilarWarning(false);
+    setBatchUrls([]);
     clearProcessingId();
     ingestLink.reset();
     ingestFile.reset();
@@ -174,17 +214,33 @@ export function IngestDialog({ open, onClose }: IngestDialogProps) {
           {/* Link input */}
           {tab === "link" && (
             <div className="space-y-3">
-              <input
-                type="url"
+              <textarea
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="Paste a URL (GitHub, blog, etc.)"
-                className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                placeholder="Paste URLs (one per line, max 10)"
+                rows={4}
+                className="w-full px-3 py-2.5 border border-border rounded-lg bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
                 disabled={isProcessing || isWatching}
               />
               <p className="text-xs text-secondary">
-                Supports: GitHub repos, blog articles, general webpages. WeChat/Twitter links may need screenshots.
+                Supports: GitHub repos, blog articles, general webpages. Multiple URLs: one per line (max 10).
               </p>
+
+              {/* Batch processing status */}
+              {batchUrls.length > 0 && (
+                <div className="space-y-2 mt-3">
+                  {batchUrls.map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-2 p-2 rounded bg-accent text-sm">
+                      {item.status === "pending" && <span className="text-secondary">⏳</span>}
+                      {item.status === "processing" && <Loader2 size={14} className="text-primary animate-spin" />}
+                      {item.status === "success" && <CheckCircle2 size={14} className="text-success" />}
+                      {item.status === "error" && <AlertCircle size={14} className="text-danger" />}
+                      <span className="flex-1 truncate text-xs">{item.url}</span>
+                      {item.error && <span className="text-xs text-danger">{item.error}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

@@ -12,6 +12,7 @@ import { EntryFilters } from "@/components/library/EntryFilters";
 import GroupSidebar from "@/components/library/GroupSidebar";
 import { TagSidebar } from "@/components/library/TagSidebar";
 import { IngestDialog } from "@/components/ingest/IngestDialog";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import {
   ChevronDown,
   ChevronRight,
@@ -89,13 +90,20 @@ export default function LibraryPage() {
   const [techDomain, setTechDomain] = useState("");
   const [practiceValue, setPracticeValue] = useState("");
   const [knowledgeStatus, setKnowledgeStatus] = useState("");
+  const urlSortBy = searchParams.get("sortBy") as "createdAt" | "updatedAt" | "title" | null;
+  const urlSortOrder = searchParams.get("sortOrder") as "asc" | "desc" | null;
+
+  const [sortBy, setSortBy] = useState<"createdAt" | "updatedAt" | "title">(urlSortBy || "createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(urlSortOrder || "desc");
   const [isPanelStackVisible, setIsPanelStackVisible] = useState(false);
   const [groupsExpanded, setGroupsExpanded] = useState(true);
   const [tagsExpanded, setTagsExpanded] = useState(true);
   const [targetGroupId, setTargetGroupId] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const selectedGroupId = searchParams.get("groupId");
+
   const selectedAiTags = useMemo(
     () => parseTagParam(searchParams.get("aiTagsAny")),
     [searchParams]
@@ -128,6 +136,8 @@ export default function LibraryPage() {
     knowledgeStatus: knowledgeStatus || undefined,
     aiTagsAny: selectedAiTags.length > 0 ? selectedAiTags : undefined,
     userTagsAny: selectedUserTags.length > 0 ? selectedUserTags : undefined,
+    sortBy,
+    sortOrder,
   });
 
   const entries: EntryCardEntry[] = (data?.data as EntryCardEntry[]) || [];
@@ -193,11 +203,12 @@ export default function LibraryPage() {
 
   const handleBatchDelete = () => {
     if (selectedCount === 0 || batchDeleteEntries.isPending) return;
-    const confirmed = window.confirm(
-      `Delete ${selectedCount} selected entr${selectedCount > 1 ? "ies" : "y"}? This action cannot be undone.`
-    );
-    if (!confirmed) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmBatchDelete = () => {
     batchDeleteEntries.mutate([...selectedIdsOnPage]);
+    setShowDeleteConfirm(false);
   };
 
   const handleImportToGroup = () => {
@@ -235,6 +246,27 @@ export default function LibraryPage() {
     applyQueryParams((nextParams) => {
       if (groupId) nextParams.set("groupId", groupId);
       else nextParams.delete("groupId");
+    });
+  };
+
+  const handleSortChange = (newSortBy: "createdAt" | "updatedAt" | "title") => {
+    setSortBy(newSortBy);
+    setPage(1);
+    setSelectedIds([]);
+    applyQueryParams((nextParams) => {
+      nextParams.set("sortBy", newSortBy);
+      nextParams.set("sortOrder", sortOrder);
+    });
+  };
+
+  const toggleSortOrder = () => {
+    const newOrder = sortOrder === "desc" ? "asc" : "desc";
+    setSortOrder(newOrder);
+    setPage(1);
+    setSelectedIds([]);
+    applyQueryParams((nextParams) => {
+      nextParams.set("sortBy", sortBy);
+      nextParams.set("sortOrder", newOrder);
     });
   };
 
@@ -366,6 +398,29 @@ export default function LibraryPage() {
             }`}
           >
             Deprecated
+          </button>
+        </div>
+
+        {/* Sort Controls */}
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-secondary">Sort by:</span>
+          <select
+            value={sortBy}
+            onChange={(e) => handleSortChange(e.target.value as "createdAt" | "updatedAt" | "title")}
+            className="h-7 rounded-md border border-border bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
+            <option value="createdAt">Created Date</option>
+            <option value="updatedAt">Updated Date</option>
+            <option value="title">Title</option>
+          </select>
+          <button
+            type="button"
+            onClick={toggleSortOrder}
+            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-secondary hover:bg-accent transition-colors"
+            title={sortOrder === "desc" ? "Descending" : "Ascending"}
+          >
+            {sortOrder === "desc" ? "↓" : "↑"}
+            <span>{sortOrder === "desc" ? "Newest" : "Oldest"}</span>
           </button>
         </div>
 
@@ -598,6 +653,17 @@ export default function LibraryPage() {
       </div>
 
       <IngestDialog open={ingestOpen} onClose={() => setIngestOpen(false)} />
+
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        title="Delete Entries"
+        description={`Delete ${selectedCount} selected entr${selectedCount > 1 ? "ies" : "y"}? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        danger={true}
+        onConfirm={confirmBatchDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

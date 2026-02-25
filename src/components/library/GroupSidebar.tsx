@@ -17,6 +17,7 @@ import {
   useDeleteGroup,
   type GroupNode,
 } from "@/hooks/useGroups";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 export interface GroupSidebarProps {
   selectedGroupId: string | null;
@@ -37,6 +38,7 @@ function GroupItem({ group, depth, selectedGroupId, onGroupSelect }: GroupItemPr
   const [editValue, setEditValue] = useState(group.name);
   const [showChildCreate, setShowChildCreate] = useState(false);
   const [childName, setChildName] = useState("");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const editRef = useRef<HTMLInputElement>(null);
   const childInputRef = useRef<HTMLInputElement>(null);
 
@@ -64,10 +66,13 @@ function GroupItem({ group, depth, selectedGroupId, onGroupSelect }: GroupItemPr
   }
 
   function handleDelete() {
-    if (confirm(`Delete group "${group.name}"? This will also delete all sub-groups.`)) {
-      if (isSelected) onGroupSelect(null);
-      deleteGroup.mutate(group.id);
-    }
+    setShowDeleteConfirm(true);
+  }
+
+  function confirmDelete() {
+    if (isSelected) onGroupSelect(null);
+    deleteGroup.mutate(group.id);
+    setShowDeleteConfirm(false);
   }
 
   function handleChildCreate() {
@@ -227,6 +232,17 @@ function GroupItem({ group, depth, selectedGroupId, onGroupSelect }: GroupItemPr
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        title="Delete Group"
+        description={`Delete group "${group.name}"? This will also delete all sub-groups.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        danger={true}
+        onConfirm={confirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

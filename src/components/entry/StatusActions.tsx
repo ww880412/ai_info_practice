@@ -4,6 +4,7 @@ import { useState } from "react";
 import { KnowledgeStatus } from "@prisma/client";
 import { useEntryStatus } from "@/hooks/useEntryStatus";
 import { Check, Archive, AlertTriangle, RotateCcw } from "lucide-react";
+import { useToast } from "@/components/common/Toast";
 
 interface StatusActionsProps {
   entryId: string;
@@ -14,6 +15,7 @@ export function StatusActions({ entryId, currentStatus }: StatusActionsProps) {
   const updateStatus = useEntryStatus();
   const [deprecatedReason, setDeprecatedReason] = useState("");
   const [showReasonInput, setShowReasonInput] = useState(false);
+  const { showToast } = useToast();
 
   const handleStatusChange = (newStatus: KnowledgeStatus, reason?: string) => {
     updateStatus.mutate({ entryId, status: newStatus, reason });
@@ -23,7 +25,7 @@ export function StatusActions({ entryId, currentStatus }: StatusActionsProps) {
 
   const handleDeprecate = () => {
     if (!deprecatedReason.trim()) {
-      alert("Please provide a reason for marking as deprecated");
+      showToast("error", "Please provide a reason for marking as deprecated");
       return;
     }
     handleStatusChange("DEPRECATED", deprecatedReason);

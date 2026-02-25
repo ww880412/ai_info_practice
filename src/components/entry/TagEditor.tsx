@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/common/Toast";
 
 interface TagEditorProps {
   tags: string[];
@@ -12,6 +13,7 @@ export function TagEditor({ tags, onSave, className = "" }: TagEditorProps) {
   const [localTags, setLocalTags] = useState<string[]>(tags);
   const [inputValue, setInputValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const { showToast } = useToast();
 
   const handleAddTag = async () => {
     const newTag = inputValue.trim();
@@ -30,7 +32,7 @@ export function TagEditor({ tags, onSave, className = "" }: TagEditorProps) {
     } catch (error) {
       console.error("Failed to add tag:", error);
       setLocalTags(localTags);
-      alert("Failed to add tag");
+      showToast("error", "Failed to add tag");
     } finally {
       setIsSaving(false);
     }
@@ -46,7 +48,7 @@ export function TagEditor({ tags, onSave, className = "" }: TagEditorProps) {
     } catch (error) {
       console.error("Failed to remove tag:", error);
       setLocalTags(localTags);
-      alert("Failed to remove tag");
+      showToast("error", "Failed to remove tag");
     } finally {
       setIsSaving(false);
     }

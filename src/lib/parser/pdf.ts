@@ -3,11 +3,24 @@
  * For PDF: render pages and extract page-by-page with partial-success tolerance.
  */
 import { generateFromFile } from "../gemini";
-import { PROMPTS } from "../ai/prompts";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+const EXTRACT_FROM_FILE_PROMPT = `提取这个文件/图片中的所有文字内容。
+
+返回格式（严格 JSON，不要添加任何额外文字）：
+{
+  "title": "文档标题（从内容推断）",
+  "content": "提取的完整文字内容（保留原始结构，使用 Markdown 格式）"
+}
+
+要求：
+- 提取所有可见文字，不要遗漏
+- 保留文章结构（标题、段落、列表、代码块等）
+- 如果是截图，识别所有文字内容
+- 不要进行总结或改写，忠实提取原文`;
 
 interface FileParseResult {
   title: string;
@@ -151,17 +164,19 @@ async function parsePdfViaPageImages(buffer: Buffer): Promise<FileParseResult> {
     throw new Error("No rendered pages from PDF");
   }
 
-  const prompt = PROMPTS.extractFromFile();
   const results: PageExtractionResult[] = [];
   const failures: string[] = [];
 
   for (const page of pages) {
     try {
       const base64 = page.image.toString("base64");
-      const result = await generateFromFile<{ title?: string; content?: string }>(prompt, {
-        base64,
-        mimeType: "image/png",
-      });
+      const result = await generateFromFile<{ title?: string; content?: string }>(
+        EXTRACT_FROM_FILE_PROMPT,
+        {
+          base64,
+          mimeType: "image/png",
+        }
+      );
 
       const content = (result.content || "").trim();
       if (!content) {
@@ -223,7 +238,7 @@ export async function parseFile(
 
   const base64 = buffer.toString("base64");
   const result = await generateFromFile<{ title: string; content: string }>(
-    PROMPTS.extractFromFile(),
+    EXTRACT_FROM_FILE_PROMPT,
     { base64, mimeType }
   );
 
