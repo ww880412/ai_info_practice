@@ -42,7 +42,7 @@
 
 ## 3. 分阶段实施
 
-### Phase 0: 对象存储迁移（预计 1 天）
+### Phase 0: 对象存储迁移（预计 1 天｜实际任务 6.5h）
 
 **⚠️ 关键前置条件**：必须在 Phase 2 (Inngest) 之前完成
 
@@ -65,7 +65,7 @@
 
 ---
 
-### Phase 1: Vercel AI SDK 统一（预计 3 天）
+### Phase 1: Vercel AI SDK 统一（预计 3 天｜实际任务 12h）
 
 #### 3.1.1 目标
 
@@ -183,7 +183,7 @@ private async runStep1(input: ParseResult) {
 
 ---
 
-### Phase 2: Inngest 任务队列（预计 1.5 天）
+### Phase 2: Inngest 任务队列（预计 1.5 天｜实际任务 5.5h）
 
 **⚠️ 前置条件**：Phase 0 (对象存储迁移) 必须完成
 
@@ -316,7 +316,7 @@ export async function POST(req: NextRequest) {
 
 ---
 
-### Phase 3: Jina Reader 网页解析（预计 0.5 天）
+### Phase 3: Jina Reader 网页解析（预计 0.5 天｜实际任务 2h）
 
 #### 3.3.1 目标
 
@@ -387,15 +387,24 @@ export async function parseWebpage(url: string): Promise<WebpageParseResult> {
 
 ---
 
-### Phase 4: 清理与稳定化（预计 0.5 天）
+### Phase 4: 清理与稳定化（预计 0.5 天｜实际任务 3h）
 
-| 任务 | 交付物 |
-|------|--------|
-| 移除未使用的依赖 | 清理 package.json |
-| 更新 CLAUDE.md | 反映新架构 |
-| 更新 SYSTEM_ARCHITECTURE.md | 反映框架变更 |
-| 全量回归测试 | E2E smoke tests 全通过 |
-| 部署验证 | Docker 构建 + 本地运行 |
+#### 3.4.1 目标
+
+- 清理未使用的依赖
+- 更新项目文档反映新架构
+- 全量回归测试验证
+- 部署验证
+
+#### 3.4.2 实施步骤
+
+| 步骤 | 任务 | 交付物 | 估时 |
+|------|------|--------|------|
+| 4.1 | 移除未使用的依赖 | 清理 package.json | 0.5h |
+| 4.2 | 更新 CLAUDE.md | 反映新架构 | 0.5h |
+| 4.3 | 更新 SYSTEM_ARCHITECTURE.md | 反映框架变更 | 0.5h |
+| 4.4 | 全量回归测试 | E2E smoke tests 全通过 | 1h |
+| 4.5 | 部署验证 | Docker 构建 + 本地运行 | 0.5h |
 
 ---
 
