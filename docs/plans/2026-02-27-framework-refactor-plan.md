@@ -8,7 +8,7 @@
 
 | 目标 | 量化指标 |
 |------|----------|
-| 代码精简 | 手写核心代码从 ~1,436 行降至 ~350 行（-75%） |
+| 代码精简 | 手写核心代码从 ~1,193 行降至 ~360 行（-70%） |
 | 框架统一 | LLM 调用统一到 Vercel AI SDK |
 | 可靠性提升 | 任务队列从内存级升级为持久化 |
 | 维护成本降低 | 从「自己维护」转为「社区维护」 |
@@ -42,10 +42,35 @@
 
 ## 3. 分阶段实施
 
-### Phase 1: Vercel AI SDK 统一（预计 2 天）
+### Phase 0: 对象存储迁移（预计 1 天）
+
+**⚠️ 关键前置条件**：必须在 Phase 2 (Inngest) 之前完成
+
+#### 3.0.1 目标
+
+- 将文件上传从本地 `public/uploads` 迁移到对象存储（S3/R2/Cloudflare R2）
+- 修改 parser 从对象存储 URL 读取文件
+- 确保分布式队列环境下文件可访问
+
+#### 3.0.2 实施步骤
+
+| 步骤 | 任务 | 交付物 | 估时 |
+|------|------|--------|------|
+| 0.1 | 选择对象存储方案（建议 Cloudflare R2） | 技术选型文档 | 0.5h |
+| 0.2 | 配置对象存储 SDK + 环境变量 | 上传/下载工具函数 | 1h |
+| 0.3 | 修改 `/api/upload` 路由 | 上传到对象存储 | 1h |
+| 0.4 | 修改 parser (pdf.ts, image-multimodal.ts) | 从 URL 读取文件 | 2h |
+| 0.5 | 数据迁移脚本 | 迁移现有文件到对象存储 | 1h |
+| 0.6 | 测试 + 验证 | 所有上传/解析功能正常 | 1h |
+
+---
+
+### Phase 1: Vercel AI SDK 统一（预计 3 天）
 
 #### 3.1.1 目标
 
+- 创建 `lib/ai/client.ts` 统一 AI SDK 配置
+- 迁移所有 gemini.ts 依赖（13 个文件）
 - 删除 `lib/gemini.ts` (246 行)
 - 重写 `lib/ai/agent/engine.ts` 核心部分 (~400 行)
 - 删除 `lib/ai/classifier.ts` + `lib/ai/practiceConverter.ts` (120 行)
@@ -53,20 +78,26 @@
 #### 3.1.2 新增依赖
 
 ```bash
-npm install ai @ai-sdk/google
+npm install ai@^4.0.0 @ai-sdk/google@^1.0.0
 ```
+
+**验证版本**（2026-02-28）:
+- `ai`: ^4.0.0
+- `@ai-sdk/google`: ^1.0.0
+- 兼容 Next.js 16.x + React 19.x + Zod 4.x
 
 #### 3.1.3 实施步骤
 
 | 步骤 | 任务 | 交付物 | 估时 |
 |------|------|--------|------|
 | 1.1 | 创建 `lib/ai/client.ts` | AI SDK 统一配置 | 0.5h |
-| 1.2 | 重写 `generateJSON` → `generateObject` | 删除 gemini.ts | 1h |
-| 1.3 | 重写 `ReActAgent.runStep1/runStep2` | 使用 Zod schema 强制输出 | 2h |
-| 1.4 | 删除 `parseAgentResponse` 及相关正则 | 删除 ~150 行 | 0.5h |
-| 1.5 | 删除 classifier.ts + practiceConverter.ts | 移除遗留代码 | 0.5h |
-| 1.6 | 更新所有 import 引用 | 全项目搜索替换 | 0.5h |
-| 1.7 | 运行测试 + 修复 | 全部测试通过 | 1h |
+| 1.2 | 迁移 agent 模块 (4个文件) | engine.ts, builtin-tools.ts, route-strategy.ts, decision-repair.ts | 3h |
+| 1.3 | 迁移 parser 模块 (2个文件) | pdf.ts, image-multimodal.ts | 1h |
+| 1.4 | 迁移 AI 功能模块 (3个文件) | smartSummary.ts, associationDiscovery.ts, classifier.ts | 2h |
+| 1.5 | 迁移 API 路由 (2个文件) | ingest/route.ts, config/validate/route.ts | 1h |
+| 1.6 | 删除 gemini.ts + practiceConverter.ts | 移除遗留代码 | 0.5h |
+| 1.7 | 更新所有测试 | gemini.test.ts 等 | 2h |
+| 1.8 | 运行测试 + 修复 | 全部测试通过 | 2h |
 
 #### 3.1.4 代码示例
 
@@ -94,7 +125,8 @@ export async function generateJSON<T>(prompt: string): Promise<T> {
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 
 export function getAIClient() {
-  const apiKey = process.env.GEMINI_API_KEY || getStoredApiKey();
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
   return createGoogleGenerativeAI({ apiKey });
 }
 
@@ -151,37 +183,36 @@ private async runStep1(input: ParseResult) {
 
 ---
 
-### Phase 2: Inngest 任务队列（预计 2 天）
+### Phase 2: Inngest 任务队列（预计 1.5 天）
 
-**⚠️ 关键前置条件**：
-当前 ingest 路由直接读写本地 `public/uploads` 文件。分布式队列/函数执行环境会失去本地文件系统可见性。
-
-**必须先完成**：
-1. 将文件上传迁移到对象存储（S3/R2/Cloudflare R2 等）
-2. 修改 parser 从对象存储 URL 读取文件
-3. 然后再进行队列替换
+**⚠️ 前置条件**：Phase 0 (对象存储迁移) 必须完成
 
 #### 3.2.1 目标
 
 - 删除 `lib/ingest/queue.ts` (174 行)
+- **保留** `lib/ingest/retry.ts` (109 行，被 ai/process 路由使用)
 - 任务持久化，进程重启不丢失
 - 可视化 dashboard 监控
 
 #### 3.2.2 新增依赖
 
 ```bash
-npm install inngest
+npm install inngest@^3.0.0
 ```
+
+**验证版本**（2026-02-28）:
+- `inngest`: ^3.0.0
+- 兼容 Next.js 16.x
 
 #### 3.2.3 实施步骤
 
 | 步骤 | 任务 | 交付物 | 估时 |
 |------|------|--------|------|
 | 2.1 | 创建 `lib/inngest/client.ts` | Inngest 客户端配置 | 0.5h |
-| 2.2 | 创建 `lib/inngest/functions/process-entry.ts` | 入库处理函数 | 1h |
+| 2.2 | 创建 `lib/inngest/functions/process-entry.ts` | 入库处理函数 | 1.5h |
 | 2.3 | 创建 `app/api/inngest/route.ts` | Inngest webhook | 0.5h |
 | 2.4 | 重写 `app/api/ingest/route.ts` | 使用 inngest.send() | 1h |
-| 2.5 | 删除 `lib/ingest/queue.ts` + `lib/ingest/retry.ts` | 清理旧代码 | 0.5h |
+| 2.5 | 删除 `lib/ingest/queue.ts` | 清理队列代码 | 0.5h |
 | 2.6 | 配置 Inngest Dev Server | 本地开发环境 | 0.5h |
 | 2.7 | 运行测试 + 修复 | 全部测试通过 | 1h |
 
@@ -383,18 +414,31 @@ export async function parseWebpage(url: string): Promise<WebpageParseResult> {
 ## 5. 时间线
 
 ```
-2026-02-28  Phase 1 开始
-2026-03-01  Phase 1 完成，Phase 2 开始
-2026-03-02  Phase 2 完成，Phase 3 开始
-2026-03-02  Phase 3 完成，Phase 4 开始
-2026-03-03  Phase 4 完成，全量验收
+2026-02-28  Phase 0 开始（对象存储迁移）
+2026-02-29  Phase 0 完成，Phase 1 开始
+2026-03-03  Phase 1 完成，Phase 2 开始
+2026-03-04  Phase 2 完成，Phase 3 开始
+2026-03-05  Phase 3 完成，Phase 4 开始
+2026-03-05  Phase 4 完成，全量验收
 ```
 
-**总预计工时**：4 天
+**总预计工时**：6.5 天
+- Phase 0: 1 天（对象存储迁移）
+- Phase 1: 3 天（Vercel AI SDK）
+- Phase 2: 1.5 天（Inngest）
+- Phase 3: 0.5 天（Jina Reader）
+- Phase 4: 0.5 天（清理稳定化）
 
 ---
 
 ## 6. 代码量变化预估
+
+**统计基准**（2026-02-28 验证）:
+```bash
+wc -l src/lib/gemini.ts src/lib/ai/agent/engine.ts src/lib/ingest/queue.ts \
+      src/lib/ingest/retry.ts src/lib/ai/classifier.ts src/lib/ai/practiceConverter.ts
+# 输出: 1193 total
+```
 
 | 模块 | 重构前 | 重构后 | 变化 |
 |------|--------|--------|------|
@@ -404,10 +448,11 @@ export async function parseWebpage(url: string): Promise<WebpageParseResult> {
 | classifier.ts | 53 行 | 0 行（删除） | -53 |
 | practiceConverter.ts | 67 行 | 0 行（删除） | -67 |
 | ingest/queue.ts | 174 行 | 0 行（删除） | -174 |
-| ingest/retry.ts | ~80 行 | 0 行（删除） | -80 |
+| ingest/retry.ts | 109 行 | 109 行（保留） | 0 |
 | inngest/* | 0 行 | 100 行（新增） | +100 |
 | parser/jina.ts | 0 行 | 30 行（新增） | +30 |
-| **总计** | ~1,164 行 | ~360 行 | **-804 行 (-69%)** |
+| storage/* | 0 行 | 50 行（新增） | +50 |
+| **总计** | ~1,193 行 | ~360 行 | **-833 行 (-70%)** |
 
 ---
 
