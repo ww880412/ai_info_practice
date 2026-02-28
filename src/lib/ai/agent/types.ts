@@ -53,4 +53,5 @@ export interface AgentContext {
   evaluations: Record<string, unknown>;
   observations: string[];
   history: ReasoningStep[];
+  intermediateResults: Record<string, unknown>;
 }

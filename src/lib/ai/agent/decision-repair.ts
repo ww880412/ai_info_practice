@@ -1,4 +1,4 @@
-import { generateJSON } from "@/lib/gemini";
+import { generateJSON } from "../generate";
 import {
   evaluateDecisionQuality,
   isDecisionMostlyChinese,

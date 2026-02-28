@@ -2,7 +2,7 @@
  * PDF/Image parser - resilient multimodal extraction.
  * For PDF: render pages and extract page-by-page with partial-success tolerance.
  */
-import { generateFromFile } from "../gemini";
+import { generateFromFile } from "../ai/generate";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

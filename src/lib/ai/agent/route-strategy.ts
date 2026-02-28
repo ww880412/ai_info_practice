@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { toolsRegistry } from './tools';
 import { DEFAULT_PROCESSING_STRATEGIES } from './config';
-import { getGeminiModel } from '@/lib/gemini';
+import { generateJSON } from '../generate';
 
 function asString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
@@ -41,7 +41,6 @@ toolsRegistry.register({
     content: z.string().optional(),
   }),
   handler: async (params, context) => {
-    const model = getGeminiModel();
     const evaluationsMap = Object.keys(asStringRecord(params.evaluations)).length > 0
       ? asStringRecord(params.evaluations)
       : asStringRecord(context.evaluations);
@@ -73,11 +72,8 @@ ${strategies}
   "reason": "选择理由"
 }`;
 
-    const result = await model.generateContent(prompt);
-
     try {
-      const jsonMatch = result.response.text().match(/\{[\s\S]*\}/);
-      const parsed = JSON.parse(jsonMatch?.[0] || '{}');
+      const parsed = await generateJSON<{ strategy: string; confidence: number; reason: string }>(prompt);
       return { success: true, data: parsed };
     } catch {
       return { success: false, error: 'Failed to parse strategy selection' };

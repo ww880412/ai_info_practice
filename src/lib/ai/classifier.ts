@@ -2,7 +2,7 @@
  * AI Classifier + Extractor (L1 + L2 merged).
  * Single API call for classification and key info extraction.
  */
-import { generateJSON } from "../gemini";
+import { generateJSON } from "./generate";
 import type { ContentType, TechDomain, PracticeValue } from "@prisma/client";
 
 export interface ClassifyAndExtractResult {

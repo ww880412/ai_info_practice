@@ -1,4 +1,4 @@
-import { generateJSON } from "../gemini";
+import { generateJSON } from "./generate";
 
 export interface SmartSummaryResult {
   conciseSummary: string;

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { generateJSON } from "../gemini";
+import { generateJSON } from "./generate";
 
 export interface RelatedEntry {
   id: string;

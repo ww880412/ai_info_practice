@@ -1,6 +1,6 @@
 import type { AgentConfig, ReasoningStep, ReasoningTrace } from "./types";
 import type { ParseResult } from "../../parser/index";
-import { generateJSON, getGeminiModel } from "../../gemini";
+import { generateJSON } from "../generate";
 import { prisma } from "../../prisma";
 import { stringifyObservation } from "../../trace/observation";
 
@@ -340,21 +340,12 @@ export class ReActAgent {
     prompt: string,
     stage: "step-1" | "step-2"
   ): Promise<Record<string, unknown>> {
-    try {
-      const json = await generateJSON<Record<string, unknown>>(prompt);
-      const normalized = toObject(json);
-      if (!normalized) {
-        throw new Error(`Agent ${stage} returned non-object JSON`);
-      }
-      return normalized;
-    } catch (primaryError) {
-      const model = getGeminiModel();
-      const fallbackResponse = await model.generateContent(prompt);
-      const text = fallbackResponse.response.text();
-      const parsed = toObject(text);
-      if (parsed) return parsed;
-      throw primaryError;
+    const json = await generateJSON<Record<string, unknown>>(prompt);
+    const normalized = toObject(json);
+    if (!normalized) {
+      throw new Error(`Agent ${stage} returned non-object JSON`);
     }
+    return normalized;
   }
 
   private buildStep1Prompt(input: ParseResult): string {

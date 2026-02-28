@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { setServerConfig } from "@/lib/gemini";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { generateText } from "ai";
+import { setServerConfig } from "@/lib/ai/client";
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,11 +19,12 @@ export async function POST(request: NextRequest) {
       ? "gemini-2.0-flash"
       : (model || "gemini-2.0-flash");
 
-    // Validate API key by making a simple request
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const testModel = genAI.getGenerativeModel({ model: validationModel });
-
-    await testModel.generateContent("Hi");
+    // Validate API key by making a simple request using Vercel AI SDK
+    const google = createGoogleGenerativeAI({ apiKey });
+    await generateText({
+      model: google(validationModel),
+      prompt: "Hi",
+    });
 
     // Set server config after successful validation
     setServerConfig({ apiKey, model });

@@ -1,4 +1,4 @@
-import { generateFromFile } from '../gemini';
+import { generateFromFile } from '../ai/generate';
 import type { ParseStrategy, ParseInput, ParseResult } from './strategy';
 import { SourceType } from '@prisma/client';
 

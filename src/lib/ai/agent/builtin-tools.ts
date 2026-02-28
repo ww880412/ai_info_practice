@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { toolsRegistry } from './tools';
 import type { AgentContext } from './types';
-import { getGeminiModel } from '@/lib/gemini';
+import { generateJSON, generateText } from '../generate';
 import { findSimilarEntries } from '@/lib/ai/deduplication';
 import { DEFAULT_EVALUATION_DIMENSIONS } from './config';
 
@@ -30,7 +30,6 @@ toolsRegistry.register({
     source: z.string().optional(),
   }),
   handler: async (params, context: AgentContext) => {
-    const model = getGeminiModel();
     const dimensionId = asString(params.dimensionId);
     if (!dimensionId) {
       return { success: false, error: 'dimensionId is required' };
@@ -55,8 +54,7 @@ toolsRegistry.register({
     const truncatedContent = content.slice(0, 2000);
     prompt = prompt.replace('{{content}}', truncatedContent);
 
-    const result = await model.generateContent(prompt);
-    const evaluation = result.response.text();
+    const evaluation = await generateText(prompt);
 
     // 保存评估结果
     context.evaluations[dimensionId] = evaluation;
@@ -82,7 +80,6 @@ toolsRegistry.register({
     sourceType: z.string().optional(),
   }),
   handler: async (params, context: AgentContext) => {
-    const model = getGeminiModel();
     const content = getContent(params, context);
     const title = asString(params.title) ?? asString(context.input.title) ?? '';
     const sourceType = asString(params.sourceType) ?? asString(context.input.sourceType) ?? 'UNKNOWN';
@@ -133,56 +130,38 @@ ${sampledContent}
   "confidence": 0.0
 }`;
 
-    try {
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return { success: true, data: parsed };
-      }
-      return { success: false, error: 'Failed to parse classification result' };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    const classification = await generateJSON<Record<string, unknown>>(prompt);
+
+    // Store in context for next steps
+    context.intermediateResults.classification = classification;
+
+    return {
+      success: true,
+      data: classification
+    };
   },
 });
 
 // extract_summary tool
 toolsRegistry.register({
   name: 'extract_summary',
-  description: 'Step 2: Extract knowledge based on Step 1 structure',
+  description: 'Step 2: Extract detailed summary based on classification',
   parameters: z.object({
     content: z.string().optional(),
     title: z.string().optional(),
-    sourceType: z.string().optional(),
-    step1Result: z.record(z.string(), z.any()).optional(),
   }),
   handler: async (params, context: AgentContext) => {
-    const model = getGeminiModel();
     const content = getContent(params, context);
     const title = asString(params.title) ?? asString(context.input.title) ?? '';
-    const sourceType = asString(params.sourceType) ?? asString(context.input.sourceType) ?? 'UNKNOWN';
-    const step1Result = asRecord(params.step1Result) ?? {};
+    const classification = asRecord(context.intermediateResults.classification);
 
-    if (!content) return { success: false, error: 'No content provided for summary extraction' };
-
-    const contentSnapshot = content.slice(0, 90000);
-    const step1Json = JSON.stringify(step1Result, null, 2);
-    const contentType = asString(step1Result.contentType);
-
-    let extractionHints = '';
-    if (contentType === 'TUTORIAL') {
-      extractionHints = `
-特别提取要求（TUTORIAL）：
-- extractedMetadata.codeExamples: 提取代码示例（language, code, description）
-- extractedMetadata.references: 提取参考链接（官方文档、相关博客等）`;
-    } else if (contentType === 'TOOL_RECOMMENDATION') {
-      extractionHints = `
-特别提取要求（TOOL_RECOMMENDATION）：
-- extractedMetadata.versionInfo: 提取工具版本信息（tool, version, releaseDate）
-- extractedMetadata.references: 提取官方链接和相关资源`;
+    if (!classification) {
+      return { success: false, error: 'Classification result not found. Run classify_content first.' };
     }
+    if (!content) return { success: false, error: 'No content provided' };
+
+    const sampledContent = content.slice(0, 90000);
+    const step1Json = JSON.stringify(classification, null, 2);
 
     const prompt = `你是知识提取专家，请执行 Step 2：基于 Step 1 的结构规划提取完整结果。
 
@@ -190,214 +169,148 @@ Step 1 结果：
 ${step1Json}
 
 输入标题：${title}
-输入来源：${sourceType}
 原始内容长度：${content.length} 字符
-${extractionHints}
+
+信息密度要求：
+- 长度 < 5000：core 建议 3-5 条，extended 1-2 条
+- 长度 5000-20000：core 建议 5-8 条，extended 2-4 条
+- 长度 > 20000：core 建议 8-12 条，extended 4-8 条
 
 内容：
-${contentSnapshot}
+${sampledContent}
 
 输出语言要求：
 - 所有自然语言字段默认使用简体中文。
-- 允许保留必要专业术语（如 RAG、Agent、LLM、API、CLIP、QPS）。
+- 允许保留必要专业术语。
 
-summaryStructure.type 选择指南：
-- "api-reference": API 文档、SDK 参考、函数/方法文档
-- "comparison-matrix": 工具对比、框架比较、技术评估
-- "timeline-evolution": 版本历史、技术演进、发布说明
-
-返回严格 JSON（不要 markdown）：
+返回严格 JSON：
 {
   "coreSummary": "string",
   "practiceValue": "KNOWLEDGE" | "ACTIONABLE",
   "practiceReason": "string",
-  "practiceTask": null | { "title": "string", "summary": "string", "difficulty": "EASY" | "MEDIUM" | "HARD", "estimatedTime": "string", "prerequisites": ["string"], "steps": [{ "order": 1, "title": "string", "description": "string" }] },
+  "practiceTask": null | {
+    "title": "string",
+    "summary": "string",
+    "difficulty": "EASY" | "MEDIUM" | "HARD",
+    "estimatedTime": "string",
+    "prerequisites": ["string"],
+    "steps": [{ "order": 1, "title": "string", "description": "string" }]
+  },
   "difficulty": "EASY" | "MEDIUM" | "HARD",
   "sourceTrust": "HIGH" | "MEDIUM" | "LOW",
   "timeliness": "RECENT" | "OUTDATED" | "CLASSIC",
-  "contentForm": "TEXTUAL" | "CODE_HEAVY" | "VISUAL" | "MULTIMODAL",
-  "summaryStructure": { "type": "...", "reasoning": "string", "fields": {} },
-  "keyPoints": { "core": ["string"], "extended": ["string"] },
-  "boundaries": { "applicable": ["string"], "notApplicable": ["string"] },
-  "confidence": 0.0,
-  "extractedMetadata": {}
+  "contentForm": "TEXTUAL" | "CODE_HEAVY" | "VISUAL" | "MULTIMODAL"
 }`;
 
-    try {
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return { success: true, data: parsed };
-      }
-      return { success: false, error: 'Failed to parse extraction result' };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
-  },
-});
+    const summary = await generateJSON<Record<string, unknown>>(prompt);
 
-// find_relations tool
-toolsRegistry.register({
-  name: 'find_relations',
-  description: '查找关联知识',
-  parameters: z.object({
-    content: z.string().optional(),
-    tags: z.array(z.string()).optional(),
-  }),
-  handler: async (params, context: AgentContext) => {
-    const content = getContent(params, context);
-    if (!content) return { success: false, error: 'No content provided for relation discovery' };
-    const similar = await findSimilarEntries(content, 0.3);
-    return { success: true, data: similar };
-  },
-});
-
-// generate_practice tool
-toolsRegistry.register({
-  name: 'generate_practice',
-  description: '生成实践任务',
-  parameters: z.object({
-    content: z.string().optional(),
-    summary: z.string().optional(),
-  }),
-  handler: async (params, context: AgentContext) => {
-    const model = getGeminiModel();
-    const content = getContent(params, context);
-    const summary =
-      asString(params.summary) ??
-      (typeof context.evaluations?.extract_summary === 'string'
-        ? context.evaluations.extract_summary
-        : '');
-    if (!content) return { success: false, error: 'No content provided for practice generation' };
-    const prompt = `根据以下内容生成实践任务：\n\n摘要：${summary}\n\n详细内容：${content.slice(0, 5000)}`;
-    const result = await model.generateContent(prompt);
-    return { success: true, data: result.response.text() };
-  },
-});
-
-// extract_notes tool
-toolsRegistry.register({
-  name: 'extract_notes',
-  description: '提取知识笔记',
-  parameters: z.object({
-    content: z.string().optional(),
-  }),
-  handler: async (params, context: AgentContext) => {
-    const model = getGeminiModel();
-    const content = getContent(params, context);
-    if (!content) return { success: false, error: 'No content provided for note extraction' };
-    const prompt = `从以下内容提取知识笔记：\n\n${content.slice(0, 5000)}`;
-    const result = await model.generateContent(prompt);
-    return { success: true, data: result.response.text() };
-  },
-});
-
-// store_knowledge tool
-toolsRegistry.register({
-  name: 'store_knowledge',
-  description: '存储到知识库',
-  parameters: z.object({
-    data: z.record(z.string(), z.any()),
-  }),
-  handler: async (params) => {
-    const data = asRecord(params.data) ?? {};
-    // 实际存储逻辑由 Agent 引擎处理
-    return { success: true, data: { stored: true, data } };
+    return {
+      success: true,
+      data: summary
+    };
   },
 });
 
 // extract_code tool (for TUTORIAL content)
 toolsRegistry.register({
   name: 'extract_code',
-  description: 'Extract code examples from TUTORIAL content',
+  description: 'Extract code examples from tutorial content',
   parameters: z.object({
     content: z.string().optional(),
   }),
   handler: async (params, context: AgentContext) => {
-    const model = getGeminiModel();
     const content = getContent(params, context);
-    if (!content) return { success: false, error: 'No content provided for code extraction' };
 
-    const prompt = `从以下教程内容中提取代码示例。返回 JSON 格式：
+    if (!content) return { success: false, error: 'No content provided' };
 
-内容：
-${content.slice(0, 20000)}
-
-返回格式：
+    const prompt = `从以下内容中提取代码示例。返回 JSON：
 {
   "codeExamples": [
-    {
-      "language": "string (e.g., python, javascript, bash)",
-      "code": "string (actual code)",
-      "description": "string (what this code does)",
-      "runnable": boolean (can this code be run directly?)
-    }
+    { "language": "string", "code": "string", "description": "string" }
   ]
-}`;
+}
 
-    try {
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return { success: true, data: parsed };
-      }
-      return { success: false, error: 'Failed to parse code extraction result' };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+内容：
+${content.slice(0, 50000)}`;
+
+    const result = await generateJSON<{ codeExamples: Array<{ language: string; code: string; description: string }> }>(prompt);
+
+    context.intermediateResults.codeExamples = result.codeExamples;
+
+    return {
+      success: true,
+      data: result
+    };
   },
 });
 
 // extract_version tool (for TOOL_RECOMMENDATION content)
 toolsRegistry.register({
   name: 'extract_version',
-  description: 'Extract version info and alternatives from TOOL_RECOMMENDATION content',
+  description: 'Extract version information from tool recommendation content',
   parameters: z.object({
     content: z.string().optional(),
   }),
   handler: async (params, context: AgentContext) => {
-    const model = getGeminiModel();
     const content = getContent(params, context);
-    if (!content) return { success: false, error: 'No content provided for version extraction' };
 
-    const prompt = `从以下工具推荐内容中提取版本信息和替代方案。返回 JSON 格式：
+    if (!content) return { success: false, error: 'No content provided' };
 
-内容：
-${content.slice(0, 20000)}
-
-返回格式：
+    const prompt = `从以下内容中提取工具版本信息。返回 JSON：
 {
   "versionInfo": {
-    "tool": "string (tool name)",
-    "version": "string (current version)",
-    "releaseDate": "string (optional)",
-    "compatibility": ["string (compatible platforms/versions)"]
+    "tool": "string",
+    "version": "string",
+    "releaseDate": "string (optional)"
   },
-  "alternatives": [
-    {
-      "name": "string",
-      "comparison": "string (how it compares to main tool)"
-    }
+  "references": [
+    { "title": "string", "url": "string", "type": "official|blog|paper|repo" }
   ]
-}`;
+}
 
-    try {
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        return { success: true, data: parsed };
-      }
-      return { success: false, error: 'Failed to parse version extraction result' };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+内容：
+${content.slice(0, 30000)}`;
+
+    const result = await generateJSON<{ versionInfo: Record<string, unknown>; references: Array<Record<string, unknown>> }>(prompt);
+
+    context.intermediateResults.versionInfo = result.versionInfo;
+    context.intermediateResults.references = result.references;
+
+    return {
+      success: true,
+      data: result
+    };
   },
 });
 
-export { toolsRegistry };
+// check_duplicate tool
+toolsRegistry.register({
+  name: 'check_duplicate',
+  description: '检查是否有重复或相似内容',
+  parameters: z.object({
+    content: z.string().optional(),
+    threshold: z.number().optional(),
+  }),
+  handler: async (params, context: AgentContext) => {
+    const content = getContent(params, context);
+    const threshold = typeof params.threshold === 'number' ? params.threshold : 0.5;
+
+    if (!content) return { success: false, error: 'No content provided' };
+
+    const similarEntries = await findSimilarEntries(content, threshold);
+
+    context.intermediateResults.duplicateCheck = {
+      hasDuplicates: similarEntries.length > 0,
+      similarEntries
+    };
+
+    return {
+      success: true,
+      data: {
+        hasDuplicates: similarEntries.length > 0,
+        count: similarEntries.length,
+        entries: similarEntries.slice(0, 3) // Return top 3
+      }
+    };
+  },
+});

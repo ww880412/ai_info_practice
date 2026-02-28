@@ -16,7 +16,7 @@ import {
   getMinDecisionQualityScore,
   validateAndRepairDecision,
 } from "@/lib/ai/agent/decision-repair";
-import { setServerConfig } from "@/lib/gemini";
+import { setServerConfig } from "@/lib/ai/client";
 import { isDynamicSummaryEnabled } from "@/config/flags";
 import { buildConfidenceScore } from "@/lib/ai/agent/confidence";
 import { isLegacyClassifierFallbackEnabled } from "@/lib/ai/fallback-policy";

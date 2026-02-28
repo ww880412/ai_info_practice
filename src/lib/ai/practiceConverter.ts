@@ -2,7 +2,7 @@
  * Practice Converter (L3).
  * Converts ACTIONABLE content into structured practice tasks with steps.
  */
-import { generateJSON } from "../gemini";
+import { generateJSON } from "./generate";
 import type { Difficulty } from "@prisma/client";
 
 export interface PracticeConvertResult {
