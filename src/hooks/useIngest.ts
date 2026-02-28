@@ -87,7 +87,7 @@ export function useIngest() {
       const res = await fetch("/api/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inputType: "PDF", fileKey: fileUrl, config }),
+        body: JSON.stringify({ inputType: "PDF", fileUrl, config }),
       });
       if (!res.ok) throw new Error("Failed to ingest file");
       return res.json();

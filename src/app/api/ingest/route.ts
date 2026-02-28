@@ -606,7 +606,7 @@ initializeIngestQueue(asyncProcess);
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { inputType, url, fileKey, text } = body;
+    const { inputType, url, fileUrl, text } = body;
 
     if (!inputType || !["LINK", "PDF", "TEXT"].includes(inputType)) {
       return NextResponse.json(
@@ -619,11 +619,19 @@ export async function POST(request: NextRequest) {
     if (inputType === "LINK" && !url) {
       return NextResponse.json({ error: "url is required for LINK input" }, { status: 400 });
     }
-    if (inputType === "PDF" && !fileKey) {
-      return NextResponse.json({ error: "fileKey is required for PDF input" }, { status: 400 });
+    if (inputType === "PDF" && !fileUrl) {
+      return NextResponse.json({ error: "fileUrl is required for PDF input" }, { status: 400 });
     }
     if (inputType === "TEXT" && !text) {
       return NextResponse.json({ error: "text is required for TEXT input" }, { status: 400 });
+    }
+
+    // Validate fileUrl format for security (SSRF prevention)
+    if (inputType === "PDF" && fileUrl && !fileUrl.startsWith('r2://')) {
+      return NextResponse.json(
+        { error: "Invalid fileUrl format. Only r2:// URLs are accepted." },
+        { status: 400 }
+      );
     }
 
     // Determine source type
@@ -640,7 +648,7 @@ export async function POST(request: NextRequest) {
     const entry = await prisma.entry.create({
       data: {
         inputType,
-        rawUrl: inputType === "LINK" ? url : inputType === "PDF" ? fileKey : null,
+        rawUrl: inputType === "LINK" ? url : inputType === "PDF" ? fileUrl : null,
         rawText: inputType === "TEXT" ? text : null,
         sourceType,
         processStatus: "PENDING",

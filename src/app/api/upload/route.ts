@@ -43,7 +43,6 @@ export async function POST(request: NextRequest) {
     );
 
     return NextResponse.json({
-      fileKey: result.key,
       fileUrl: result.url,
       mimeType: result.mimeType,
       size: result.size,

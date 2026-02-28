@@ -72,24 +72,18 @@ export async function getFileUrl(key: string): Promise<string> {
 }
 
 /**
- * Download file from URL (supports both R2 internal and external URLs)
+ * Download file from R2 storage URL
+ * Only supports R2 internal URL format (r2://bucket/key)
+ * External URLs are rejected for security (SSRF prevention)
  */
 export async function downloadFromUrl(url: string): Promise<DownloadResult> {
-  // Handle R2 internal URL format: r2://bucket/key
-  if (url.startsWith('r2://')) {
-    const key = url.replace(/^r2:\/\/[^/]+\//, '');
-    return downloadFile(key);
+  // Only allow R2 internal URL format: r2://bucket/key
+  if (!url.startsWith('r2://')) {
+    throw new Error(
+      `Invalid storage URL format: ${url.substring(0, 50)}... Only r2:// URLs are supported`
+    );
   }
 
-  // Handle HTTP(S) URLs
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to download from ${url}: ${response.status}`);
-  }
-
-  const arrayBuffer = await response.arrayBuffer();
-  return {
-    buffer: Buffer.from(arrayBuffer),
-    mimeType: response.headers.get('content-type') || 'application/octet-stream',
-  };
+  const key = url.replace(/^r2:\/\/[^/]+\//, '');
+  return downloadFile(key);
 }
