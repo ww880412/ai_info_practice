@@ -75,7 +75,10 @@ git status  # 应显示 "working tree clean"
 - **前端**: Next.js 16, React 19, Tailwind CSS v4
 - **后端**: Next.js App Router API Routes
 - **数据库**: PostgreSQL 15 + Prisma 5.22.0
-- **AI**: Google Gemini API
+- **AI**: Vercel AI SDK + Google Gemini API
+- **任务队列**: Inngest
+- **对象存储**: Cloudflare R2
+- **网页解析**: Jina Reader (fallback: cheerio)
 - **部署**: Docker + docker-compose
 
 ## 目录结构
@@ -113,6 +116,8 @@ src/
 │   └── usePracticeQueue.ts
 ├── lib/                 # 核心库
 │   ├── ai/             # AI 处理模块
+│   │   ├── client.ts   # Vercel AI SDK 客户端
+│   │   ├── generate.ts # 生成函数 (generateJSON, generateText, generateFromFile)
 │   │   ├── agent/     # ReAct Agent 引擎
 │   │   │   ├── engine.ts           # Agent 核心引擎
 │   │   │   ├── builtin-tools.ts    # 内置工具集
@@ -135,7 +140,8 @@ src/
 │   ├── parser/         # 内容解析
 │   │   ├── index.ts    # 统一解析入口
 │   │   ├── github.ts   # GitHub 解析
-│   │   ├── webpage.ts  # 网页解析
+│   │   ├── webpage.ts  # 网页解析 (Jina Reader + cheerio fallback)
+│   │   ├── jina.ts     # Jina Reader 封装
 │   │   ├── pdf.ts      # PDF 解析
 │   │   ├── pdf-text.ts # PDF 文本提取
 │   │   ├── text.ts     # 纯文本解析
@@ -156,11 +162,17 @@ src/
 │   │   ├── group-options.ts    # 分组选项
 │   │   └── group-import.ts     # 分组导入
 │   ├── ingest/         # 入库逻辑
-│   │   ├── queue.ts    # 入库队列
 │   │   └── retry.ts    # 重试机制
+│   ├── inngest/        # Inngest 任务队列
+│   │   ├── client.ts   # Inngest 客户端
+│   │   └── functions/  # 任务函数
+│   │       └── process-entry.ts  # 条目处理
+│   ├── storage/        # 对象存储 (Cloudflare R2)
+│   │   ├── client.ts   # R2 客户端
+│   │   ├── upload.ts   # 上传功能
+│   │   └── download.ts # 下载功能
 │   ├── trace/          # 追踪系统
 │   │   └── observation.ts      # 观察记录
-│   ├── gemini.ts       # Gemini API 封装
 │   ├── prisma.ts       # Prisma Client
 │   ├── sanitize.ts     # 数据清洗
 │   └── tag-aggregation.ts  # 标签聚合
@@ -172,9 +184,16 @@ src/
 ```
 输入 (LINK/TEXT/PDF)
     ↓
-Parser 解析 (提取原始内容)
+/api/ingest (创建 Entry)
     ↓
-ReAct Agent 两步推理
+Inngest 任务队列 (entry/ingest 事件)
+    ↓
+Parser 解析
+    ├── LINK → Jina Reader (fallback: cheerio)
+    ├── PDF → 多模态 AI 提取
+    └── TEXT → 直接处理
+    ↓
+ReAct Agent 两步推理 (Vercel AI SDK + Gemini)
     ├── Step 1: 快速分类 (contentType, techDomain, aiTags, summaryStructure)
     └── Step 2: 深度分析 (coreSummary, keyPoints, boundaries, practiceTask)
     ↓
