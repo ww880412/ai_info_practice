@@ -435,7 +435,7 @@ export async function parseWebpage(url: string): Promise<WebpageParseResult> {
 - Phase 1: 3 天（Vercel AI SDK，实际任务 12h）
 - Phase 2: 1.5 天（Inngest，实际任务 5.5h）
 - Phase 3: 0.5 天（Jina Reader，实际任务 2h）
-- Phase 4: 0.5 天（清理稳定化，实际任务 ~3h）
+- Phase 4: 0.5 天（清理稳定化，实际任务 3h）
 
 **说明**：实际任务时间合计约 29h，日历排期 6.5 天包含了缓冲时间、测试调试、文档更新等非编码工作。
 
