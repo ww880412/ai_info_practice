@@ -2,13 +2,11 @@
  * Inngest function for processing entries
  * Replaces the in-memory queue with persistent task processing
  */
-import { inngest, type IngestConfig } from '../client';
+import { inngest } from '../client';
 import { prisma } from '@/lib/prisma';
-import { setServerConfig } from '@/lib/ai/client';
 import { parseWithLogging, type ParseInput, type ParseResult } from '@/lib/parser';
 import { classifyAndExtract, type ClassifyAndExtractResult } from '@/lib/ai/classifier';
 import { convertToPractice } from '@/lib/ai/practiceConverter';
-import { findSimilarEntries } from '@/lib/ai/deduplication';
 import { ReActAgent } from '@/lib/ai/agent';
 import { getAgentConfig } from '@/lib/ai/agent/get-config';
 import {
@@ -139,12 +137,10 @@ export const processEntry = inngest.createFunction(
   },
   { event: 'entry/ingest' },
   async ({ event, step }) => {
-    const { entryId, config = {} } = event.data;
+    const { entryId } = event.data;
 
-    // Set server config if provided
-    if (config.geminiApiKey || config.geminiModel) {
-      setServerConfig(config);
-    }
+    // AI configuration is read from environment variables
+    // No per-request config to avoid global state pollution
 
     // Step 1: Load entry and parse content
     const parsed = await step.run('parse-content', async () => {
@@ -228,6 +224,16 @@ export const processEntry = inngest.createFunction(
         });
         content = result.content;
         title = result.title;
+
+        // Persist parsed content for TEXT input (consistent with LINK/PDF)
+        await prisma.entry.update({
+          where: { id: entryId },
+          data: {
+            title,
+            originalContent: content,
+            sourceType: result.sourceType as SourceType,
+          },
+        });
       }
 
       if (!content) {

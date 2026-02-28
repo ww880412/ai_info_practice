@@ -87,6 +87,12 @@ function normalizeStep2Payload(payload: Record<string, unknown>): Record<string,
     sourceTrust: payload.sourceTrust,
     timeliness: payload.timeliness,
     contentForm: payload.contentForm,
+    // Step 2 can also output these fields - preserve them
+    summaryStructure: payload.summaryStructure,
+    keyPoints: payload.keyPoints,
+    boundaries: payload.boundaries,
+    confidence: payload.confidence,
+    extractedMetadata: payload.extractedMetadata,
   };
 }
 

@@ -10,8 +10,8 @@ export interface IngestConfig {
 }
 
 type Events = {
-  'entry/ingest': { data: { entryId: string; config?: IngestConfig } };
-  'entry/reprocess': { data: { entryId: string; config?: IngestConfig } };
+  'entry/ingest': { data: { entryId: string } };
+  'entry/reprocess': { data: { entryId: string } };
 };
 
 export const inngest = new Inngest({

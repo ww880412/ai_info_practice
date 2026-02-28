@@ -27,6 +27,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "text is required for TEXT input" }, { status: 400 });
     }
 
+    // Validate URL format for security (SSRF prevention)
+    if (inputType === "LINK" && url) {
+      try {
+        const parsedUrl = new URL(url);
+        if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+          return NextResponse.json(
+            { error: "Invalid URL protocol. Only http and https are allowed." },
+            { status: 400 }
+          );
+        }
+        // Block localhost and private networks
+        const hostname = parsedUrl.hostname.toLowerCase();
+        if (
+          hostname === 'localhost' ||
+          hostname === '127.0.0.1' ||
+          hostname.startsWith('192.168.') ||
+          hostname.startsWith('10.') ||
+          hostname.startsWith('172.') ||
+          hostname.endsWith('.local')
+        ) {
+          return NextResponse.json(
+            { error: "Internal URLs are not allowed." },
+            { status: 400 }
+          );
+        }
+      } catch {
+        return NextResponse.json(
+          { error: "Invalid URL format." },
+          { status: 400 }
+        );
+      }
+    }
+
     // Validate fileUrl format for security (SSRF prevention)
     if (inputType === "PDF" && fileUrl && !fileUrl.startsWith('r2://')) {
       return NextResponse.json(
@@ -73,9 +106,11 @@ export async function POST(request: NextRequest) {
     const config = body.config || {};
 
     // Trigger async processing via Inngest
+    // Note: We don't pass config in the event to avoid API key exposure
+    // Server will use environment variables for AI configuration
     await inngest.send({
       name: 'entry/ingest',
-      data: { entryId: entry.id, config },
+      data: { entryId: entry.id },
     });
 
     return NextResponse.json({
