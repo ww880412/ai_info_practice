@@ -22,6 +22,9 @@ model Entry {
   title       String?
   originalContent String?      @db.Text
 
+  // API credential for processing (optional, uses env default if null)
+  credentialId String?
+
   // AI processing status
   processStatus ProcessStatus  @default(PENDING)
   processError  String?
@@ -339,6 +342,23 @@ model AgentConfig {
   isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─────────────── API Credentials ───────────────
+
+model ApiCredential {
+  id             String   @id @default(cuid())
+  encryptedKey   String   @db.Text
+  keyHint        String?  // Last 4 chars for display (e.g., "...abcd")
+  provider       String   @default("gemini")
+  model          String?
+  isValid        Boolean  @default(true)
+  lastUsedAt     DateTime?
+  lastValidatedAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([isValid])
 }
 
 // ─────────────── Entry Split Tables (B2.1) ───────────────

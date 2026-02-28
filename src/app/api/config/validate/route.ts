@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText } from "ai";
-import { setServerConfig } from "@/lib/ai/client";
+import { prisma } from "@/lib/prisma";
+import { encryptApiKey, getKeyHint } from "@/lib/crypto";
 
 export async function POST(request: NextRequest) {
   try {
-    const { apiKey, model } = await request.json();
+    const { apiKey, model, credentialId } = await request.json();
 
     if (!apiKey) {
       return NextResponse.json(
@@ -26,14 +27,57 @@ export async function POST(request: NextRequest) {
       prompt: "Hi",
     });
 
-    // Set server config after successful validation
-    setServerConfig({ apiKey, model });
+    // Store encrypted credential in database
+    const encryptedKey = encryptApiKey(apiKey);
+    const keyHint = getKeyHint(apiKey);
 
-    return NextResponse.json({ valid: true });
+    let credential;
+    if (credentialId) {
+      // Update existing credential
+      credential = await prisma.apiCredential.update({
+        where: { id: credentialId },
+        data: {
+          encryptedKey,
+          keyHint,
+          model: model || "gemini-2.5-flash",
+          isValid: true,
+          lastValidatedAt: new Date(),
+        },
+      });
+    } else {
+      // Create new credential
+      credential = await prisma.apiCredential.create({
+        data: {
+          encryptedKey,
+          keyHint,
+          provider: "gemini",
+          model: model || "gemini-2.5-flash",
+          isValid: true,
+          lastValidatedAt: new Date(),
+        },
+      });
+    }
+
+    return NextResponse.json({
+      valid: true,
+      credentialId: credential.id,
+      keyHint: credential.keyHint,
+    });
   } catch (error: unknown) {
-    console.error("Config validation error:", error);
     const message = error instanceof Error ? error.message : String(error);
-    // Return more detailed error
+
+    // Distinguish between API key errors and internal errors
+    if (message.includes("KEY_ENCRYPTION_SECRET") || message.includes("Prisma") || message.includes("database")) {
+      console.error("Config validation internal error:", message);
+      return NextResponse.json(
+        { error: "Server configuration error. Please contact support." },
+        { status: 500 }
+      );
+    }
+
+    // Log sanitized error for debugging
+    console.error("Config validation error:", message.replace(/AIza[a-zA-Z0-9_-]+/g, "[API_KEY_REDACTED]"));
+
     const errorMessage = message.includes("model")
       ? "Invalid model name"
       : "Invalid API key";

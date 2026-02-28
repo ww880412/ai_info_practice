@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, Check, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, Check, AlertCircle, Shield } from "lucide-react";
 
 const CONFIG_STORAGE_KEY = "ai-practice-config";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
@@ -9,6 +9,8 @@ const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 interface ConfigState {
   geminiApiKey: string;
   geminiModel: string;
+  credentialId: string | null;
+  keyHint: string | null;
   isValid: boolean;
   isChecking: boolean;
 }
@@ -17,6 +19,8 @@ function getInitialConfig(): ConfigState {
   const defaultConfig: ConfigState = {
     geminiApiKey: "",
     geminiModel: DEFAULT_GEMINI_MODEL,
+    credentialId: null,
+    keyHint: null,
     isValid: false,
     isChecking: false,
   };
@@ -30,12 +34,14 @@ function getInitialConfig(): ConfigState {
     const parsed = JSON.parse(saved);
     return {
       ...defaultConfig,
-      geminiApiKey:
-        typeof parsed?.geminiApiKey === "string" ? parsed.geminiApiKey : "",
+      geminiApiKey: "", // Never load raw key from localStorage
       geminiModel:
         typeof parsed?.geminiModel === "string" && parsed.geminiModel
           ? parsed.geminiModel
           : DEFAULT_GEMINI_MODEL,
+      credentialId: parsed?.credentialId || null,
+      keyHint: parsed?.keyHint || null,
+      isValid: !!parsed?.credentialId,
     };
   } catch {
     return defaultConfig;
@@ -50,28 +56,36 @@ export default function SettingsPage() {
   const handleSave = async () => {
     setSaveStatus("saving");
     try {
-      // Save to localStorage
-      localStorage.setItem(
-        CONFIG_STORAGE_KEY,
-        JSON.stringify({
-          geminiApiKey: config.geminiApiKey,
-          geminiModel: config.geminiModel,
-        })
-      );
-
-      // Validate by calling API
+      // Validate and store credential on server
       const res = await fetch("/api/config/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           apiKey: config.geminiApiKey,
           model: config.geminiModel,
+          credentialId: config.credentialId,
         }),
       });
 
       if (res.ok) {
+        const data = await res.json();
+        // Only store credentialId and model locally (not the raw key)
+        localStorage.setItem(
+          CONFIG_STORAGE_KEY,
+          JSON.stringify({
+            credentialId: data.credentialId,
+            keyHint: data.keyHint,
+            geminiModel: config.geminiModel,
+          })
+        );
+        setConfig((prev) => ({
+          ...prev,
+          geminiApiKey: "", // Clear raw key from memory
+          credentialId: data.credentialId,
+          keyHint: data.keyHint,
+          isValid: true,
+        }));
         setSaveStatus("saved");
-        setConfig((prev) => ({ ...prev, isValid: true }));
       } else {
         setSaveStatus("error");
       }
@@ -87,6 +101,8 @@ export default function SettingsPage() {
     setConfig({
       geminiApiKey: "",
       geminiModel: DEFAULT_GEMINI_MODEL,
+      credentialId: null,
+      keyHint: null,
       isValid: false,
       isChecking: false,
     });
@@ -109,24 +125,40 @@ export default function SettingsPage() {
             {/* Gemini API Key */}
             <div>
               <label className="block text-sm font-medium mb-1">Gemini API Key</label>
-              <div className="relative">
-                <input
-                  type={showKey ? "text" : "password"}
-                  value={config.geminiApiKey}
-                  onChange={(e) =>
-                    setConfig((prev) => ({ ...prev, geminiApiKey: e.target.value }))
-                  }
-                  placeholder="Enter your Gemini API key"
-                  className="w-full px-3 py-2 pr-10 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowKey(!showKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-secondary hover:text-foreground"
-                >
-                  {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
+              {config.credentialId ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+                  <Shield size={16} className="text-green-600" />
+                  <span className="text-sm text-green-700 dark:text-green-300">
+                    Securely stored (Key: {config.keyHint})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setConfig((prev) => ({ ...prev, credentialId: null, keyHint: null, isValid: false }))}
+                    className="ml-auto text-xs text-green-600 hover:underline"
+                  >
+                    Change Key
+                  </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <input
+                    type={showKey ? "text" : "password"}
+                    value={config.geminiApiKey}
+                    onChange={(e) =>
+                      setConfig((prev) => ({ ...prev, geminiApiKey: e.target.value }))
+                    }
+                    placeholder="Enter your Gemini API key"
+                    className="w-full px-3 py-2 pr-10 bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKey(!showKey)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-secondary hover:text-foreground"
+                  >
+                    {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              )}
               <p className="text-xs text-secondary mt-1">
                 Get your API key from{" "}
                 <a
@@ -137,6 +169,7 @@ export default function SettingsPage() {
                 >
                   Google AI Studio
                 </a>
+                . Keys are encrypted and stored securely on the server.
               </p>
             </div>
 

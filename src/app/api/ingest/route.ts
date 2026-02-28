@@ -7,7 +7,20 @@ import type { SourceType } from "@prisma/client";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { inputType, url, fileUrl, text } = body;
+    const { inputType, url, fileUrl, text, config } = body;
+
+    // Validate credentialId if provided
+    if (config?.credentialId) {
+      const credential = await prisma.apiCredential.findUnique({
+        where: { id: config.credentialId },
+      });
+      if (!credential || !credential.isValid) {
+        return NextResponse.json(
+          { error: "Invalid or expired API credential. Please re-configure in Settings." },
+          { status: 401 }
+        );
+      }
+    }
 
     if (!inputType || !["LINK", "PDF", "TEXT"].includes(inputType)) {
       return NextResponse.json(
@@ -78,13 +91,14 @@ export async function POST(request: NextRequest) {
       else if (url.includes("twitter.com") || url.includes("x.com")) sourceType = "TWITTER";
     }
 
-    // Create entry
+    // Create entry with optional credentialId
     const entry = await prisma.entry.create({
       data: {
         inputType,
         rawUrl: inputType === "LINK" ? url : inputType === "PDF" ? fileUrl : null,
         rawText: inputType === "TEXT" ? text : null,
         sourceType,
+        credentialId: config?.credentialId || null,
         processStatus: "PENDING",
         processError: "任务已提交，等待处理...",
       },
@@ -102,12 +116,8 @@ export async function POST(request: NextRequest) {
       similarEntries = await findSimilarEntries(text, 0.5);
     }
 
-    // Extract config from request body
-    const config = body.config || {};
-
     // Trigger async processing via Inngest
-    // Note: We don't pass config in the event to avoid API key exposure
-    // Server will use environment variables for AI configuration
+    // credentialId is stored in entry, worker will resolve it
     await inngest.send({
       name: 'entry/ingest',
       data: { entryId: entry.id },

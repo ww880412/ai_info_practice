@@ -143,13 +143,19 @@ export const processEntry = inngest.createFunction(
   async ({ event, step }) => {
     const { entryId } = event.data;
 
-    // AI configuration is read from environment variables
-    // No per-request config to avoid global state pollution
-
-    // Step 1: Load entry and parse content
+    // Step 1: Load entry, resolve credential, and parse content
     const parsed = await step.run('parse-content', async () => {
       const entry = await prisma.entry.findUnique({ where: { id: entryId } });
       if (!entry) throw new Error('Entry not found');
+
+      // Resolve credential and set server config for this processing run
+      if (entry.credentialId) {
+        const { resolveCredential, setServerConfig } = await import('@/lib/ai/client');
+        const config = await resolveCredential(entry.credentialId);
+        if (config.apiKey) {
+          setServerConfig({ apiKey: config.apiKey, model: config.model });
+        }
+      }
 
       let content = entry.originalContent || '';
       let title = entry.title || '';

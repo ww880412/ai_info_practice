@@ -34,7 +34,7 @@ function getConfig() {
   try {
     const parsed = JSON.parse(saved);
     return {
-      geminiApiKey: parsed.geminiApiKey,
+      credentialId: parsed.credentialId,
       geminiModel: parsed.geminiModel,
     };
   } catch {
