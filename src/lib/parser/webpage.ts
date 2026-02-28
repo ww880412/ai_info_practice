@@ -1,8 +1,9 @@
 /**
- * Generic webpage parser using cheerio.
+ * Generic webpage parser - Jina Reader primary, cheerio fallback.
  */
 import * as cheerio from "cheerio";
 import type { ParseMetadata } from "./strategy";
+import { parseWithJina } from "./jina";
 
 interface WebpageParseResult {
   title: string;
@@ -17,6 +18,12 @@ export function isWeChatUrl(url: string): boolean {
 
 export function isTwitterUrl(url: string): boolean {
   return url.includes("twitter.com") || url.includes("x.com");
+}
+
+function detectSourceType(url: string): WebpageParseResult["sourceType"] {
+  if (isWeChatUrl(url)) return "WECHAT";
+  if (isTwitterUrl(url)) return "TWITTER";
+  return "WEBPAGE";
 }
 
 function extractMetadata($: ReturnType<typeof cheerio.load>): ParseMetadata {
@@ -49,10 +56,29 @@ function extractMetadata($: ReturnType<typeof cheerio.load>): ParseMetadata {
 }
 
 export async function parseWebpage(url: string): Promise<WebpageParseResult> {
-  let sourceType: WebpageParseResult["sourceType"] = "WEBPAGE";
-  if (isWeChatUrl(url)) sourceType = "WECHAT";
-  if (isTwitterUrl(url)) sourceType = "TWITTER";
+  const sourceType = detectSourceType(url);
 
+  // Primary: Try Jina Reader (supports JS-rendered pages)
+  const jinaResult = await parseWithJina(url);
+  if (jinaResult.success && jinaResult.content.length > 100) {
+    return {
+      title: jinaResult.title,
+      content: jinaResult.content,
+      sourceType,
+    };
+  }
+
+  // Fallback: Use cheerio (static HTML only)
+  return parseWithCheerio(url, sourceType);
+}
+
+/**
+ * Parse webpage using cheerio (fallback for static content)
+ */
+async function parseWithCheerio(
+  url: string,
+  sourceType: WebpageParseResult["sourceType"]
+): Promise<WebpageParseResult> {
   const response = await fetch(url, {
     headers: {
       "User-Agent":
