@@ -117,6 +117,28 @@ const result = await generateFromFile(prompt, fileData, FileExtractSchema);
 
 ---
 
+### 7. URL 发送给第三方 Jina（敏感参数风险）
+
+**级别**: Medium (已缓解)
+**来源**: Phase 3 Codex 评审
+**位置**: `src/lib/parser/jina.ts:24`
+**问题**: 所有网页 URL 会发送给第三方 Jina，可能含 token/query 敏感参数。
+**已处理**: 添加 `PARSER_JINA_ENABLED` 开关，可禁用 Jina。
+**待处理**: 敏感参数脱敏、特定域名禁用 Jina。
+
+---
+
+### 8. Jina 串行超时预算
+
+**级别**: Low
+**来源**: Phase 3 Codex 评审
+**位置**: `src/lib/parser/jina.ts:6`, `src/lib/parser/webpage.ts:87`
+**问题**: 最坏情况 Jina(15s) + Cheerio(15s) = 30s/URL。
+**已处理**: 将 Jina 超时从 30s 降到 15s。
+**待处理**: 429/5xx 快速降级、熔断机制。
+
+---
+
 ## 已修复项
 
 | 问题 | 级别 | 修复提交 |
@@ -126,6 +148,10 @@ const result = await generateFromFile(prompt, fileData, FileExtractSchema);
 | normalizeStep2Payload 丢字段 | High | 23b7934 |
 | TEXT 分支未持久化 | High | 23b7934 |
 | LINK SSRF 校验 | Medium | 23b7934 |
+| Jina metadata 丢失 | High | (Phase 3) |
+| 错误 API header x-respond-with | Medium | (Phase 3) |
+| isTwitterUrl 误判 | Low | (Phase 3) |
+| 错误链合并 | Medium | (Phase 3) |
 
 ---
 
@@ -137,3 +163,5 @@ const result = await generateFromFile(prompt, fileData, FileExtractSchema);
 - [ ] #4 buildSemanticSnapshot limit - Phase 4 清理
 - [ ] #5 Inngest 幂等竞争 - 生产部署前
 - [ ] #6 文件解析 schema 约束 - 下一迭代
+- [ ] #7 Jina 敏感参数脱敏 - 下一迭代
+- [ ] #8 Jina 熔断机制 - 性能优化

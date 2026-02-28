@@ -17,7 +17,13 @@ export function isWeChatUrl(url: string): boolean {
 }
 
 export function isTwitterUrl(url: string): boolean {
-  return url.includes("twitter.com") || url.includes("x.com");
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return hostname === 'twitter.com' || hostname === 'www.twitter.com' ||
+           hostname === 'x.com' || hostname === 'www.x.com';
+  } catch {
+    return false;
+  }
 }
 
 function detectSourceType(url: string): WebpageParseResult["sourceType"] {
@@ -57,19 +63,56 @@ function extractMetadata($: ReturnType<typeof cheerio.load>): ParseMetadata {
 
 export async function parseWebpage(url: string): Promise<WebpageParseResult> {
   const sourceType = detectSourceType(url);
+  let jinaError: string | undefined;
 
   // Primary: Try Jina Reader (supports JS-rendered pages)
   const jinaResult = await parseWithJina(url);
   if (jinaResult.success && jinaResult.content.length > 100) {
+    // Try to extract metadata even when Jina succeeds
+    const metadata = await extractMetadataFromUrl(url).catch(() => undefined);
     return {
       title: jinaResult.title,
       content: jinaResult.content,
       sourceType,
+      metadata,
     };
   }
 
+  // Store Jina error for better debugging
+  jinaError = jinaResult.error;
+
   // Fallback: Use cheerio (static HTML only)
-  return parseWithCheerio(url, sourceType);
+  try {
+    return await parseWithCheerio(url, sourceType);
+  } catch (cheerioError) {
+    // Combine errors for better debugging
+    const cheerioMessage = cheerioError instanceof Error ? cheerioError.message : String(cheerioError);
+    const combinedMessage = jinaError
+      ? `Jina failed: ${jinaError}; Cheerio failed: ${cheerioMessage}`
+      : cheerioMessage;
+    throw new Error(combinedMessage);
+  }
+}
+
+/**
+ * Extract metadata from URL without full content parsing
+ */
+async function extractMetadataFromUrl(url: string): Promise<ParseMetadata> {
+  const response = await fetch(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    },
+    signal: AbortSignal.timeout(5000), // Short timeout for metadata only
+  });
+
+  if (!response.ok) {
+    return {};
+  }
+
+  const html = await response.text();
+  const $ = cheerio.load(html);
+  return extractMetadata($);
 }
 
 /**

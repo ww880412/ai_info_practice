@@ -3,7 +3,7 @@
  * Supports JavaScript-rendered pages and provides clean markdown output
  */
 
-const JINA_READER_TIMEOUT = 30000;
+const JINA_READER_TIMEOUT = 15000; // Reduced from 30s to avoid long delays
 const MIN_CONTENT_LENGTH = 100;
 
 export interface JinaParseResult {
@@ -14,17 +14,35 @@ export interface JinaParseResult {
 }
 
 /**
+ * Check if Jina Reader is enabled via environment variable
+ */
+export function isJinaEnabled(): boolean {
+  return process.env.PARSER_JINA_ENABLED !== 'false';
+}
+
+/**
  * Parse webpage content using Jina Reader API
  * @param url - The URL to parse
  * @returns Parsed content in markdown format
  */
 export async function parseWithJina(url: string): Promise<JinaParseResult> {
+  // Check if Jina is enabled
+  if (!isJinaEnabled()) {
+    return {
+      title: '',
+      content: '',
+      success: false,
+      error: 'Jina Reader is disabled',
+    };
+  }
+
   try {
     // Jina Reader API - free tier, no API key required
+    // Using x-respond-with header per official documentation
     const response = await fetch(`https://r.jina.ai/${encodeURIComponent(url)}`, {
       headers: {
         'Accept': 'text/markdown',
-        'X-Return-Format': 'markdown',
+        'x-respond-with': 'markdown',
       },
       signal: AbortSignal.timeout(JINA_READER_TIMEOUT),
     });

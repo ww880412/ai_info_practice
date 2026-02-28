@@ -1,13 +1,35 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { parseWithJina } from "./jina";
+import { parseWithJina, isJinaEnabled } from "./jina";
+
+describe("isJinaEnabled", () => {
+  it("returns true by default", () => {
+    delete process.env.PARSER_JINA_ENABLED;
+    expect(isJinaEnabled()).toBe(true);
+  });
+
+  it("returns false when explicitly disabled", () => {
+    process.env.PARSER_JINA_ENABLED = 'false';
+    expect(isJinaEnabled()).toBe(false);
+    delete process.env.PARSER_JINA_ENABLED;
+  });
+});
 
 describe("parseWithJina", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
+    delete process.env.PARSER_JINA_ENABLED;
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    delete process.env.PARSER_JINA_ENABLED;
+  });
+
+  it("returns disabled error when PARSER_JINA_ENABLED=false", async () => {
+    process.env.PARSER_JINA_ENABLED = 'false';
+    const result = await parseWithJina("https://example.com");
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("disabled");
   });
 
   it("returns parsed content on success", async () => {
