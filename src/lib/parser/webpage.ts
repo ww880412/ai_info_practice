@@ -63,7 +63,6 @@ function extractMetadata($: ReturnType<typeof cheerio.load>): ParseMetadata {
 
 export async function parseWebpage(url: string): Promise<WebpageParseResult> {
   const sourceType = detectSourceType(url);
-  let jinaError: string | undefined;
 
   // Primary: Try Jina Reader (supports JS-rendered pages)
   const jinaResult = await parseWithJina(url);
@@ -79,7 +78,7 @@ export async function parseWebpage(url: string): Promise<WebpageParseResult> {
   }
 
   // Store Jina error for better debugging
-  jinaError = jinaResult.error;
+  const jinaError = jinaResult.error;
 
   // Fallback: Use cheerio (static HTML only)
   try {

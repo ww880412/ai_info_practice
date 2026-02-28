@@ -481,7 +481,7 @@ export const processEntry = inngest.createFunction(
       });
     }
 
-    // Step 5: Mark as done
+    // Step 5: Mark as done and cleanup
     await step.run('finalize', async () => {
       await prisma.entry.update({
         where: { id: entryId },
@@ -491,6 +491,10 @@ export const processEntry = inngest.createFunction(
           knowledgeStatus: 'TO_REVIEW',
         },
       });
+
+      // Reset global config to prevent credential leakage to subsequent jobs
+      const { setServerConfig } = await import('@/lib/ai/client');
+      setServerConfig({});
     });
 
     return { success: true, entryId };

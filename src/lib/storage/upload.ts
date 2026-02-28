@@ -3,7 +3,7 @@
  */
 import { PutObjectCommand, AbortMultipartUploadCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
-import { getStorageClient, getBucketName, getPublicUrl } from './client';
+import { getStorageClient, getBucketName } from './client';
 import { randomUUID } from 'crypto';
 import type { Readable } from 'stream';
 
@@ -34,10 +34,8 @@ export async function uploadFile(
     })
   );
 
-  const publicUrl = getPublicUrl();
-  const url = publicUrl
-    ? `${publicUrl}/${key}`
-    : `r2://${bucket}/${key}`;
+  // Always use r2:// format for internal storage references
+  const url = `r2://${bucket}/${key}`;
 
   return {
     key,
@@ -101,10 +99,8 @@ export async function uploadFileStream(
     throw error;
   }
 
-  const publicUrl = getPublicUrl();
-  const url = publicUrl
-    ? `${publicUrl}/${key}`
-    : `r2://${bucket}/${key}`;
+  // Always use r2:// format for internal storage references
+  const url = `r2://${bucket}/${key}`;
 
   return {
     key,
