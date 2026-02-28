@@ -23,6 +23,16 @@
 6. **去重复杂度修正**：从"全表扫描 O(n)"改为"最近 100 条窗口匹配"
 7. **可观测性表述修正**：ProcessAttempt 标注为"待接入"
 
+**第三轮修正内容**（基于 Codex 第三轮验证反馈）：
+1. **测试分布表口径统一**：修正第 4.3 节测试分布表数值，确保与文档声明的"仅统计 it/test 块"口径一致
+   - parser: 12 → 8
+   - ai/agent: 19 → 15
+   - gemini: 7 → 5
+   - ingest: 10 → 7
+   - entries + entry: 12 → 9
+   - sanitize: 15 → 12
+   - deduplication: 9 → 7
+
 **验证方法**：
 - 测试数量：`rg '\b(it|test)\s*\(' src -g '*.test.ts' | wc -l` → 78
 - Prisma 模型：`rg '^model\s+' prisma/schema.prisma | wc -l` → 13
@@ -287,15 +297,15 @@ parserRegistry.register(webpageStrategy);
 
 | 模块 | 测试数（it/test） | 评估 |
 |------|--------|------|
-| parser | 12 | ✅ 充足 |
-| ai/agent | 19 | ✅ 充足 |
-| gemini | 7 | ⚠️ 一般 |
-| ingest | 10 | ⚠️ 一般 |
-| entries + entry | 12 | ⚠️ 一般 |
-| sanitize | 15 | ✅ 充足 |
-| deduplication | 9 | ✅ 充足 |
+| parser | 8 | ⚠️ 一般 |
+| ai/agent | 15 | ✅ 充足 |
+| gemini | 5 | ⚠️ 一般 |
+| ingest | 7 | ⚠️ 一般 |
+| entries + entry | 9 | ⚠️ 一般 |
+| sanitize | 12 | ✅ 充足 |
+| deduplication | 7 | ⚠️ 一般 |
 
-**说明**：测试数统计口径为 `it/test` 块数量（不含 `describe`）
+**说明**：测试数统计口径为 `it/test` 块数量（不含 `describe`），通过 `rg '\b(it|test)\s*\(' <path> | wc -l` 验证
 
 - 缺乏 API 路由的集成测试
 - E2E 测试刚建立（26 个 smoke tests）
