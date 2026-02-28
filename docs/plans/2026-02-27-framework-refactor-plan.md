@@ -151,7 +151,15 @@ private async runStep1(input: ParseResult) {
 
 ---
 
-### Phase 2: Inngest 任务队列（预计 1 天）
+### Phase 2: Inngest 任务队列（预计 2 天）
+
+**⚠️ 关键前置条件**：
+当前 ingest 路由直接读写本地 `public/uploads` 文件。分布式队列/函数执行环境会失去本地文件系统可见性。
+
+**必须先完成**：
+1. 将文件上传迁移到对象存储（S3/R2/Cloudflare R2 等）
+2. 修改 parser 从对象存储 URL 读取文件
+3. 然后再进行队列替换
 
 #### 3.2.1 目标
 
@@ -444,5 +452,6 @@ export async function parseWebpage(url: string): Promise<WebpageParseResult> {
 ---
 
 *计划制定时间: 2026-02-27*
+*最后修订时间: 2026-02-28（基于架构评审四轮核验结果）*
 *计划负责人: AI Assistant*
 *待用户确认后启动*
