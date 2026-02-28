@@ -8,7 +8,7 @@
 
 | 目标 | 量化指标 |
 |------|----------|
-| 代码精简 | 手写核心代码从 ~1,193 行降至 ~360 行（-70%） |
+| 代码精简 | 手写核心代码从 ~1,193 行降至 ~519 行（-56.5%） |
 | 框架统一 | LLM 调用统一到 Vercel AI SDK |
 | 可靠性提升 | 任务队列从内存级升级为持久化 |
 | 维护成本降低 | 从「自己维护」转为「社区维护」 |
@@ -313,7 +313,6 @@ export async function POST(req: NextRequest) {
 - [ ] 进程重启后，pending 任务自动恢复
 - [ ] 删除文件列表：
   - `src/lib/ingest/queue.ts`
-  - `src/lib/ingest/retry.ts`
 
 ---
 
@@ -415,18 +414,18 @@ export async function parseWebpage(url: string): Promise<WebpageParseResult> {
 
 ```
 2026-02-28  Phase 0 开始（对象存储迁移）
-2026-02-29  Phase 0 完成，Phase 1 开始
-2026-03-03  Phase 1 完成，Phase 2 开始
-2026-03-04  Phase 2 完成，Phase 3 开始
-2026-03-05  Phase 3 完成，Phase 4 开始
-2026-03-05  Phase 4 完成，全量验收
+2026-03-01  Phase 0 完成，Phase 1 开始
+2026-03-04  Phase 1 完成，Phase 2 开始
+2026-03-05  Phase 2 完成，Phase 3 开始
+2026-03-06  Phase 3 完成，Phase 4 开始
+2026-03-06  Phase 4 完成，全量验收
 ```
 
-**总预计工时**：6.5 天
-- Phase 0: 1 天（对象存储迁移）
-- Phase 1: 3 天（Vercel AI SDK）
-- Phase 2: 1.5 天（Inngest）
-- Phase 3: 0.5 天（Jina Reader）
+**总预计工时**：6.5 天（按每天 6.5 小时有效工作时间计算）
+- Phase 0: 1 天（对象存储迁移，6.5h）
+- Phase 1: 3 天（Vercel AI SDK，12h 实际任务时间）
+- Phase 2: 1.5 天（Inngest，5.5h 实际任务时间）
+- Phase 3: 0.5 天（Jina Reader，2h 实际任务时间）
 - Phase 4: 0.5 天（清理稳定化）
 
 ---
@@ -452,7 +451,7 @@ wc -l src/lib/gemini.ts src/lib/ai/agent/engine.ts src/lib/ingest/queue.ts \
 | inngest/* | 0 行 | 100 行（新增） | +100 |
 | parser/jina.ts | 0 行 | 30 行（新增） | +30 |
 | storage/* | 0 行 | 50 行（新增） | +50 |
-| **总计** | ~1,193 行 | ~360 行 | **-833 行 (-70%)** |
+| **总计** | ~1,193 行 | ~519 行 | **-674 行 (-56.5%)** |
 
 ---
 
