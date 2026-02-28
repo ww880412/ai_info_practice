@@ -123,6 +123,10 @@ export const processEntry = inngest.createFunction(
   {
     id: 'process-entry',
     retries: 3,
+    concurrency: {
+      key: 'event.data.entryId',
+      limit: 1,
+    },
     onFailure: async (ctx) => {
       const entryId = ctx.event.data.event.data.entryId;
       const errorMessage = ctx.event.data.error.message || 'Processing failed after retries';

@@ -3,10 +3,16 @@
  * For PDF: render pages and extract page-by-page with partial-success tolerance.
  */
 import { generateFromFile } from "../ai/generate";
+import { z } from "zod";
 import { execFile } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+const FileExtractSchema = z.object({
+  title: z.string().optional().default("Uploaded Document"),
+  content: z.string().min(1, "Content cannot be empty"),
+});
 
 const EXTRACT_FROM_FILE_PROMPT = `提取这个文件/图片中的所有文字内容。
 
@@ -237,9 +243,10 @@ export async function parseFile(
   }
 
   const base64 = buffer.toString("base64");
-  const result = await generateFromFile<{ title: string; content: string }>(
+  const result = await generateFromFile(
     EXTRACT_FROM_FILE_PROMPT,
-    { base64, mimeType }
+    { base64, mimeType },
+    FileExtractSchema
   );
 
   return {

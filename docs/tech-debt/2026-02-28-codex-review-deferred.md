@@ -157,11 +157,11 @@ const result = await generateFromFile(prompt, fileData, FileExtractSchema);
 
 ## 跟进计划
 
-- [ ] #1 上传文件类型校验 - 下一迭代
-- [ ] #2 localStorage 存 API Key - 长期改进
-- [ ] #3 大文件内存/超时 - 架构改进
-- [ ] #4 buildSemanticSnapshot limit - Phase 4 清理
-- [ ] #5 Inngest 幂等竞争 - 生产部署前
-- [ ] #6 文件解析 schema 约束 - 下一迭代
-- [ ] #7 Jina 敏感参数脱敏 - 下一迭代
-- [ ] #8 Jina 熔断机制 - 性能优化
+- [x] #1 上传文件类型校验 - ~~下一迭代~~ **已存在** (行14-26)
+- [ ] #2 localStorage 存 API Key - 长期改进 (设计决策，暂缓)
+- [ ] #3 大文件内存/超时 - 架构改进 (需流式处理，暂缓)
+- [x] #4 buildSemanticSnapshot limit - ~~Phase 4 清理~~ **已修复** (65%/35% 动态分配)
+- [x] #5 Inngest 幂等竞争 - ~~生产部署前~~ **已修复** (concurrency 约束)
+- [x] #6 文件解析 schema 约束 - ~~下一迭代~~ **已修复** (Zod schema 校验)
+- [x] #7 Jina 敏感参数脱敏 - ~~下一迭代~~ **已修复** (sanitizeUrl)
+- [x] #8 Jina 熔断机制 - ~~性能优化~~ **已修复** (circuit breaker)

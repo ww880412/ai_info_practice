@@ -5,6 +5,17 @@
 
 const JINA_READER_TIMEOUT = 15000; // Reduced from 30s to avoid long delays
 const MIN_CONTENT_LENGTH = 100;
+const CIRCUIT_BREAKER_THRESHOLD = 3;
+const CIRCUIT_BREAKER_RESET_MS = 60_000; // 1 minute
+
+let consecutiveFailures = 0;
+let lastFailureTime = 0;
+
+const SENSITIVE_PARAMS = [
+  'token', 'api_key', 'apikey', 'key', 'secret', 'password', 'pwd',
+  'access_token', 'auth', 'auth_token', 'session', 'sessionid',
+  'credential', 'sig', 'signature', 'private_token',
+];
 
 export interface JinaParseResult {
   title: string;
@@ -18,6 +29,29 @@ export interface JinaParseResult {
  */
 export function isJinaEnabled(): boolean {
   return process.env.PARSER_JINA_ENABLED !== 'false';
+}
+
+/**
+ * Sanitize URL by removing sensitive query parameters
+ */
+function sanitizeUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    const keysToDelete: string[] = [];
+
+    urlObj.searchParams.forEach((_, key) => {
+      const lowerKey = key.toLowerCase();
+      // Use exact match to avoid false positives (e.g., 'monkey' matching 'key')
+      if (SENSITIVE_PARAMS.some(p => lowerKey === p)) {
+        keysToDelete.push(key);
+      }
+    });
+
+    keysToDelete.forEach(key => urlObj.searchParams.delete(key));
+    return urlObj.toString();
+  } catch {
+    return url;
+  }
 }
 
 /**
@@ -36,10 +70,28 @@ export async function parseWithJina(url: string): Promise<JinaParseResult> {
     };
   }
 
+  // Circuit breaker: skip if too many recent failures
+  const now = Date.now();
+  if (consecutiveFailures >= CIRCUIT_BREAKER_THRESHOLD) {
+    if (now - lastFailureTime < CIRCUIT_BREAKER_RESET_MS) {
+      return {
+        title: '',
+        content: '',
+        success: false,
+        error: `Circuit breaker open (${consecutiveFailures} consecutive failures)`,
+      };
+    }
+    // Reset circuit breaker after timeout
+    consecutiveFailures = 0;
+  }
+
   try {
+    // Sanitize URL to remove sensitive query parameters before sending to Jina
+    const sanitizedUrl = sanitizeUrl(url);
+
     // Jina Reader API - free tier, no API key required
     // Using x-respond-with header per official documentation
-    const response = await fetch(`https://r.jina.ai/${encodeURIComponent(url)}`, {
+    const response = await fetch(`https://r.jina.ai/${encodeURIComponent(sanitizedUrl)}`, {
       headers: {
         'Accept': 'text/markdown',
         'x-respond-with': 'markdown',
@@ -48,6 +100,12 @@ export async function parseWithJina(url: string): Promise<JinaParseResult> {
     });
 
     if (!response.ok) {
+      // Track failure for circuit breaker (only 429/5xx are service issues)
+      const status = response.status;
+      if (status === 429 || status >= 500) {
+        consecutiveFailures++;
+        lastFailureTime = now;
+      }
       return {
         title: '',
         content: '',
@@ -72,12 +130,19 @@ export async function parseWithJina(url: string): Promise<JinaParseResult> {
     const titleMatch = markdown.match(/^#\s+(.+)$/m);
     const title = titleMatch?.[1]?.trim() || extractTitleFromUrl(url);
 
+    // Success: reset circuit breaker
+    consecutiveFailures = 0;
+
     return {
       title,
       content: markdown,
       success: true,
     };
   } catch (error) {
+    // Track failure for circuit breaker (network/timeout errors)
+    consecutiveFailures++;
+    lastFailureTime = Date.now();
+
     return {
       title: '',
       content: '',

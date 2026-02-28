@@ -10,7 +10,8 @@
       "Bash(npx prisma:*)",
       "Bash(npx next:*)",
       "WebFetch(domain:ai.google.dev)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "mcp__plugin_claude-mem_mcp-search__save_memory"
     ]
   }
 }

@@ -172,7 +172,7 @@ export function buildContentSnapshot(content: string, limit = STEP2_INPUT_LIMIT)
  * Build semantic snapshot with intelligent content segmentation
  * - Short content (<12K): Pass through entirely
  * - Medium content (12K-50K): Extract first 2 sentences per paragraph, preserve code blocks
- * - Long content (>50K): Take first 8K + last 4K with truncation marker
+ * - Long content (>50K): Take head (65% of limit) + tail (35% of limit) with truncation marker
  */
 export function buildSemanticSnapshot(content: string, limit = STEP2_INPUT_LIMIT): string {
   const SHORT_THRESHOLD = 12_000;
@@ -183,10 +183,10 @@ export function buildSemanticSnapshot(content: string, limit = STEP2_INPUT_LIMIT
     return content;
   }
 
-  // Long content: head + tail strategy
+  // Long content: head + tail strategy (proportional to limit)
   if (content.length > MEDIUM_THRESHOLD) {
-    const headSize = 8_000;
-    const tailSize = 4_000;
+    const headSize = Math.floor(limit * 0.65);
+    const tailSize = Math.floor(limit * 0.35);
     const head = content.slice(0, headSize);
     const tail = content.slice(-tailSize);
 

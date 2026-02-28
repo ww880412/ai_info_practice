@@ -1,6 +1,12 @@
 import { generateFromFile } from '../ai/generate';
+import { z } from 'zod';
 import type { ParseStrategy, ParseInput, ParseResult } from './strategy';
 import { SourceType } from '@prisma/client';
+
+const FileExtractSchema = z.object({
+  title: z.string().optional().default("Image"),
+  content: z.string().min(1, "Content cannot be empty"),
+});
 
 const EXTRACT_FROM_FILE_PROMPT = `提取这个文件/图片中的所有文字内容。
 
@@ -28,9 +34,10 @@ export class ImageMultimodalStrategy implements ParseStrategy {
     const buffer = input.data as Buffer;
     const base64 = buffer.toString('base64');
 
-    const result = await generateFromFile<{ title: string; content: string }>(
+    const result = await generateFromFile(
       EXTRACT_FROM_FILE_PROMPT,
-      { base64, mimeType: input.mimeType || 'image/png' }
+      { base64, mimeType: input.mimeType || 'image/png' },
+      FileExtractSchema
     );
 
     return {
