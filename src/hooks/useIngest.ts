@@ -69,7 +69,7 @@ export function useIngest() {
 
   const ingestFile = useMutation({
     mutationFn: async ({ file }: IngestFileParams): Promise<IngestResponse> => {
-      // Step 1: Upload file
+      // Step 1: Upload file to R2 storage
       const formData = new FormData();
       formData.append("file", file);
       const uploadRes = await fetch("/api/upload", {
@@ -80,14 +80,14 @@ export function useIngest() {
         const err = await uploadRes.json();
         throw new Error(err.error || "Upload failed");
       }
-      const { fileKey } = await uploadRes.json();
+      const { fileUrl } = await uploadRes.json();
 
-      // Step 2: Ingest with fileKey
+      // Step 2: Ingest with fileUrl (stored in rawUrl field)
       const config = getConfig();
       const res = await fetch("/api/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inputType: "PDF", fileKey, config }),
+        body: JSON.stringify({ inputType: "PDF", fileKey: fileUrl, config }),
       });
       if (!res.ok) throw new Error("Failed to ingest file");
       return res.json();

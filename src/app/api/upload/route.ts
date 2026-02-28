@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
-import { randomUUID } from "crypto";
-
-const UPLOAD_DIR = join(process.cwd(), "public", "uploads");
+import { uploadFile } from "@/lib/storage";
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,7 +25,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (100MB max for local storage)
+    // Validate file size (100MB max)
     const MAX_SIZE = 100 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
       return NextResponse.json(
@@ -38,19 +34,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Save file
-    await mkdir(UPLOAD_DIR, { recursive: true });
-    const ext = file.name.split(".").pop() || "bin";
-    const fileName = `${randomUUID()}.${ext}`;
-    const filePath = join(UPLOAD_DIR, fileName);
-
+    // Upload to R2 storage
     const bytes = await file.arrayBuffer();
-    await writeFile(filePath, Buffer.from(bytes));
+    const result = await uploadFile(
+      Buffer.from(bytes),
+      file.name,
+      file.type
+    );
 
     return NextResponse.json({
-      fileKey: fileName,
-      mimeType: file.type,
-      size: file.size,
+      fileKey: result.key,
+      fileUrl: result.url,
+      mimeType: result.mimeType,
+      size: result.size,
     });
   } catch (error) {
     console.error("Upload error:", error);

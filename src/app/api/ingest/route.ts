@@ -30,8 +30,7 @@ import {
   initializeIngestQueue,
   type IngestTaskConfig,
 } from "@/lib/ingest/queue";
-import { readFile, unlink } from "fs/promises";
-import { join } from "path";
+import { downloadFromUrl } from "@/lib/storage";
 import type { Prisma, ProcessStatus, SourceType } from "@prisma/client";
 import {
   SummaryStructureSchema,
@@ -235,15 +234,15 @@ async function asyncProcess(
       await updateEntryProcessStatus(entryId, "PARSING", "正在解析文件内容（大文件可能需要更久）...");
 
       try {
-        // rawUrl stores the fileKey for uploaded files
-        const fileKey = entry.rawUrl;
-        if (!fileKey) throw new Error("No file key found");
+        // rawUrl stores the file URL from R2 storage
+        const fileUrl = entry.rawUrl;
+        if (!fileUrl) throw new Error("No file URL found");
 
-        const filePath = join(process.cwd(), "public", "uploads", fileKey);
-        const buffer = await readFile(filePath);
+        // Download from R2 storage
+        const { buffer, mimeType: detectedMimeType } = await downloadFromUrl(fileUrl);
 
-        // Detect mime type from extension
-        const ext = fileKey.split(".").pop()?.toLowerCase();
+        // Use detected mime type or fallback based on extension
+        const ext = fileUrl.split(".").pop()?.toLowerCase();
         const mimeMap: Record<string, string> = {
           pdf: "application/pdf",
           png: "image/png",
@@ -252,7 +251,9 @@ async function asyncProcess(
           webp: "image/webp",
           heic: "image/heic",
         };
-        const mimeType = mimeMap[ext || ""] || "application/pdf";
+        const mimeType = detectedMimeType !== "application/octet-stream"
+          ? detectedMimeType
+          : (mimeMap[ext || ""] || "application/pdf");
         const parseType: ParseInput["type"] = mimeType.startsWith("image/")
           ? "IMAGE"
           : "PDF";
@@ -290,17 +291,9 @@ async function asyncProcess(
             sourceType: parsed.sourceType as SourceType,
           },
         });
-
-        // Clean up uploaded file
-        await unlink(filePath).catch(() => {});
       } catch (parseError) {
         console.error("PDF parse branch failed:", parseError);
-        // Clean up uploaded file even on failure
-        const fileKey = entry.rawUrl;
-        if (fileKey) {
-          const filePath = join(process.cwd(), "public", "uploads", fileKey);
-          await unlink(filePath).catch(() => {});
-        }
+        // Files are stored in R2, no local cleanup needed
         await updateEntryProcessStatus(
           entryId,
           "FAILED",
