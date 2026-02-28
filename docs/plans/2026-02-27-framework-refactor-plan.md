@@ -421,12 +421,14 @@ export async function parseWebpage(url: string): Promise<WebpageParseResult> {
 2026-03-06  Phase 4 完成，全量验收
 ```
 
-**总预计工时**：6.5 天（按每天 6.5 小时有效工作时间计算）
-- Phase 0: 1 天（对象存储迁移，6.5h）
-- Phase 1: 3 天（Vercel AI SDK，12h 实际任务时间）
-- Phase 2: 1.5 天（Inngest，5.5h 实际任务时间）
-- Phase 3: 0.5 天（Jina Reader，2h 实际任务时间）
-- Phase 4: 0.5 天（清理稳定化）
+**总预计工时**：6.5 天（日历排期，含缓冲时间）
+- Phase 0: 1 天（对象存储迁移，实际任务 6.5h）
+- Phase 1: 3 天（Vercel AI SDK，实际任务 12h）
+- Phase 2: 1.5 天（Inngest，实际任务 5.5h）
+- Phase 3: 0.5 天（Jina Reader，实际任务 2h）
+- Phase 4: 0.5 天（清理稳定化，实际任务 ~3h）
+
+**说明**：实际任务时间合计约 29h，日历排期 6.5 天包含了缓冲时间、测试调试、文档更新等非编码工作。
 
 ---
 
