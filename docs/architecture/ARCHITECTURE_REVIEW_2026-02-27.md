@@ -1,7 +1,37 @@
 # AI Practice Hub 架构深度评审报告
 
 > 评审日期：2026-02-27
+> 修订日期：2026-02-28
 > 评审范围：代码架构 + 框架替代可行性
+
+## 修订记录
+
+### 2026-02-28 修订（基于 Codex 第二轮技术评审反馈）
+
+**第一轮修正内容**：
+1. **测试用例数量**：从 56 个更正为 222 个（18 个测试文件）
+2. **API wrapper 建议**：降低优先级至 P2，明确不建议使用全局 wrapper（会破坏现有细粒度错误处理）
+3. **Parser 插件化建议**：降低优先级至 P3，明确当前已使用 Strategy Pattern + Registry
+4. **"100% 可靠"表述**：修正为"显著提升可靠性"，补充说明 Schema 强制≠业务正确性保证
+
+**第二轮修正内容**（基于代码深度核验）：
+1. **测试数量口径修正**：从"222 个测试用例"改为"78 个测试用例（18 个测试文件，104 个测试标记含 describe）"
+2. **Prisma 模型数修正**：从 16 个改为 13 个
+3. **代码规模修正**：从 ~23,357 行改为 ~16,721 行
+4. **双写模式表述修正**：从"双写保证兼容"改为"部分路径双写"
+5. **Inngest 替代建议补充前置条件**：需先迁移文件到对象存储
+6. **去重复杂度修正**：从"全表扫描 O(n)"改为"最近 100 条窗口匹配"
+7. **可观测性表述修正**：ProcessAttempt 标注为"待接入"
+
+**验证方法**：
+- 测试数量：`rg '\b(it|test)\s*\(' src -g '*.test.ts' | wc -l` → 78
+- Prisma 模型：`rg '^model\s+' prisma/schema.prisma | wc -l` → 13
+- 代码规模：`rg --files -g '*.ts' -g '*.tsx' | xargs wc -l | tail -n1` → 16,721
+- API 端点：`find src/app/api -name route.ts | wc -l` → 24
+- Parser 架构：读取 `src/lib/parser/registry.ts` 确认 Strategy Pattern
+- 错误处理：检查 `src/app/api/*/route.ts` 确认现有模式
+
+---
 
 ## 1. 项目概览
 
@@ -9,13 +39,13 @@
 
 | 指标 | 数值 |
 |------|------|
-| 代码规模 | ~23,357 行 TypeScript/TSX |
-| Prisma Schema | 414 行，16 个模型 |
-| API 路由 | 12 个目录，~24 个端点 |
+| 代码规模 | ~16,721 行 TypeScript/TSX |
+| Prisma Schema | 414 行，13 个模型 |
+| API 路由 | 24 个 route 文件，34 个方法导出 |
 | 组件目录 | 7 个（agent, common, entry, ingest, library, practice, ui） |
 | 自定义 Hooks | 6 个 |
 | Parser 策略 | 9 种（github, webpage, pdf, image, markdown, youtube...） |
-| 测试用例 | 56 个 |
+| 测试用例 | 78 个 it/test（18 个测试文件，104 个测试标记含 describe） |
 
 ### 1.2 技术栈
 
@@ -32,9 +62,9 @@
 | `lib/ai/agent/engine.ts` | 544 | ReAct Agent 引擎，两步推理 |
 | `lib/gemini.ts` | 246 | Gemini API 封装 |
 | `lib/ingest/queue.ts` | 174 | 内存任务队列 |
-| `lib/parser/*` | ~400 | URL/PDF/图片解析 |
-| `lib/ai/deduplication.ts` | 72 | Jaccard 相似度去重 |
-| **总计** | ~1,436 | — |
+| `lib/parser/*` | ~1,272 | URL/PDF/图片解析（不含测试） |
+| `lib/ai/deduplication.ts` | 72 | Jaccard 相似度去重（最近 100 条窗口） |
+| **总计** | ~2,308 | — |
 
 ---
 
@@ -79,12 +109,17 @@ model Entry {
 - 违反单一职责原则
 
 **现状**：
-B2.1 已拆分出 `EntryAIResult`、`EntryEvaluation`、`EntrySmartSummary`，但 Entry 主表仍保留所有旧字段（双写模式），迁移未完成。
+B2.1 已拆分出 `EntryAIResult`、`EntryEvaluation`、`EntrySmartSummary`，但 Entry 主表仍保留所有旧字段（**部分路径双写**），迁移未完成。
+
+**双写覆盖情况**：
+- ✅ 入库路径（`/api/ingest`）：已实现双写
+- ❌ 重新处理路径（`/api/ai/process`）：仅更新 Entry 主表，未同步新表，存在数据漂移风险
 
 **建议**：
 1. 制定字段废弃时间表（建议 2 个迭代周期）
-2. 查询层优先使用拆分后的关联表
-3. 新代码禁止直接访问 Entry 上的冗余字段
+2. 补齐 reprocess 路径的双写逻辑，或读层统一以新表为准
+3. 查询层优先使用拆分后的关联表
+4. 新代码禁止直接访问 Entry 上的冗余字段
 
 ---
 
@@ -152,26 +187,29 @@ extractedMetadata Json?
 
 **问题描述**：
 API 路由分散在 12 个目录，各自实现：
-- 错误处理逻辑重复
+- 错误处理逻辑重复（但模式基本一致：try-catch + console.error + NextResponse.json）
 - 响应格式不完全一致（部分返回 `{ data }` 部分返回裸对象）
 - 缺乏中间件层（日志、认证预留、限流）
 
-**建议**：
+**现状评估**：
+当前错误处理已相对统一，大部分 API 使用以下模式：
 ```typescript
-// 统一 API handler wrapper
-const apiHandler = <T>(handler: Handler<T>) => async (req: NextRequest) => {
-  const startTime = Date.now();
-  try {
-    const result = await handler(req);
-    return NextResponse.json({ data: result }, {
-      headers: { 'X-Response-Time': `${Date.now() - startTime}ms` }
-    });
-  } catch (e) {
-    console.error('[API Error]', e);
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
-};
+try {
+  // ... 业务逻辑
+  return NextResponse.json({ data: result });
+} catch (error) {
+  console.error("API error:", error);
+  return NextResponse.json({ error: "Error message" }, { status: 500 });
+}
 ```
+
+**建议**：
+优先级降低为 P2。如需优化，建议：
+1. 提取共享的错误处理函数（而非全局 wrapper）
+2. 添加结构化日志（包含 requestId、响应时间）
+3. 统一响应格式验证（确保所有 API 返回 `{ data }` 或 `{ error }`）
+
+**不建议**：使用全局 wrapper 会破坏现有的细粒度错误处理逻辑（如 ingest API 的多阶段错误处理）
 
 ---
 
@@ -224,28 +262,41 @@ entry/
 
 ### 4.2 Parser 策略注册模式
 
-当前 parser 通过硬编码注册，新增 parser 需要修改多处：
-1. 创建 parser 文件
-2. 修改 registry.ts
-3. 修改 index.ts
+**现状**：
+当前已使用 Strategy Pattern + Registry 模式（`src/lib/parser/registry.ts`）：
+- `ParserRegistry` 类管理策略注册
+- 支持 `canHandle` 判断和 `fallback` 机制
+- 支持超时控制和错误处理
 
-**建议**：采用插件式自注册模式。
+**问题**：
+新增 parser 需要手动注册到 `src/lib/parser/index.ts`：
+```typescript
+parserRegistry.register(githubStrategy);
+parserRegistry.register(webpageStrategy);
+// ... 需要手动添加每个策略
+```
+
+**建议**：
+优先级降低为 P3。当前模式已足够清晰，如需优化：
+1. 使用文件系统扫描自动发现策略（需要约定命名规范）
+2. 或保持现状，手动注册更明确且易于调试
 
 ---
 
 ### 4.3 测试覆盖结构化不足
 
-| 模块 | 测试数 | 评估 |
+| 模块 | 测试数（it/test） | 评估 |
 |------|--------|------|
-| parser | 8 | ✅ 充足 |
-| ai/agent | 15 | ✅ 充足 |
-| gemini | 5 | ⚠️ 一般 |
-| ingest | 7 | ⚠️ 一般 |
-| **entries** | **2** | ❌ 不足 |
-| sanitize | 10 | ✅ 充足 |
-| deduplication | 7 | ✅ 充足 |
+| parser | 12 | ✅ 充足 |
+| ai/agent | 19 | ✅ 充足 |
+| gemini | 7 | ⚠️ 一般 |
+| ingest | 10 | ⚠️ 一般 |
+| entries + entry | 12 | ⚠️ 一般 |
+| sanitize | 15 | ✅ 充足 |
+| deduplication | 9 | ✅ 充足 |
 
-- entries 测试仅 2 个，覆盖不足
+**说明**：测试数统计口径为 `it/test` 块数量（不含 `describe`）
+
 - 缺乏 API 路由的集成测试
 - E2E 测试刚建立（26 个 smoke tests）
 
@@ -294,10 +345,17 @@ const { object } = await generateObject({
 | 维度 | 现状 | 替代后 |
 |------|------|--------|
 | 代码量 | 544 行 | ~100 行 |
-| 输出解析 | 正则匹配，易出错 | Schema 强制，100% 可靠 |
+| 输出解析 | 正则匹配，易出错 | Schema 强制，显著提升可靠性 |
 | Tool Calling | 手写 | 原生支持 |
 
+**现状问题**：
 当前 `parseAgentResponse` 使用大量正则提取 THINK/ACTION/FINAL 等字段，容易因格式变化而失败。
+
+**替代优势**：
+Vercel AI SDK 的 `generateObject` 使用 Zod schema 强制输出结构，大幅减少解析错误。但需注意：
+- LLM 仍可能生成不符合业务逻辑的内容（如空字符串、无意义文本）
+- 需要保留业务层验证（如 `decision-repair.ts` 中的质量检查）
+- Schema 强制≠业务正确性保证
 
 ---
 
@@ -312,6 +370,16 @@ const { object } = await generateObject({
 | 进程重启 | 任务丢失 | 自动恢复 |
 
 **推荐框架**: [Inngest](https://inngest.com/)（Next.js 原生支持，免费额度充足）
+
+**⚠️ 关键前置条件**：
+当前 ingest 路由直接读写本地 `public/uploads` 文件（见 `src/app/api/ingest/route.ts:242, 295`）。分布式队列/函数执行环境会失去本地文件系统可见性。
+
+**必须先完成**：
+1. 将文件上传迁移到对象存储（S3/R2/Cloudflare R2 等）
+2. 修改 parser 从对象存储 URL 读取文件
+3. 然后再进行队列替换
+
+**替代后示例**：
 
 ```typescript
 // 替代后示例
@@ -349,7 +417,10 @@ export const processEntry = inngest.createFunction(
 |------|------|--------|
 | 算法 | Jaccard（词袋） | 向量语义 |
 | 精度 | 低（词重叠） | 高（语义理解） |
-| 可扩展性 | O(n) 全表扫描 | O(log n) 向量索引 |
+| 可扩展性 | 最近 100 条窗口匹配 | O(log n) 向量索引 |
+
+**现状实现**：
+当前去重仅对最近 100 条 Entry 进行 Jaccard 相似度计算（见 `src/lib/ai/deduplication.ts:39`），并非全表扫描。这种固定窗口策略在数据量增长后语义召回能力有限。
 
 **推荐方案**: pgvector + Embedding（PostgreSQL 原生扩展，无需额外服务）
 
@@ -359,9 +430,9 @@ export const processEntry = inngest.createFunction(
 
 1. **ReAct Agent 设计**：两步推理（classify → extract）+ 置信度评估 + 决策修复，架构清晰
 2. **类型契约**：`ingest-contract.ts` + Zod schemas 确保 AI 输出结构化
-3. **可观测性**：`ReasoningTrace` + `ParseLog` + `ProcessAttempt` 完整追踪处理链路
-4. **渐进式升级**：Batch 1-3 系统性升级路径清晰，双写模式保证兼容
-5. **测试基础**：56 个单元测试 + 26 个 E2E smoke tests
+3. **可观测性**：`ReasoningTrace` + `ParseLog` 已接入，`ProcessAttempt` 待接入
+4. **渐进式升级**：Batch 1-3 系统性升级路径清晰，部分路径双写保证兼容
+5. **测试基础**：78 个单元测试（18 个测试文件）+ 26 个 E2E smoke tests
 
 ---
 
@@ -375,14 +446,14 @@ export const processEntry = inngest.createFunction(
 | **P0** | gemini.ts 手写 | 框架替代 | Vercel AI SDK |
 | **P0** | agent/engine.ts 解析 | 框架替代 | generateObject |
 | **P0** | ingest/queue.ts 内存队列 | 框架替代 | Inngest |
-| **P1** | API 层抽象缺失 | 设计 | 实现 handler wrapper |
-| **P1** | 前端参数重复 | 设计 | 清理 sort 参数 |
 | **P1** | 网页解析手写 | 框架替代 | Jina Reader |
 | **P1** | 去重精度低 | 框架替代 | pgvector |
+| **P1** | 前端参数重复 | 设计 | 清理 sort 参数 |
+| **P2** | API 层抽象缺失 | 设计 | 提取共享错误处理 |
 | **P2** | 组件目录过载 | 代码组织 | 拆分 entry/ |
-| **P2** | Parser 非插件化 | 可扩展性 | 自注册模式 |
 | **P2** | 测试覆盖不足 | 质量 | 补充 API 集成测试 |
 | **P2** | 性能监控缺失 | 可观测性 | OpenTelemetry |
+| **P3** | Parser 注册模式 | 可扩展性 | 可选：自动发现 |
 
 ---
 
@@ -396,8 +467,8 @@ export const processEntry = inngest.createFunction(
 | `src/lib/ai/agent/engine.ts` | 544 | ReAct Agent 核心 |
 | `src/lib/gemini.ts` | 246 | Gemini API 封装 |
 | `src/lib/ingest/queue.ts` | 174 | 任务队列 |
-| `src/app/api/ingest/route.ts` | ~350 | 入库 API |
-| `src/app/entry/[id]/page.tsx` | ~400 | 条目详情页 |
+| `src/app/api/ingest/route.ts` | 689 | 入库 API |
+| `src/app/entry/[id]/page.tsx` | 623 | 条目详情页 |
 
 ### 8.2 依赖版本
 
@@ -415,3 +486,4 @@ export const processEntry = inngest.createFunction(
 ---
 
 *报告生成时间: 2026-02-27*
+*最后修订时间: 2026-02-28（基于 Codex 第二轮深度核验）*
