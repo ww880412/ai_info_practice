@@ -2,23 +2,25 @@
 
 > 里程碑级状态索引。会话级交接细节记录在 `PROGRESS.log`。
 
-## 📍 当前状态（2026-02-25）
+## 📍 当前状态（2026-03-02）
 
 ### 活跃分支
-- `main`（主线，Batch 3 已合并）
+- `main`（主线，ReAct Agent Phase 1 已完成）
 
 ### 本次完成
-- ✅ Batch 3 系统性升级（B3.1-B3.11），45 文件 +1239/-222 行
-- ✅ UI 组件完善（Toast、ConfirmDialog、Skeleton），替换所有原生 alert/confirm
-- ✅ 全局搜索（Cmd+K，SearchDialog + API）
-- ✅ 排序增强（createdAt/updatedAt/title，URL 持久化）
-- ✅ 批量导入（多 URL textarea，最多 10 个）
-- ✅ Prompt 整理（删除 prompts.ts，内联到使用处）
-- ✅ Parser 元数据增强（webpage meta 标签、GitHub stars/topics）
-- ✅ JSON 字段 Zod 类型安全校验
-- ✅ AI 结果版本化（version + isActive 字段）
-- ✅ Parser 扩展（YouTube oEmbed + Markdown）
-- ✅ 文档归档（5 个 plan → archive/2026-Q1/）、operations 引用清理
+- ✅ **ReAct Agent Phase 1 实施完成**（接口重构）
+  - 添加 IAgentEngine 接口和 AgentProcessOptions 类型
+  - 重构 ReActAgent 实现接口
+  - 创建 createAgentEngine() 工厂函数
+  - 更新 Inngest 和 API Route 调用
+  - 通过 Codex 评审（修复 1 Medium + 1 Low 问题）
+  - TypeScript 编译通过，单元测试通过
+
+### 待讨论
+- ⏸️ ReAct Agent Phase 2+ 实施路径选择
+  - 选项 A: 引入 LangGraph（原方案，风险高）
+  - 选项 B: 基于 Vercel AI SDK 渐进式实施（推荐）
+  - 选项 C: 先解决核心问题，暂缓 ReAct
 
 ---
 
@@ -65,4 +67,4 @@
 
 ---
 
-*最后更新: 2026-02-25*
+*最后更新: 2026-03-02*
