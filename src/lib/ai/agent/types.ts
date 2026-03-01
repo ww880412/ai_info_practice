@@ -55,3 +55,25 @@ export interface AgentContext {
   history: ReasoningStep[];
   intermediateResults: Record<string, unknown>;
 }
+
+import type { NormalizedAgentIngestDecision } from './ingest-contract';
+
+/**
+ * Agent 引擎统一接口
+ * 确保 v1 和 v2 实现兼容
+ */
+export interface IAgentEngine {
+  /**
+   * 处理条目并返回决策
+   * @param entryId 条目 ID
+   * @param input 解析后的输入
+   * @param options 可选配置（进度回调等）
+   */
+  process(
+    entryId: string,
+    input: ParseResult,
+    options?: {
+      onProgress?: (message: string) => Promise<void>;
+    }
+  ): Promise<NormalizedAgentIngestDecision>;
+}

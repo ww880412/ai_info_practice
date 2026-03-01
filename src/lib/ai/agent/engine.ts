@@ -1,8 +1,9 @@
-import type { AgentConfig, ReasoningStep, ReasoningTrace } from "./types";
+import type { AgentConfig, ReasoningStep, ReasoningTrace, IAgentEngine } from "./types";
 import type { ParseResult } from "../../parser/index";
 import { generateJSON } from "../generate";
 import { prisma } from "../../prisma";
 import { stringifyObservation } from "../../trace/observation";
+import { normalizeAgentIngestDecision, type NormalizedAgentIngestDecision } from './ingest-contract';
 
 interface ParsedAction {
   action: string;
@@ -266,14 +267,40 @@ export function parseAgentResponse(response: string): ParsedAgentResponse {
   };
 }
 
-export class ReActAgent {
+export class ReActAgent implements IAgentEngine {
   private config: AgentConfig;
 
   constructor(config: AgentConfig) {
     this.config = config;
   }
 
+  /**
+   * 处理条目并返回决策（新签名）
+   * 内部执行推理过程，最终返回标准化的决策结果
+   */
   async process(
+    entryId: string,
+    input: ParseResult,
+    options?: {
+      onProgress?: (message: string) => Promise<void>;
+    }
+  ): Promise<NormalizedAgentIngestDecision> {
+    // 执行原有的推理过程
+    const trace = await this.executeReasoning(entryId, input, options);
+
+    // 在方法内部完成标准化转换
+    const normalized = normalizeAgentIngestDecision(trace.finalResult, {
+      contentLength: input.content.length,
+    });
+
+    if (!normalized) {
+      throw new Error('Agent output missing required fields');
+    }
+
+    return normalized;
+  }
+
+  private async executeReasoning(
     entryId: string,
     input: ParseResult,
     options: AgentProcessOptions = {}

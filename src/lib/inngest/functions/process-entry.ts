@@ -7,10 +7,8 @@ import { prisma } from '@/lib/prisma';
 import { parseWithLogging, type ParseInput, type ParseResult } from '@/lib/parser';
 import { classifyAndExtract, type ClassifyAndExtractResult } from '@/lib/ai/classifier';
 import { convertToPractice } from '@/lib/ai/practiceConverter';
-import { ReActAgent } from '@/lib/ai/agent';
-import { getAgentConfig } from '@/lib/ai/agent/get-config';
+import { createAgentEngine } from '@/lib/ai/agent/factory';
 import {
-  normalizeAgentIngestDecision,
   type NormalizedAgentIngestDecision,
   type NormalizedPracticeTask,
 } from '@/lib/ai/agent/ingest-contract';
@@ -265,24 +263,13 @@ export const processEntry = inngest.createFunction(
       let agentFailureReason = '';
 
       try {
-        const agentConfig = await getAgentConfig();
-        const agent = new ReActAgent(agentConfig);
-
-        const trace = await agent.process(entryId, parsed);
-        const normalized = normalizeAgentIngestDecision(trace.finalResult, {
-          contentLength: parsed.content.length,
-        });
-
-        if (!normalized) {
-          throw new Error('Agent output missing required fields');
-        }
-
-        const { decision: repairedDecision } = await validateAndRepairDecision(normalized, {
+        const agent = await createAgentEngine();
+        const decision = await agent.process(entryId, parsed);
+        const { decision: repairedDecision } = await validateAndRepairDecision(decision, {
           contentLength: parsed.content.length,
           maxEnglishRatio: getMaxDecisionEnglishRatio(),
           minQualityScore: getMinDecisionQualityScore(),
         });
-
         result = repairedDecision;
       } catch (error) {
         agentFailureReason = error instanceof Error ? error.message : String(error);

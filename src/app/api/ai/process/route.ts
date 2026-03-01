@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { classifyAndExtract, type ClassifyAndExtractResult } from "@/lib/ai/classifier";
 import { convertToPractice } from "@/lib/ai/practiceConverter";
-import { ReActAgent } from "@/lib/ai/agent";
-import { getAgentConfig } from "@/lib/ai/agent/get-config";
+import { createAgentEngine } from "@/lib/ai/agent/factory";
 import {
-  normalizeAgentIngestDecision,
   type NormalizedAgentIngestDecision,
   type NormalizedPracticeTask,
 } from "@/lib/ai/agent/ingest-contract";
@@ -176,8 +174,7 @@ export async function POST(request: NextRequest) {
     let agentFailureReason = "";
 
     try {
-      const agentConfig = await getAgentConfig();
-      const agent = new ReActAgent(agentConfig);
+      const agent = await createAgentEngine();
 
       decision = await runWithProgressRetry({
         label: "AI重处理",
@@ -193,20 +190,13 @@ export async function POST(request: NextRequest) {
           await updateProcessStatus(targetEntryId, "AI_PROCESSING", message);
         },
         operation: async () => {
-          const trace = await agent.process(targetEntryId, parseInput, {
+          const decision = await agent.process(targetEntryId, parseInput, {
             onProgress: async (message) => {
               await updateProcessStatus(targetEntryId, "AI_PROCESSING", message);
             },
           });
 
-          const normalized = normalizeAgentIngestDecision(trace.finalResult, {
-            contentLength: content.length,
-          });
-          if (!normalized) {
-            throw new Error("Agent output missing required fields");
-          }
-
-          const { decision: repaired } = await validateAndRepairDecision(normalized, {
+          const { decision: repaired } = await validateAndRepairDecision(decision, {
             contentLength: content.length,
             maxEnglishRatio: getMaxDecisionEnglishRatio(),
             minQualityScore: getMinDecisionQualityScore(),
