@@ -5,6 +5,8 @@ import { inngest } from "@/lib/inngest/client";
 import type { SourceType } from "@prisma/client";
 
 export async function POST(request: NextRequest) {
+  let createdEntryId: string | null = null;
+
   try {
     const body = await request.json();
     const { inputType, url, fileUrl, text, config } = body;
@@ -103,6 +105,7 @@ export async function POST(request: NextRequest) {
         processError: "任务已提交，等待处理...",
       },
     });
+    createdEntryId = entry.id;
 
     // Check for similar entries (only for TEXT type, as LINK/PDF content is parsed asynchronously)
     let similarEntries: Array<{
@@ -131,6 +134,20 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Ingest error:", error);
+
+    if (createdEntryId) {
+      const errorMessage = error instanceof Error ? error.message : "Queue dispatch failed";
+      await prisma.entry.update({
+        where: { id: createdEntryId },
+        data: {
+          processStatus: "FAILED",
+          processError: `任务入队失败: ${errorMessage}`,
+        },
+      }).catch((updateError) => {
+        console.error("Failed to mark entry as FAILED:", updateError);
+      });
+    }
+
     return NextResponse.json(
       { error: "Failed to ingest content" },
       { status: 500 }

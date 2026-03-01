@@ -24,22 +24,45 @@ services:
     container_name: ai-practice-app
     ports:
       - "3001:3001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       DATABASE_URL: postgresql://ai_practice:${POSTGRES_PASSWORD:-practice123}@postgres:5432/ai_practice?schema=public
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3-flash-preview}
+      INNGEST_DEV: ${INNGEST_DEV:-http://inngest:8288}
+      INNGEST_EVENT_KEY: ${INNGEST_EVENT_KEY}
+      INNGEST_SIGNING_KEY: ${INNGEST_SIGNING_KEY}
       NEXT_PUBLIC_APP_URL: http://localhost:3001
       KEY_ENCRYPTION_SECRET: ${KEY_ENCRYPTION_SECRET}
       R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
       R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
       R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
       R2_BUCKET_NAME: ${R2_BUCKET_NAME}
+      # Local proxy configuration (optional)
+      USE_LOCAL_PROXY: ${USE_LOCAL_PROXY:-false}
+      LOCAL_PROXY_URL: ${LOCAL_PROXY_URL:-http://host.docker.internal:8045/v1}
+      LOCAL_PROXY_KEY: ${LOCAL_PROXY_KEY}
+      LOCAL_PROXY_MODEL: ${LOCAL_PROXY_MODEL:-gemini-3.1-pro-high}
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
     volumes:
       - ./uploads:/app/public/uploads
+
+  inngest:
+    image: node:20-alpine
+    container_name: ai-practice-inngest
+    working_dir: /app
+    command: >
+      sh -c "npx --yes inngest-cli@latest dev -u http://app:3001/api/inngest -p 8288"
+    ports:
+      - "8288:8288"
+    depends_on:
+      app:
+        condition: service_started
+    restart: unless-stopped
 
 volumes:
   postgres_data:

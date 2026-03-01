@@ -1,11 +1,83 @@
 /**
  * Vercel AI SDK unified client configuration
  * Replaces @google/generative-ai with @ai-sdk/google
+ * Supports local OpenAI-compatible proxy for cost savings
  */
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { LanguageModel } from 'ai';
 import { prisma } from '@/lib/prisma';
 import { decryptApiKey } from '@/lib/crypto';
+
+// ─────────────── Local Proxy Configuration ───────────────
+
+export interface LocalProxyConfig {
+  enabled: boolean;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+}
+
+const ALLOWED_PROXY_HOSTS = ['localhost', '127.0.0.1', '::1', 'host.docker.internal'];
+
+function validateProxyUrl(urlStr: string): void {
+  const url = new URL(urlStr);
+  if (!['http:', 'https:'].includes(url.protocol)) {
+    throw new Error(`Invalid proxy protocol: ${url.protocol}`);
+  }
+  if (!ALLOWED_PROXY_HOSTS.includes(url.hostname)) {
+    throw new Error(`Proxy URL must be localhost, got: ${url.hostname}`);
+  }
+}
+
+export function getLocalProxyConfig(): LocalProxyConfig | null {
+  const enabled = process.env.USE_LOCAL_PROXY === 'true';
+  if (!enabled) return null;
+
+  const baseUrl = process.env.LOCAL_PROXY_URL || 'http://127.0.0.1:8045/v1';
+  const apiKey = process.env.LOCAL_PROXY_KEY || '';
+  const model = process.env.LOCAL_PROXY_MODEL || 'gemini-3.1-pro-high';
+
+  return { enabled, baseUrl, apiKey, model };
+}
+
+export function isLocalProxyMode(): boolean {
+  return process.env.USE_LOCAL_PROXY === 'true';
+}
+
+let cachedProxyProvider: ReturnType<typeof createOpenAICompatible> | null = null;
+let cachedProxyConfig: string = '';
+
+function getLocalProxyProvider(): ReturnType<typeof createOpenAICompatible> {
+  const config = getLocalProxyConfig();
+
+  // H3: fail closed - don't silently fallback
+  if (!config || !config.enabled) {
+    throw new Error('Local proxy not enabled');
+  }
+  if (!config.apiKey) {
+    throw new Error('Local proxy enabled but LOCAL_PROXY_KEY not set');
+  }
+  if (!config.baseUrl) {
+    throw new Error('Local proxy enabled but LOCAL_PROXY_URL not set');
+  }
+
+  // H1: SSRF validation
+  validateProxyUrl(config.baseUrl);
+
+  const configKey = `${config.baseUrl}:${config.apiKey}`;
+  if (cachedProxyConfig !== configKey || !cachedProxyProvider) {
+    cachedProxyProvider = createOpenAICompatible({
+      name: 'local-proxy',
+      baseURL: config.baseUrl,
+      headers: { Authorization: `Bearer ${config.apiKey}` },
+    });
+    cachedProxyConfig = configKey;
+  }
+  return cachedProxyProvider;
+}
+
+// ─────────────── AI Client Configuration ───────────────
 
 export interface AIClientConfig {
   apiKey?: string;
@@ -93,8 +165,16 @@ function getGoogleProvider() {
 
 /**
  * Get a Vercel AI SDK compatible language model
+ * Uses local proxy if enabled, otherwise Gemini
  */
 export function getModel(): LanguageModel {
+  // Check for local proxy mode first
+  if (isLocalProxyMode()) {
+    const proxy = getLocalProxyProvider();
+    const config = getLocalProxyConfig()!;
+    return proxy.chatModel(config.model);
+  }
+
   const google = getGoogleProvider();
   const modelName = getModelName();
   return google(modelName);
@@ -102,8 +182,16 @@ export function getModel(): LanguageModel {
 
 /**
  * Get model with specific configuration override
+ * Note: Local proxy mode takes precedence over config overrides
  */
 export function getModelWithConfig(config: AIClientConfig): LanguageModel {
+  // Check for local proxy mode first
+  if (isLocalProxyMode()) {
+    const proxy = getLocalProxyProvider();
+    const proxyConfig = getLocalProxyConfig()!;
+    return proxy.chatModel(proxyConfig.model);
+  }
+
   const normalized = normalizeConfig(config);
   const apiKey = normalized.apiKey || getApiKey();
   const modelName = normalized.model || getModelName();
@@ -147,8 +235,16 @@ export async function resolveCredential(credentialId: string | null): Promise<No
 
 /**
  * Get model using a credentialId (for Inngest workers)
+ * Note: Local proxy mode takes precedence
  */
 export async function getModelWithCredential(credentialId: string | null): Promise<LanguageModel> {
+  // Check for local proxy mode first
+  if (isLocalProxyMode()) {
+    const proxy = getLocalProxyProvider();
+    const proxyConfig = getLocalProxyConfig()!;
+    return proxy.chatModel(proxyConfig.model);
+  }
+
   const config = await resolveCredential(credentialId);
   if (!config.apiKey) {
     throw new Error('No API key available');

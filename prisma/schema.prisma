@@ -350,7 +350,8 @@ model ApiCredential {
   id             String   @id @default(cuid())
   encryptedKey   String   @db.Text
   keyHint        String?  // Last 4 chars for display (e.g., "...abcd")
-  provider       String   @default("gemini")
+  provider       String   @default("gemini")  // "gemini" | "openai-compatible"
+  baseUrl        String?  // For openai-compatible providers (e.g., local proxy)
   model          String?
   isValid        Boolean  @default(true)
   lastUsedAt     DateTime?
