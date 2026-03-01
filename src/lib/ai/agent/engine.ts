@@ -1,4 +1,4 @@
-import type { AgentConfig, ReasoningStep, ReasoningTrace, IAgentEngine } from "./types";
+import type { AgentConfig, ReasoningStep, ReasoningTrace, IAgentEngine, AgentProcessOptions } from "./types";
 import type { ParseResult } from "../../parser/index";
 import { generateJSON } from "../generate";
 import { prisma } from "../../prisma";
@@ -16,10 +16,6 @@ interface ParsedAgentResponse {
   reasoning: string;
   observation: string;
   final: unknown | null;
-}
-
-export interface AgentProcessOptions {
-  onProgress?: (message: string) => Promise<void> | void;
 }
 
 const STEP1_INPUT_LIMIT = 12_000;
@@ -281,9 +277,7 @@ export class ReActAgent implements IAgentEngine {
   async process(
     entryId: string,
     input: ParseResult,
-    options?: {
-      onProgress?: (message: string) => Promise<void>;
-    }
+    options?: AgentProcessOptions
   ): Promise<NormalizedAgentIngestDecision> {
     // 执行原有的推理过程
     const trace = await this.executeReasoning(entryId, input, options);

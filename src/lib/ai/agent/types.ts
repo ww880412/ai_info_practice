@@ -1,4 +1,13 @@
 import type { ParseResult } from '../../parser/index';
+import type { NormalizedAgentIngestDecision } from './ingest-contract';
+
+/**
+ * Agent 处理选项
+ * 统一的进度回调类型定义
+ */
+export interface AgentProcessOptions {
+  onProgress?: (message: string) => void | Promise<void>;
+}
 
 export interface EvaluationDimension {
   id: string;
@@ -56,8 +65,6 @@ export interface AgentContext {
   intermediateResults: Record<string, unknown>;
 }
 
-import type { NormalizedAgentIngestDecision } from './ingest-contract';
-
 /**
  * Agent 引擎统一接口
  * 确保 v1 和 v2 实现兼容
@@ -72,8 +79,6 @@ export interface IAgentEngine {
   process(
     entryId: string,
     input: ParseResult,
-    options?: {
-      onProgress?: (message: string) => Promise<void>;
-    }
+    options?: AgentProcessOptions
   ): Promise<NormalizedAgentIngestDecision>;
 }
