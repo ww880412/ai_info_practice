@@ -31,6 +31,8 @@ export interface AgentConfig {
   processingStrategies: ProcessingStrategy[];
   availableTools: string[];
   maxIterations: number;
+  /** Phase 2a: 是否启用 AI SDK 工具调用模式 */
+  useToolCalling: boolean;
 }
 
 export interface ReasoningStep {
@@ -44,17 +46,54 @@ export interface ReasoningStep {
   error?: string;
 }
 
+export interface ToolCallTelemetry {
+  toolCallId: string;
+  toolName: string;
+  success: boolean;
+  durationMs: number;
+  error?: string;
+}
+
+export interface ToolCallStats {
+  total: number;
+  success: number;
+  failed: number;
+  byTool: Record<string, {
+    total: number;
+    success: number;
+    failed: number;
+    durationMsTotal: number;
+  }>;
+}
+
+export interface FallbackInfo {
+  triggered: boolean;
+  fromMode?: 'tool_calling';
+  reason?: 'tool_calling_error';
+  errorName?: string;
+  errorMessage?: string;
+}
+
+export interface ReasoningTraceMetadata {
+  startTime: string;
+  endTime: string;
+  iterations: number;
+  toolsUsed: string[];
+  // Phase 2a v2: 新增可选字段用于精确监控
+  schemaVersion?: number;
+  executionIntent?: 'tool_calling' | 'two_step';
+  executionMode?: 'tool_calling' | 'two_step';
+  twoStepReason?: 'tool_calling_disabled' | 'fallback_after_tool_error' | 'configured_two_step';
+  fallback?: FallbackInfo;
+  toolCallStats?: ToolCallStats;
+}
+
 export interface ReasoningTrace {
   entryId: string;
   input: ParseResult;
   steps: ReasoningStep[];
   finalResult: unknown;
-  metadata: {
-    startTime: string;
-    endTime: string;
-    iterations: number;
-    toolsUsed: string[];
-  };
+  metadata: ReasoningTraceMetadata;
 }
 
 export interface AgentContext {

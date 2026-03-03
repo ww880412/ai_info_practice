@@ -1,9 +1,13 @@
-import type { AgentConfig, ReasoningStep, ReasoningTrace, IAgentEngine, AgentProcessOptions } from "./types";
+import type { AgentConfig, ReasoningStep, ReasoningTrace, ReasoningTraceMetadata, ToolCallStats, ToolCallTelemetry, FallbackInfo, IAgentEngine, AgentProcessOptions } from "./types";
 import type { ParseResult } from "../../parser/index";
 import { generateJSON } from "../generate";
+import { generateText as aiGenerateText, Output, stepCountIs } from 'ai';
+import { getModel } from '../client';
 import { prisma } from "../../prisma";
 import { stringifyObservation } from "../../trace/observation";
 import { normalizeAgentIngestDecision, type NormalizedAgentIngestDecision } from './ingest-contract';
+import { createSDKTools, createToolExecutionContext } from './sdk-tools';
+import { DecisionSchema } from './decision-schema';
 
 interface ParsedAction {
   action: string;
@@ -299,6 +303,209 @@ export class ReActAgent implements IAgentEngine {
     input: ParseResult,
     options: AgentProcessOptions = {}
   ): Promise<ReasoningTrace> {
+    // Phase 2a: 根据配置选择执行路径
+    if (this.config.useToolCalling) {
+      return this.executeWithTools(entryId, input, options);
+    }
+    // 配置关闭工具调用 - 明确原因
+    return this.executeTwoStepReasoning(entryId, input, options, 'tool_calling_disabled');
+  }
+
+  /**
+   * Phase 2a: 使用 AI SDK 工具调用的执行路径
+   */
+  private async executeWithTools(
+    entryId: string,
+    input: ParseResult,
+    options: AgentProcessOptions = {}
+  ): Promise<ReasoningTrace> {
+    const startTime = new Date();
+    const steps: ReasoningStep[] = [];
+    const toolsUsed: string[] = [];
+    const toolCallTelemetry: ToolCallTelemetry[] = [];
+
+    await options.onProgress?.("AI 工具调用模式：分析内容...");
+
+    // 创建工具执行上下文，传入运行时配置
+    const ctx = createToolExecutionContext(entryId, input, this.config);
+    const tools = createSDKTools(ctx);
+
+    const systemPrompt = `你是知识管理助手。分析输入内容并生成结构化决策。
+
+可用工具：
+- classify_content: 对内容进行分类
+- extract_summary: 提取详细摘要
+- extract_code: 提取代码片段（适用于教程）
+- extract_version: 提取版本信息（适用于工具推荐）
+- check_duplicate: 检查重复内容
+- route_to_strategy: 选择处理策略
+
+请先调用 classify_content 分析内容类型，然后根据类型调用相应工具。
+最后输出符合 schema 的决策结果。`;
+
+    const userPrompt = `分析以下内容：
+
+标题：${input.title}
+来源：${input.sourceType}
+长度：${input.content.length} 字符
+
+内容：
+${buildSemanticSnapshot(input.content, STEP2_INPUT_LIMIT)}`;
+
+    try {
+      const result = await aiGenerateText({
+        model: getModel(),
+        system: systemPrompt,
+        prompt: userPrompt,
+        tools,
+        toolChoice: 'auto',
+        stopWhen: stepCountIs(this.config.maxIterations),
+        output: Output.object({
+          schema: DecisionSchema,
+        }),
+      });
+
+      // 从 result.steps 构建 ReasoningStep[] 并收集工具调用遥测
+      result.steps.forEach((step, index) => {
+        const stepToolCalls = step.toolCalls ?? [];
+        const stepToolResults = step.toolResults ?? [];
+        const stepToolNames = stepToolCalls.map(tc => tc.toolName);
+        toolsUsed.push(...stepToolNames);
+
+        const stepStartTime = Date.now();
+        const toolCallDetails: Array<{ toolCallId: string; toolName: string; output: unknown; success: boolean; durationMs: number }> = [];
+
+        const observation = stepToolResults.map(tr => {
+          const output = 'result' in tr ? (tr as { result: unknown }).result : undefined;
+          const outputObj = output as { success?: boolean } | undefined;
+          const success = outputObj?.success !== false;
+          const durationMs = Math.floor((Date.now() - stepStartTime) / Math.max(1, stepToolResults.length));
+
+          toolCallTelemetry.push({
+            toolCallId: tr.toolCallId,
+            toolName: tr.toolName,
+            success,
+            durationMs,
+          });
+
+          toolCallDetails.push({
+            toolCallId: tr.toolCallId,
+            toolName: tr.toolName,
+            output,
+            success,
+            durationMs,
+          });
+
+          return {
+            toolCallId: tr.toolCallId,
+            toolName: tr.toolName,
+            output,
+          };
+        });
+
+        steps.push({
+          step: index + 1,
+          timestamp: new Date().toISOString(),
+          thought: step.text || '',
+          action: stepToolNames[0] || 'reasoning',
+          observation: JSON.stringify(observation),
+          reasoning: step.text || '',
+          context: {
+            stepType: stepToolCalls.length > 0 ? 'tool_call' : 'reasoning',
+            toolCallCount: stepToolCalls.length,
+            toolCalls: toolCallDetails,
+            durationMs: toolCallDetails.reduce((sum, tc) => sum + tc.durationMs, 0),
+          },
+        });
+      });
+
+      // 构建工具调用统计
+      const toolCallStats = this.buildToolCallStats(toolCallTelemetry);
+
+      // 合并工具调用结果与最终输出
+      const finalResult = {
+        ...(ctx.shared.classification || {}),
+        ...(ctx.shared.intermediateResults.summary || {}),
+        ...(result.output || {}),
+        extractedMetadata: {
+          codeExamples: ctx.shared.intermediateResults.codeExamples,
+          versionInfo: ctx.shared.intermediateResults.versionInfo,
+          references: ctx.shared.intermediateResults.references,
+        },
+      };
+
+      const metadata: ReasoningTraceMetadata = {
+        startTime: startTime.toISOString(),
+        endTime: new Date().toISOString(),
+        iterations: steps.length,
+        toolsUsed: [...new Set(toolsUsed)],
+        schemaVersion: 2,
+        executionIntent: 'tool_calling',
+        executionMode: 'tool_calling',
+        toolCallStats,
+      };
+
+      return this.saveTrace(entryId, input, steps, finalResult, metadata);
+    } catch (error) {
+      // 工具调用失败时回退到两步模式，记录失败信息
+      const err = error as Error;
+      console.warn('Tool calling failed, falling back to two-step mode:', err.message);
+
+      const partialStats = this.buildToolCallStats(toolCallTelemetry);
+      return this.executeTwoStepReasoning(
+        entryId,
+        input,
+        options,
+        'fallback_after_tool_error',
+        {
+          triggered: true,
+          fromMode: 'tool_calling',
+          reason: 'tool_calling_error',
+          errorName: err.name,
+          errorMessage: err.message,
+        },
+        partialStats
+      );
+    }
+  }
+
+  /**
+   * 构建工具调用统计
+   */
+  private buildToolCallStats(telemetry: ToolCallTelemetry[]): ToolCallStats {
+    const byTool: ToolCallStats['byTool'] = {};
+    let total = 0;
+    let success = 0;
+    let failed = 0;
+
+    for (const t of telemetry) {
+      total++;
+      if (t.success) success++;
+      else failed++;
+
+      if (!byTool[t.toolName]) {
+        byTool[t.toolName] = { total: 0, success: 0, failed: 0, durationMsTotal: 0 };
+      }
+      byTool[t.toolName].total++;
+      if (t.success) byTool[t.toolName].success++;
+      else byTool[t.toolName].failed++;
+      byTool[t.toolName].durationMsTotal += t.durationMs;
+    }
+
+    return { total, success, failed, byTool };
+  }
+
+  /**
+   * 原有的两步推理执行路径
+   */
+  private async executeTwoStepReasoning(
+    entryId: string,
+    input: ParseResult,
+    options: AgentProcessOptions = {},
+    twoStepReason: 'tool_calling_disabled' | 'fallback_after_tool_error' | 'configured_two_step' = 'configured_two_step',
+    fallbackInfo?: FallbackInfo,
+    preFallbackToolStats?: ToolCallStats
+  ): Promise<ReasoningTrace> {
     const startTime = new Date().toISOString();
     const steps: ReasoningStep[] = [];
 
@@ -340,12 +547,21 @@ export class ReActAgent implements IAgentEngine {
 
     const finalResult = mergeTwoStepResults(step1, step2);
 
-    const trace = await this.saveTrace(entryId, input, steps, finalResult, {
+    // 构建包含执行意图和回退信息的 metadata
+    const metadata: ReasoningTraceMetadata = {
       startTime,
       endTime: new Date().toISOString(),
       iterations: 2,
       toolsUsed: ["llm_step_1", "llm_step_2"],
-    });
+      schemaVersion: 2,
+      executionIntent: twoStepReason === 'fallback_after_tool_error' ? 'tool_calling' : 'two_step',
+      executionMode: 'two_step',
+      twoStepReason,
+      fallback: fallbackInfo || { triggered: false },
+      toolCallStats: preFallbackToolStats,
+    };
+
+    const trace = await this.saveTrace(entryId, input, steps, finalResult, metadata);
 
     return trace;
   }

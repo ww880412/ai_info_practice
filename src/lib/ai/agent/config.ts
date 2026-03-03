@@ -105,12 +105,13 @@ export function getDefaultConfig(): AgentConfig {
       'evaluate_dimension',
       'classify_content',
       'extract_summary',
+      'extract_code',
+      'extract_version',
+      'check_duplicate',
       'route_to_strategy',
-      'generate_practice',
-      'extract_notes',
-      'find_relations',
-      'store_knowledge',
     ],
     maxIterations: 10,
+    // Phase 2a: 默认启用工具调用模式，设置 REACT_AGENT_USE_TOOLS=false 可禁用
+    useToolCalling: process.env.REACT_AGENT_USE_TOOLS !== 'false',
   };
 }
