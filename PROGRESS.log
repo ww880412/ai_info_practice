@@ -135,3 +135,83 @@
 **状态**：
 - 方案已批准，知识已沉淀，待实施
 - 记忆库已更新，方法论可复用
+
+---
+
+### 会话：Phase 2 方案规划 + Codex 双轮评审
+
+**时间**：2026-03-02 07:38-09:15
+
+**任务**：
+1. 清理 Phase 1 的 15 次迭代文档
+2. 创建 Phase 2 渐进式实施方案
+3. 提交 Codex 评审并修正
+
+**完成事项**：
+
+1. ✅ **文档清理**
+   - 归档 v1.0-v2.12 共 14 个迭代文档到 `docs/archive/react-agent-iterations/`
+   - 保留 v2.13-final.md 作为最终批准版本
+   - 创建归档 README 说明历史背景
+
+2. ✅ **Phase 2 渐进式方案创建**
+   - 创建 `docs/plans/2026-03-02-react-agent-phase2-progressive.md`
+   - 分解为 4 个子阶段：2a（工具激活）、2b（动态输出）、2c（提示词）、2d（简单循环）
+   - 每个阶段独立验证，可随时回滚
+   - 总工作量：6-12h（取决于是否实施 2d）
+
+3. ✅ **Codex 第一轮评审**
+   - 发现 4 个 HIGH 问题：
+     1. API 假设错误：应使用 `generateText` 而非 `generateObject`
+     2. Phase 2d 收益低：与现有两步推理重叠
+     3. 工具数量不一致：实际 7 个而非 8 个
+     4. 验收标准偏主观：缺少量化门槛
+   - 更新原方案，添加"Codex 评审结果"章节
+   - 创建修正版 Phase 2a 方案：`docs/plans/2026-03-02-react-agent-phase2a-corrected.md`
+
+4. ✅ **Codex 第二轮评审**（双方案并行）
+
+   **评审 1 - 原方案**：`Reject`
+   - 6 个问题（4 High + 2 Medium）
+   - 关键问题：文档内部自相矛盾、Phase 2d 决策未落地、验收标准不可执行
+
+   **评审 2 - Phase 2a 修正版**：`Reject`
+   - 6 个问题（5 Blocking/High + 1 Medium）
+   - 关键问题：
+     - 工具定义使用 `parameters` 而非 `inputSchema`
+     - ReasoningTrace 适配字段错误（`args/result` vs `input/output`）
+     - 工具清单不对齐（`extract_references` vs `check_duplicate`）
+     - 实施步骤引用不存在的文件和类型
+     - 输出 schema 与契约不匹配
+     - 验收标准缺少具体口径
+
+5. ⏸️ **方案修正**（部分完成）
+   - 开始修正 Phase 2a 方案的代码示例
+   - 修正工具定义：`parameters` → `inputSchema`
+   - 修正工具清单：`extract_references` → `check_duplicate`
+   - 修正输出 schema：对齐 `normalizeAgentIngestDecision` 契约
+   - 用户要求结束会话，剩余修正待下次继续
+
+**文档产出**：
+- ✅ Phase 2 渐进式方案：`docs/plans/2026-03-02-react-agent-phase2-progressive.md`
+- ✅ Phase 2a 修正版方案：`docs/plans/2026-03-02-react-agent-phase2a-corrected.md`（v1.2，部分修正）
+- ✅ 归档 README：`docs/archive/react-agent-iterations/README.md`
+- ✅ PROGRESS.md 更新：记录 Phase 2 进度和待决策事项
+
+**关键发现**：
+1. Vercel AI SDK v6.0.105 中 `generateObject` 已 deprecated
+2. 正确 API：`generateText` + `tools` + `stopWhen` + `output`
+3. 工具定义必须使用 `inputSchema` 而非 `parameters`
+4. ReasoningTrace 适配需要使用 SDK 正确字段：`toolCall.input`、`toolResult.output`
+5. 当前实际注册了 7 个工具，不是 8 个
+
+**待决策事项**：
+- Phase 2 方案修正策略：
+  - 选项 A：由 AI 继续修正两个方案
+  - 选项 B：让 Codex 修正后 AI 评审
+  - 选项 C：重新规划 Phase 2 实施路径
+
+**下次会话**：
+- 用户决定修正策略后继续
+- 完成方案修正并通过 Codex 评审
+- 开始 Phase 2a 实施

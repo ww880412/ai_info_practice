@@ -16,11 +16,17 @@
   - 通过 Codex 评审（修复 1 Medium + 1 Low 问题）
   - TypeScript 编译通过，单元测试通过
 
-### 待讨论
-- ⏸️ ReAct Agent Phase 2+ 实施路径选择
-  - 选项 A: 引入 LangGraph（原方案，风险高）
-  - 选项 B: 基于 Vercel AI SDK 渐进式实施（推荐）
-  - 选项 C: 先解决核心问题，暂缓 ReAct
+### 进行中
+- 🚧 ReAct Agent Phase 2 渐进式实施（选项 B）
+  - Phase 2a: 激活工具系统（4-6h）- 方案评审中（Codex 第二轮评审完成，发现多个 Blocking 问题）
+  - Phase 2b: 动态输出深度（2-3h）- 待开始
+  - Phase 2c: 提示词优化（2-3h）- 待开始
+  - Phase 2d: 简单循环（3-4h）- 暂不实施（Codex 建议：指标触发）
+
+### 待决策
+- Phase 2 方案修正策略：
+  - 原方案和 Phase 2a 修正版均被 Codex 拒绝
+  - 需要决定：由 AI 修正 vs 让 Codex 修正 vs 重新规划
 
 ---
 
