@@ -8,7 +8,8 @@
     "start": "next start -p 3001",
     "lint": "eslint",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "monitor:tools": "npx tsx scripts/monitor-tool-calling.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.34",
