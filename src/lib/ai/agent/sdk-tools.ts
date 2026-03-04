@@ -9,6 +9,7 @@ import type { AgentConfig, EvaluationDimension, ProcessingStrategy } from './typ
 import { generateJSON, generateText } from '../generate';
 import { findSimilarEntries } from '@/lib/ai/deduplication';
 import { selectToolPipeline } from './route-strategy';
+import { getContentDepth, getFieldsGuidance } from './content-depth';
 
 /**
  * 工具执行时的共享上下文
@@ -183,10 +184,18 @@ ${sampledContent}
         const sampledContent = content.slice(0, 90000);
         const step1Json = JSON.stringify(classification, null, 2);
 
+        // Phase 2b-2: 计算内容深度并生成 fields 指导
+        const depth = getContentDepth(content.length);
+        const structureType = (classification?.summaryStructure as { type?: string })?.type;
+        const fieldsGuidance = getFieldsGuidance(depth, structureType);
+
+        // Phase 2b-2: 使用 JSON.stringify 防止 prompt 注入
+        const safeStep1Json = JSON.stringify(step1Json);
+
         const prompt = `你是知识提取专家，请执行 Step 2：基于 Step 1 的结构规划提取完整结果。
 
 Step 1 结果：
-${step1Json}
+${safeStep1Json}
 
 输入标题：${title}
 原始内容长度：${content.length} 字符
@@ -196,6 +205,7 @@ ${step1Json}
 - 长度 5000-20000：core 建议 5-8 条，extended 2-4 条
 - 长度 > 20000：core 建议 8-12 条，extended 4-8 条
 
+${fieldsGuidance ? `fieldsGuidance:\n${fieldsGuidance}\n` : ''}
 内容：
 ${sampledContent}
 
@@ -206,6 +216,11 @@ ${sampledContent}
 返回严格 JSON：
 {
   "coreSummary": "string",
+  "summaryStructure": {
+    "type": "string",
+    "fields": {},
+    "reasoning": "string"
+  },
   "practiceValue": "KNOWLEDGE" | "ACTIONABLE",
   "practiceReason": "string",
   "practiceTask": null | {

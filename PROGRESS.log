@@ -215,3 +215,42 @@
 - 用户决定修正策略后继续
 - 完成方案修正并通过 Codex 评审
 - 开始 Phase 2a 实施
+
+## 2026-03-04
+### 会话：Phase 2b-2 实施与验证
+
+**背景**：
+- Phase 2b-1 已完成并验证（两步模式动态输出）
+- Phase 2b-2：tool-calling 模式动态输出
+
+**做了什么**：
+1. **查询 Claude-Codex 协作方式**
+   - 三层审查框架：Layer 1 技术审查 → 多轮迭代 → 实施决策
+
+2. **Phase 2b-2 代码实施**
+   - sdk-tools.ts：
+     - 导入 `getContentDepth` 和 `getFieldsGuidance`
+     - 注入 fieldsGuidance 到 extract_summary prompt
+     - 扩展输出契约包含 summaryStructure
+   - engine.ts：
+     - 添加 summaryStructure fallback 链：Step2 → Step1 → 默认值
+     - 保留 extractedMetadata 组装逻辑
+   - ✅ TypeScript 编译通过
+
+3. **手动验证**
+   - 初始测试：API 配额限制（Token pool is empty）
+   - 切换到官方 Gemini API 完成验证
+   - ✅ tool-calling 模式输出动态 fields（7 个字段）
+   - 恢复本地代理配置
+
+**文档产出**：
+- ✅ PROGRESS.md 更新：Phase 2b-2 标记为"已完成、已验证"
+- ✅ PROJECT_STATUS.md 同步更新状态
+
+**关键发现**：
+- 本地代理不支持 tool-calling 模式（或需要特定配置）
+- 官方 Gemini API 可正常工作
+
+**下次会话**：
+- 无待办事项
+- Phase 2c 提示词优化待开始

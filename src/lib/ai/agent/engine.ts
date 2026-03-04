@@ -424,10 +424,21 @@ ${buildSemanticSnapshot(input.content, STEP2_INPUT_LIMIT)}`;
       const toolCallStats = this.buildToolCallStats(toolCallTelemetry);
 
       // 合并工具调用结果与最终输出
+      // Phase 2b-2: 确保 summaryStructure 来自 Step2，fallback 到 Step1
       const finalResult = {
         ...(ctx.shared.classification || {}),
         ...(ctx.shared.intermediateResults.summary || {}),
         ...(result.output || {}),
+
+        // Phase 2b-2: summaryStructure fallback 链 - Step2 → Step1 → 默认值
+        summaryStructure: (
+          ctx.shared.intermediateResults.summary as { summaryStructure?: unknown }
+        )?.summaryStructure
+        ?? (result.output as { summaryStructure?: unknown })?.summaryStructure
+        ?? (ctx.shared.classification as { summaryStructure?: unknown })?.summaryStructure
+        ?? { type: 'generic', fields: {}, reasoning: '' },
+
+        // ⚠️ 保留原有的 extractedMetadata 组装（engine.ts:431）
         extractedMetadata: {
           codeExamples: ctx.shared.intermediateResults.codeExamples,
           versionInfo: ctx.shared.intermediateResults.versionInfo,
