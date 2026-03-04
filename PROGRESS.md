@@ -23,13 +23,13 @@
 ### 进行中
 - 🚧 ReAct Agent Phase 2 渐进式实施
   - Phase 2a: ✅ 已完成并合并
-  - Phase 2b-1: ✅ 已完成（待提交）
-  - Phase 2b-2: ⏳ 待 2b-1 验证后启动
+  - Phase 2b-1: ✅ 已完成、已验证
+  - Phase 2b-2: ⏩ 进入实施阶段（Layer 2）
   - Phase 2c: 待开始（提示词优化）
   - Phase 2d: 暂不实施
 
 ### 待处理
-- Phase 2b-1 提交（100 tests pass, TypeScript 编译通过, Codex 9.5/10）
+- Phase 2b-2 实施：sdk-tools.ts + engine.ts 修改
 
 ---
 
