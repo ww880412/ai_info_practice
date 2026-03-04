@@ -2,10 +2,11 @@
 
 > 里程碑级状态索引。会话级交接细节记录在 `PROGRESS.log`。
 
-## 📍 当前状态（2026-03-02）
+## 📍 当前状态（2026-03-04）
 
 ### 活跃分支
-- `main`（主线，ReAct Agent Phase 1 已完成）
+- `main`（主线，Phase 1 已完成）
+- `feature/iteration-upgrade`（当前工作分支）
 
 ### 本次完成
 - ✅ **ReAct Agent Phase 1 实施完成**（接口重构）
@@ -14,19 +15,21 @@
   - 创建 createAgentEngine() 工厂函数
   - 更新 Inngest 和 API Route 调用
   - 通过 Codex 评审（修复 1 Medium + 1 Low 问题）
-  - TypeScript 编译通过，单元测试通过
+- ✅ **ReAct Agent Phase 2a 实施完成**（工具激活 + 灰度监控）
+  - 工具激活系统实现
+  - 灰度监控机制（grayscale monitoring）
+  - npm 脚本 monitor:tools
 
 ### 进行中
-- 🚧 ReAct Agent Phase 2 渐进式实施（选项 B）
-  - Phase 2a: 激活工具系统（4-6h）- 方案评审中（Codex 第二轮评审完成，发现多个 Blocking 问题）
-  - Phase 2b: 动态输出深度（2-3h）- 待开始
-  - Phase 2c: 提示词优化（2-3h）- 待开始
-  - Phase 2d: 简单循环（3-4h）- 暂不实施（Codex 建议：指标触发）
+- 🚧 ReAct Agent Phase 2 渐进式实施
+  - Phase 2a: ✅ 已完成并合并
+  - Phase 2b-1: ✅ 已完成（待提交）
+  - Phase 2b-2: ⏳ 待 2b-1 验证后启动
+  - Phase 2c: 待开始（提示词优化）
+  - Phase 2d: 暂不实施
 
-### 待决策
-- Phase 2 方案修正策略：
-  - 原方案和 Phase 2a 修正版均被 Codex 拒绝
-  - 需要决定：由 AI 修正 vs 让 Codex 修正 vs 重新规划
+### 待处理
+- Phase 2b-1 提交（100 tests pass, TypeScript 编译通过, Codex 9.5/10）
 
 ---
 
@@ -56,21 +59,24 @@
 | 模块 | 测试数 |
 |------|--------|
 | parser | 8 |
-| ai/agent | 15 |
+| ai/agent | 16 (+1) |
 | gemini | 5 |
 | ingest | 7 |
 | entries | 2 |
 | sanitize | 10 |
 | deduplication | 7 |
-| **总计** | **56** |
+| **总计** | **57** |
 
 ---
 
 ## 🔜 项目待办
 
-- 系统性升级 Batch 1-3 全部完成，进入稳定维护阶段
-- 可选后续：E2E 测试覆盖、性能优化、国际化
+1. **Phase 2b-1 提交**: 合并 feature/iteration-upgrade 到 main
+2. **Phase 2b-2**: tool-calling 模式动态输出（待 2b-1 验证）
+3. **Phase 2c**: 提示词优化（few-shot 示例）
+4. **测试覆盖完善**: 补充 E2E 测试
+5. **可选后续**: 性能优化、国际化
 
 ---
 
-*最后更新: 2026-03-02*
+*最后更新: 2026-03-04*

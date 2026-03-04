@@ -93,7 +93,6 @@ const GenericSchema = z.object({
 
 // API Reference schema
 const ApiReferenceSchema = z.object({
-  type: z.literal('api-reference'),
   endpoint: z.string().optional(),
   parameters: z.array(z.object({
     name: z.string(),
@@ -115,7 +114,6 @@ const ApiReferenceSchema = z.object({
 
 // Comparison Matrix schema
 const ComparisonMatrixSchema = z.object({
-  type: z.literal('comparison-matrix'),
   items: z.array(z.object({
     name: z.string(),
     description: z.string().optional(),
@@ -127,7 +125,6 @@ const ComparisonMatrixSchema = z.object({
 
 // Timeline Evolution schema
 const TimelineEvolutionSchema = z.object({
-  type: z.literal('timeline-evolution'),
   events: z.array(z.object({
     date: z.string(),
     version: z.string().optional(),
@@ -194,7 +191,7 @@ export function getRequiredFields(type: SummaryStructureType): string[] {
     case 'argument-evidence-condition':
       return ['argument', 'evidence'];
     case 'api-reference':
-      return ['endpoint'];
+      return [];  // Phase 2b-1: 所有字段可选
     case 'comparison-matrix':
       return ['items', 'dimensions', 'matrix'];
     case 'timeline-evolution':

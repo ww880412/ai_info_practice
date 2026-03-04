@@ -8,6 +8,7 @@ import { stringifyObservation } from "../../trace/observation";
 import { normalizeAgentIngestDecision, type NormalizedAgentIngestDecision } from './ingest-contract';
 import { createSDKTools, createToolExecutionContext } from './sdk-tools';
 import { DecisionSchema } from './decision-schema';
+import { getContentDepth, getFieldsGuidance } from './content-depth';
 
 interface ParsedAction {
   action: string;
@@ -679,6 +680,11 @@ ${sampledContent}
 - extractedMetadata.publishDate: 提取发布日期`;
     }
 
+    // Phase 2b-1: 动态输出深度 - 注入 fieldsGuidance
+    const depth = getContentDepth(input.content?.length ?? 0);
+    const step1Type = (step1.summaryStructure as Record<string, unknown> | undefined)?.type as string | undefined;
+    const fieldsGuidance = getFieldsGuidance(depth, step1Type);
+
     return `你是知识提取专家，请执行 Step 2：基于 Step 1 的结构规划提取完整结果。
 
 Step 1 结果：
@@ -688,6 +694,7 @@ ${step1Json}
 输入来源：${input.sourceType}
 原始内容长度：${input.content.length} 字符
 ${extractionHints}
+${fieldsGuidance}
 
 信息密度要求：
 - 长度 < 5000：core 建议 3-5 条，extended 1-2 条
