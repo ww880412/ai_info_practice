@@ -133,10 +133,36 @@ ${sampledContent}
 - 所有自然语言字段默认使用简体中文。
 - 允许保留必要专业术语（如 RAG、Agent、LLM、API、CLIP、QPS）。
 
+【techDomain 判断优先级】
+1. 如果内容主要讲神经网络、深度学习、反向传播、梯度下降 → DEEP_LEARNING
+2. 如果内容主要讲大语言模型、Transformer、Token、词嵌入 → LLM
+3. 如果内容主要讲 Agent 开发、工具调用、多智能体 → AGENT
+4. 如果内容主要讲 Prompt 工程、提示词优化 → PROMPT_ENGINEERING
+5. 如果内容主要讲 RAG、向量数据库、检索增强 → RAG
+6. 如果内容主要讲模型微调、LoRA、PEFT → FINE_TUNING
+7. 如果内容主要讲模型部署、推理优化、量化 → DEPLOYMENT
+8. 只有在无法归类到以上任何领域时才选择 OTHER
+
+【重要】keyPoints 定义：
+- keyPoints.core：核心洞察、关键结论、反直觉发现（3-5条）
+- keyPoints.extended：补充细节、技术要点（1-3条）
+- ❌ 错误：不要把 steps/流程/定义/方法 放入 keyPoints
+- ✅ 正确：提炼出"为什么重要"、"核心发现"、"关键洞察"、"底层原理"
+
+示例对比（增强版）：
+❌ 错误：keyPoints.core = ["经验一：开发专属提问工具", "经验二：替换待办清单"]  // 这是方法
+✅ 正确：keyPoints.core = ["核心洞察：工具设计必须随模型能力进化", "反直觉：简单工具可能成为绊脚石"]  // 这是洞察
+
+❌ 错误：keyPoints.core = ["神经网络由输入层、隐藏层、输出层组成"]  // 这是定义
+✅ 正确：keyPoints.core = ["核心洞察：神经网络的本质是矩阵连乘"]  // 这是洞察
+
+❌ 错误：keyPoints.core = ["步骤1：配置环境", "步骤2：安装依赖"]  // 这是步骤
+✅ 正确：keyPoints.core = ["关键发现：环境配置是最大的坑", "核心原则：依赖版本必须锁定"]  // 这是洞察
+
 返回严格 JSON（不要 markdown）：
 {
   "contentType": "TUTORIAL" | "TOOL_RECOMMENDATION" | "TECH_PRINCIPLE" | "CASE_STUDY" | "OPINION",
-  "techDomain": "PROMPT_ENGINEERING" | "AGENT" | "RAG" | "FINE_TUNING" | "DEPLOYMENT" | "OTHER",
+  "techDomain": "PROMPT_ENGINEERING" | "AGENT" | "RAG" | "FINE_TUNING" | "DEPLOYMENT" | "DEEP_LEARNING" | "LLM" | "OTHER",
   "aiTags": ["string"],
   "summaryStructure": {
     "type": "problem-solution-steps" | "concept-mechanism-flow" | "tool-feature-comparison" | "background-result-insight" | "argument-evidence-condition" | "generic" | "api-reference" | "comparison-matrix" | "timeline-evolution",
@@ -200,10 +226,29 @@ ${safeStep1Json}
 输入标题：${title}
 原始内容长度：${content.length} 字符
 
-信息密度要求：
-- 长度 < 5000：core 建议 3-5 条，extended 1-2 条
-- 长度 5000-20000：core 建议 5-8 条，extended 2-4 条
-- 长度 > 20000：core 建议 8-12 条，extended 4-8 条
+【coreSummary 长度要求】
+- 长度 < 10000：100-150字
+- 长度 10000-50000：150-200字
+- 长度 > 50000：200-250字
+- 目标：快速浏览，抓住核心，详细内容放在 summaryStructure.fields
+
+【practiceValue 判断标准】
+ACTIONABLE 必须同时满足以下条件：
+1. 有完整的操作步骤（step-by-step）
+2. 有代码示例或配置文件
+3. 读者可以立即动手实践
+
+KNOWLEDGE 包括：
+1. 经验分享（即使有步骤结构，但缺少代码示例）
+2. 原理科普
+3. 案例研究
+4. 理论探讨
+
+示例对比：
+❌ 错误：四条经验分享（无代码） → ACTIONABLE
+✅ 正确：四条经验分享（无代码） → KNOWLEDGE
+✅ 正确：带完整代码的 React 教程 → ACTIONABLE
+✅ 正确：API 使用指南（有代码示例） → ACTIONABLE
 
 ${fieldsGuidance ? `fieldsGuidance:\n${fieldsGuidance}\n` : ''}
 内容：

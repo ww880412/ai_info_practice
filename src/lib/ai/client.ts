@@ -1,13 +1,27 @@
 /**
  * Vercel AI SDK unified client configuration
  * Replaces @google/generative-ai with @ai-sdk/google
- * Supports local OpenAI-compatible proxy for cost savings
+ * Supports CRS and local OpenAI-compatible proxy providers
  */
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { LanguageModel } from 'ai';
 import { prisma } from '@/lib/prisma';
 import { decryptApiKey } from '@/lib/crypto';
+import {
+  createCRSLanguageModel,
+  getCRSConfig,
+  isCRSMode,
+  type CRSConfig,
+} from './providers/crs';
+
+if (process.env.USE_CRS_PROVIDER === 'true' && process.env.USE_LOCAL_PROXY === 'true') {
+  throw new Error(
+    'Cannot enable both CRS and LocalProxy providers. Set only one of USE_CRS_PROVIDER or USE_LOCAL_PROXY to true.'
+  );
+}
+
+type ProviderType = 'crs' | 'local-proxy' | 'openai-compatible' | 'gemini';
 
 // ─────────────── Local Proxy Configuration ───────────────
 
@@ -77,6 +91,109 @@ function getLocalProxyProvider(): ReturnType<typeof createOpenAICompatible> {
   return cachedProxyProvider;
 }
 
+function normalizeProviderType(provider: string | undefined): ProviderType {
+  if (provider === 'crs') return 'crs';
+  if (provider === 'local-proxy') return 'local-proxy';
+  if (provider === 'openai-compatible') return 'openai-compatible';
+  return 'gemini';
+}
+
+function getCurrentProvider(): ProviderType {
+  if (isCRSMode()) return 'crs';
+  if (isLocalProxyMode()) return 'local-proxy';
+  return 'gemini';
+}
+
+function createLocalProxyModel(config: {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  providerName?: 'local-proxy' | 'openai-compatible';
+}): LanguageModel {
+  if (!config.apiKey) {
+    throw new Error('No API key available for local proxy provider');
+  }
+  if (!config.baseUrl) {
+    throw new Error('No base URL available for local proxy provider');
+  }
+
+  validateProxyUrl(config.baseUrl);
+
+  const proxy = createOpenAICompatible({
+    name: config.providerName || 'local-proxy',
+    baseURL: config.baseUrl,
+    apiKey: config.apiKey,
+  });
+  return proxy.chatModel(config.model);
+}
+
+function createCRSModel(config: CRSConfig): LanguageModel {
+  if (!config.enabled) {
+    throw new Error('CRS provider not enabled');
+  }
+  if (!config.apiKey) {
+    throw new Error('CRS enabled but CRS_API_KEY not set');
+  }
+  return createCRSLanguageModel(config);
+}
+
+function getDefaultCredentialConfig(): NormalizedAIConfig {
+  const provider = getCurrentProvider();
+
+  if (provider === 'crs') {
+    const crs = getCRSConfig();
+    if (!crs) {
+      throw new Error('CRS mode enabled but CRS configuration is missing');
+    }
+    return {
+      apiKey: crs.apiKey,
+      model: crs.model,
+      provider,
+      baseUrl: crs.baseUrl,
+    };
+  }
+
+  if (provider === 'local-proxy') {
+    const proxy = getLocalProxyConfig();
+    if (!proxy) {
+      throw new Error('Local proxy mode enabled but local proxy configuration is missing');
+    }
+    return {
+      apiKey: proxy.apiKey,
+      model: proxy.model,
+      provider,
+      baseUrl: proxy.baseUrl,
+    };
+  }
+
+  return {
+    apiKey: getApiKey(),
+    model: getModelName(),
+    provider,
+  };
+}
+
+function getDefaultModelForProvider(provider: ProviderType): string {
+  if (provider === 'crs') {
+    return process.env.CRS_MODEL || 'gpt-5.3-codex';
+  }
+  if (provider === 'local-proxy' || provider === 'openai-compatible') {
+    return process.env.LOCAL_PROXY_MODEL || 'gemini-3.1-pro-high';
+  }
+  return getModelName();
+}
+
+function buildCRSConfig(config: Pick<NormalizedAIConfig, 'apiKey' | 'model' | 'baseUrl'>): CRSConfig {
+  return {
+    enabled: true,
+    baseUrl: config.baseUrl || process.env.CRS_BASE_URL || 'https://ls.xingchentech.asia/openai',
+    apiKey: config.apiKey || process.env.CRS_API_KEY || '',
+    model: config.model || process.env.CRS_MODEL || 'gpt-5.3-codex',
+    reasoningEffort: (process.env.CRS_REASONING_EFFORT as CRSConfig['reasoningEffort']) || 'xhigh',
+    disableStorage: process.env.CRS_DISABLE_STORAGE === 'true',
+  };
+}
+
 // ─────────────── AI Client Configuration ───────────────
 
 export interface AIClientConfig {
@@ -84,17 +201,23 @@ export interface AIClientConfig {
   model?: string;
   geminiApiKey?: string;
   geminiModel?: string;
+  provider?: ProviderType;
+  baseUrl?: string;
 }
 
 export interface NormalizedAIConfig {
   apiKey?: string;
   model?: string;
+  provider?: ProviderType;
+  baseUrl?: string;
 }
 
 export function normalizeConfig(config: AIClientConfig = {}): NormalizedAIConfig {
   return {
     apiKey: config.apiKey ?? config.geminiApiKey,
     model: config.model ?? config.geminiModel,
+    provider: config.provider,
+    baseUrl: config.baseUrl,
   };
 }
 
@@ -165,10 +288,17 @@ function getGoogleProvider() {
 
 /**
  * Get a Vercel AI SDK compatible language model
- * Uses local proxy if enabled, otherwise Gemini
+ * Route order: CRS -> Local Proxy -> Gemini
  */
 export function getModel(): LanguageModel {
-  // Check for local proxy mode first
+  if (isCRSMode()) {
+    const crsConfig = getCRSConfig();
+    if (!crsConfig) {
+      throw new Error('CRS mode enabled but CRS configuration is missing');
+    }
+    return createCRSModel(crsConfig);
+  }
+
   if (isLocalProxyMode()) {
     const proxy = getLocalProxyProvider();
     const config = getLocalProxyConfig()!;
@@ -182,17 +312,38 @@ export function getModel(): LanguageModel {
 
 /**
  * Get model with specific configuration override
- * Note: Local proxy mode takes precedence over config overrides
  */
 export function getModelWithConfig(config: AIClientConfig): LanguageModel {
-  // Check for local proxy mode first
+  const normalized = normalizeConfig(config);
+  const explicitProvider = normalized.provider ? normalizeProviderType(normalized.provider) : undefined;
+
+  if (explicitProvider === 'crs') {
+    return createCRSModel(buildCRSConfig(normalized));
+  }
+
+  if (explicitProvider === 'local-proxy' || explicitProvider === 'openai-compatible') {
+    return createLocalProxyModel({
+      apiKey: normalized.apiKey || process.env.LOCAL_PROXY_KEY || '',
+      baseUrl: normalized.baseUrl || process.env.LOCAL_PROXY_URL || 'http://127.0.0.1:8045/v1',
+      model: normalized.model || getDefaultModelForProvider(explicitProvider),
+      providerName: explicitProvider,
+    });
+  }
+
+  if (isCRSMode()) {
+    const crsConfig = getCRSConfig();
+    if (!crsConfig) {
+      throw new Error('CRS mode enabled but CRS configuration is missing');
+    }
+    return createCRSModel(crsConfig);
+  }
+
   if (isLocalProxyMode()) {
     const proxy = getLocalProxyProvider();
     const proxyConfig = getLocalProxyConfig()!;
     return proxy.chatModel(proxyConfig.model);
   }
 
-  const normalized = normalizeConfig(config);
   const apiKey = normalized.apiKey || getApiKey();
   const modelName = normalized.model || getModelName();
 
@@ -209,7 +360,7 @@ export function getModelWithConfig(config: AIClientConfig): LanguageModel {
  */
 export async function resolveCredential(credentialId: string | null): Promise<NormalizedAIConfig> {
   if (!credentialId) {
-    return { apiKey: getApiKey(), model: getModelName() };
+    return getDefaultCredentialConfig();
   }
 
   const credential = await prisma.apiCredential.findUnique({
@@ -218,7 +369,7 @@ export async function resolveCredential(credentialId: string | null): Promise<No
 
   if (!credential || !credential.isValid) {
     console.warn(`Credential ${credentialId} not found or invalid, falling back to env`);
-    return { apiKey: getApiKey(), model: getModelName() };
+    return getDefaultCredentialConfig();
   }
 
   // Update lastUsedAt
@@ -227,25 +378,36 @@ export async function resolveCredential(credentialId: string | null): Promise<No
     data: { lastUsedAt: new Date() },
   }).catch(() => {});
 
+  const provider = normalizeProviderType(credential.provider);
+
   return {
     apiKey: decryptApiKey(credential.encryptedKey),
-    model: credential.model || getModelName(),
+    model: credential.model || getDefaultModelForProvider(provider),
+    provider,
+    baseUrl: credential.baseUrl || undefined,
   };
 }
 
 /**
  * Get model using a credentialId (for Inngest workers)
- * Note: Local proxy mode takes precedence
  */
 export async function getModelWithCredential(credentialId: string | null): Promise<LanguageModel> {
-  // Check for local proxy mode first
-  if (isLocalProxyMode()) {
-    const proxy = getLocalProxyProvider();
-    const proxyConfig = getLocalProxyConfig()!;
-    return proxy.chatModel(proxyConfig.model);
+  const config = await resolveCredential(credentialId);
+  const provider = normalizeProviderType(config.provider);
+
+  if (provider === 'crs') {
+    return createCRSModel(buildCRSConfig(config));
   }
 
-  const config = await resolveCredential(credentialId);
+  if (provider === 'local-proxy' || provider === 'openai-compatible') {
+    return createLocalProxyModel({
+      apiKey: config.apiKey || '',
+      baseUrl: config.baseUrl || process.env.LOCAL_PROXY_URL || 'http://127.0.0.1:8045/v1',
+      model: config.model || getDefaultModelForProvider(provider),
+      providerName: provider,
+    });
+  }
+
   if (!config.apiKey) {
     throw new Error('No API key available');
   }

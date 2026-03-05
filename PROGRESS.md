@@ -2,34 +2,42 @@
 
 > 里程碑级状态索引。会话级交接细节记录在 `PROGRESS.log`。
 
-## 📍 当前状态（2026-03-04）
+## 📍 当前状态（2026-03-06）
 
 ### 活跃分支
-- `main`（主线，Phase 1 已完成）
-- `feature/iteration-upgrade`（当前工作分支）
+- `main`（主线）
 
-### 本次完成
-- ✅ **ReAct Agent Phase 1 实施完成**（接口重构）
-  - 添加 IAgentEngine 接口和 AgentProcessOptions 类型
-  - 重构 ReActAgent 实现接口
-  - 创建 createAgentEngine() 工厂函数
-  - 更新 Inngest 和 API Route 调用
-  - 通过 Codex 评审（修复 1 Medium + 1 Low 问题）
-- ✅ **ReAct Agent Phase 2a 实施完成**（工具激活 + 灰度监控）
-  - 工具激活系统实现
-  - 灰度监控机制（grayscale monitoring）
-  - npm 脚本 monitor:tools
+### 重构脉络总览
 
-### 进行中
-- 🚧 ReAct Agent Phase 2 渐进式实施
-  - Phase 2a: ✅ 已完成并合并
-  - Phase 2b-1: ✅ 已完成、已验证
-  - Phase 2b-2: ✅ 已完成、已验证（tool-calling 模式动态输出）
-  - Phase 2c: 待开始（提示词优化）
-  - Phase 2d: 暂不实施
+#### 1. Framework Refactor（框架统一）
+| Phase | 内容 | 状态 |
+|-------|------|------|
+| Phase 0 | 对象存储迁移（Cloudflare R2）| ✅ 已完成 |
+| Phase 1 | Vercel AI SDK 统一 | ✅ 已完成 |
+| Phase 2 | Inngest 任务队列 | ✅ 已完成 |
+| Phase 3 | Jina Reader 网页解析 | ✅ 已完成 |
+| Phase 4 | 清理与稳定化 | ✅ 已完成 |
+| Phase 5+ | 条件触发型任务（见 Backlog）| ⏸ 待触发 |
 
-### 待处理
-- 无
+#### 2. ReAct Agent 升级（功能增强）
+| Phase | 内容 | 状态 |
+|-------|------|------|
+| Phase 1 | 接口重构（v2.13）| ✅ 已完成 |
+| Phase 2a | 工具激活 + 灰度监控 | ✅ 已完成 |
+| Phase 2b-1 | 两步模式动态输出 | ✅ 已完成 |
+| Phase 2b-2 | tool-calling 模式动态输出 | ✅ 已完成 |
+| Phase 2c | 提示词优化（few-shot）| ✅ 已完成 |
+| Phase 2d | 简单循环 | ⏸ 暂不实施 |
+
+#### 3. Provider 扩展（多模型支持）
+| Phase | 内容 | 状态 |
+|-------|------|------|
+| CRS Provider | CRS API 集成 | ✅ 已完成 |
+
+### 当前待办
+1. **扩大测试样本**: 测试 3-5 篇不同类型文章验证 Phase 2c 效果
+2. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
+3. **Phase 2c 后续优化**: 根据测试结果决定是否继续优化
 
 ---
 
@@ -41,16 +49,18 @@
 | Phase 2: AI 处理管道 | ✅ 已完成 | L1/L2/L3 处理流程 |
 | Phase 3: 前端界面 | ✅ 已完成 | 知识库、练习队列、详情页 |
 | Phase 4: 工程规范 | ✅ 已完成 | 协作文档、测试覆盖、架构文档 |
+| Framework Refactor | ✅ Phase 0-4 完成 | 框架统一、队列持久化 |
+| ReAct Agent 升级 | ✅ Phase 2c 完成 | Phase 1-2c 完成 |
 
 ### 功能分支状态
 
-| 方向 | 分支 | Phase 1 | Phase 2 | Phase 3 | Phase 4 | 状态 |
-|------|------|---------|---------|---------|---------|------|
-| 前端层级管理 | codex/frontend-hierarchy | ✅ 标签侧边栏 | ✅ 分组管理 | ✅ 智能排序 | ✅ Dashboard | ✅ 已合并 |
-| Agent 透明化 | codex/agent-transparency | ✅ 元数据面板 | ✅ 质量评估 | ✅ 推理增强 | ✅ 处理日志 | ✅ 已合并 |
-| 系统性升级 Batch 1 | codex/batch1-systematic-upgrade | ✅ 状态模型 | ✅ 提取增强 | ✅ 详情页重构 | ✅ 文档修正 | ✅ 已合并 |
-| 系统性升级 Batch 2 | codex/batch2-systematic-upgrade | ✅ 模型拆分 | ✅ Pipeline 工具 | ✅ 前端增强 | ✅ 文档修正 | ✅ 已合并 |
-| 系统性升级 Batch 3 | codex/batch3-systematic-upgrade | ✅ UI 组件 | ✅ Parser/AI 增强 | ✅ 搜索/排序 | ✅ 文档归档 | ✅ 已合并 |
+| 方向 | 状态 |
+|------|------|
+| 前端层级管理 | ✅ 已合并 |
+| Agent 透明化 | ✅ 已合并 |
+| 系统性升级 Batch 1-3 | ✅ 已合并 |
+| Framework Refactor Phase 0-4 | ✅ 已合并 |
+| ReAct Agent Phase 1-2b | 🚧 待合并 |
 
 ---
 
@@ -59,23 +69,50 @@
 | 模块 | 测试数 |
 |------|--------|
 | parser | 8 |
-| ai/agent | 16 (+1) |
+| ai/agent | 17 |
 | gemini | 5 |
 | ingest | 7 |
 | entries | 2 |
 | sanitize | 10 |
 | deduplication | 7 |
-| **总计** | **57** |
+| **总计** | **56** |
 
 ---
 
 ## 🔜 项目待办
 
-1. **Phase 2b-1 提交**: 合并 feature/iteration-upgrade 到 main
-2. **Phase 2b-2**: tool-calling 模式动态输出（待 2b-1 验证）
-3. **Phase 2c**: 提示词优化（few-shot 示例）
-4. **测试覆盖完善**: 补充 E2E 测试
-5. **可选后续**: 性能优化、国际化
+### 当前冲刺
+1. **Phase 2c**: 提示词优化（few-shot 示例）
+2. **sdk-tools 单元测试**: 覆盖工具上下文传递
+3. **分支合并**: feature/iteration-upgrade → main
+
+### Backlog（条件触发）
+| 任务 | 触发条件 |
+|------|----------|
+| pgvector 向量检索 | 去重精度需求明确 |
+| Entry 模型拆分 | 双写稳定 1 个月后 |
+| Unstructured PDF 解析 | 复杂 PDF 需求出现 |
+| OpenTelemetry 监控 | 性能问题出现 |
+
+### 功能增强
+- 双 Provider UI 切换（local-proxy / gemini）
+- E2E 测试补充
+
+---
+
+## 📚 规划文档索引
+
+### 框架重构
+- [Framework Refactor Plan](docs/plans/2026-02-27-framework-refactor-plan.md) - Phase 0-4 + 后续 5-8
+
+### ReAct Agent 升级
+- [Phase 1 最终方案](docs/archive/2026-Q1/react-agent-phase2/2026-03-01-react-agent-upgrade-v2.13-final.md) - 接口重构
+- [Phase 2 渐进式实施](docs/plans/2026-03-02-react-agent-phase2-progressive.md) - Phase 2a-2d 规划
+- [15 轮迭代复盘](docs/retrospectives/2026-03-02-react-agent-upgrade-15-iterations.md) - 经验总结
+
+### 归档
+- [react-agent-iterations/](docs/archive/react-agent-iterations/) - v1-v2.12 迭代历史
+- [react-agent-phase2/](docs/archive/2026-Q1/react-agent-phase2/) - Phase 2 子阶段实施计划
 
 ---
 
