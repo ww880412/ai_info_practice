@@ -12,6 +12,13 @@ export interface IngestConfig {
 type Events = {
   'entry/ingest': { data: { entryId: string } };
   'entry/reprocess': { data: { entryId: string } };
+  'comparison/process-batch': {
+    data: {
+      batchId: string;
+      entryIds: string[];
+      targetMode: 'two-step' | 'tool-calling';
+    };
+  };
 };
 
 export const inngest = new Inngest({
