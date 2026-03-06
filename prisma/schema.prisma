@@ -91,6 +91,9 @@ model Entry {
   smartSummaryRelation EntrySmartSummary?
   notes EntryNote[]
 
+  // Mode comparisons (1:many)
+  modeComparisons ModeComparison[]
+
   @@index([processStatus])
   @@index([knowledgeStatus])
   @@index([knowledgeStatus, reviewedAt])
@@ -432,4 +435,56 @@ model EntryNote {
   updatedAt DateTime @updatedAt
 
   @@index([entryId])
+}
+
+// ─────────────── Mode Comparison (Phase 3b) ───────────────
+
+// Mode comparison for A/B testing Agent modes
+model ModeComparison {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  // Associated Entry
+  entryId   String
+  entry     Entry    @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  // Original mode info
+  originalMode      String  // 'two-step' | 'tool-calling'
+  originalDecision  Json    // NormalizedAgentIngestDecision
+  originalScore     Json    // QualityEvaluation
+
+  // Comparison mode info
+  comparisonMode     String  // 'two-step' | 'tool-calling'
+  comparisonDecision Json    // NormalizedAgentIngestDecision
+  comparisonScore    Json    // QualityEvaluation
+
+  // Comparison result
+  winner            String?  // 'original' | 'comparison' | 'tie'
+  scoreDiff         Float    // comparisonScore.overallScore - originalScore.overallScore
+
+  // Batch info
+  batchId           String
+  batchIndex        Int
+
+  @@index([entryId])
+  @@index([batchId])
+}
+
+model ComparisonBatch {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Batch configuration
+  targetMode    String   // Target mode to compare against
+  entryCount    Int      // Total number of entries
+
+  // Execution status
+  status        String   // 'pending' | 'processing' | 'completed' | 'failed'
+  progress      Int      @default(0)  // Number of processed entries
+
+  // Statistics
+  stats         Json?    // Batch statistics (win rate, avg score diff, etc.)
+
+  @@index([status])
 }
