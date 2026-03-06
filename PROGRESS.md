@@ -28,6 +28,7 @@
 | Phase 2b-2 | tool-calling 模式动态输出 | ✅ 已完成 |
 | Phase 2c | 提示词优化（few-shot）| ✅ 已完成 |
 | Phase 2d | 简单循环 | ⏸ 暂不实施 |
+| **Phase 3a** | **结果评分 Agent** | ✅ 已完成 |
 
 #### 3. Provider 扩展（多模型支持）
 | Phase | 内容 | 状态 |
@@ -35,8 +36,9 @@
 | CRS Provider | CRS API 集成 | ✅ 已完成 |
 
 ### 当前待办
-1. **Prompt Learning 流水线**: 将 Phase 2c 效果验证改造为自动化流水线（待规划）
-2. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
+1. **模式效果对比**: 使用评分 Agent 对比两步模式 vs tool-calling 模式（待实施）
+2. **Prompt Learning 流水线**: 将 Phase 2c 效果验证改造为自动化流水线（待规划）
+3. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
 
 ---
 
@@ -69,21 +71,22 @@
 | 模块 | 测试数 |
 |------|--------|
 | parser | 8 |
-| ai/agent | 17 |
+| ai/agent | 18 |
 | gemini | 5 |
 | ingest | 7 |
 | entries | 2 |
 | sanitize | 10 |
 | deduplication | 7 |
-| **总计** | **56** |
+| **总计** | **57** |
 
 ---
 
 ## 🔜 项目待办
 
 ### 当前冲刺
-1. **Prompt Learning 流水线**: 自动化提示词优化验证（待规划）
-2. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
+1. **模式效果对比**: 使用评分 Agent 对比两步模式 vs tool-calling 模式（待实施）
+2. **Prompt Learning 流水线**: 自动化提示词优化验证（待规划）
+3. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
 
 ### Backlog（条件触发）
 | 任务 | 触发条件 |
@@ -94,7 +97,7 @@
 | OpenTelemetry 监控 | 性能问题出现 |
 
 ### 功能增强
-- 双 Provider UI 切换（local-proxy / gemini）
+- 模式效果对比（基于评分 Agent）
 - E2E 测试补充
 
 ---
