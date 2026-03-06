@@ -299,6 +299,44 @@ export class ReActAgent implements IAgentEngine {
     return normalized;
   }
 
+  /**
+   * Process entry with specific mode (for comparison testing)
+   * @param entryId - Entry ID
+   * @param input - Parsed content
+   * @param mode - Mode to use ('two-step' | 'tool-calling')
+   * @returns Normalized decision
+   */
+  async processWithMode(
+    entryId: string,
+    input: ParseResult,
+    mode: 'two-step' | 'tool-calling'
+  ): Promise<NormalizedAgentIngestDecision> {
+    // Save original config
+    const originalConfig = this.config;
+
+    // Temporarily override config
+    this.config = {
+      ...originalConfig,
+      useToolCalling: mode === 'tool-calling',
+    };
+
+    try {
+      const trace = await this.executeReasoning(entryId, input);
+      const normalized = normalizeAgentIngestDecision(trace.finalResult, {
+        contentLength: input.content.length,
+      });
+
+      if (!normalized) {
+        throw new Error('Agent output missing required fields');
+      }
+
+      return normalized;
+    } finally {
+      // Restore original config
+      this.config = originalConfig;
+    }
+  }
+
   private async executeReasoning(
     entryId: string,
     input: ParseResult,
