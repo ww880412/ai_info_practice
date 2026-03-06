@@ -35,9 +35,8 @@
 | CRS Provider | CRS API 集成 | ✅ 已完成 |
 
 ### 当前待办
-1. **扩大测试样本**: 测试 3-5 篇不同类型文章验证 Phase 2c 效果
+1. **Prompt Learning 流水线**: 将 Phase 2c 效果验证改造为自动化流水线（待规划）
 2. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
-3. **Phase 2c 后续优化**: 根据测试结果决定是否继续优化
 
 ---
 
@@ -60,7 +59,8 @@
 | Agent 透明化 | ✅ 已合并 |
 | 系统性升级 Batch 1-3 | ✅ 已合并 |
 | Framework Refactor Phase 0-4 | ✅ 已合并 |
-| ReAct Agent Phase 1-2b | 🚧 待合并 |
+| ReAct Agent Phase 1-2c | ✅ 已合并到 main |
+| CRS Provider 集成 | ✅ 已合并到 main |
 
 ---
 
@@ -82,9 +82,8 @@
 ## 🔜 项目待办
 
 ### 当前冲刺
-1. **Phase 2c**: 提示词优化（few-shot 示例）
-2. **sdk-tools 单元测试**: 覆盖工具上下文传递
-3. **分支合并**: feature/iteration-upgrade → main
+1. **Prompt Learning 流水线**: 自动化提示词优化验证（待规划）
+2. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
 
 ### Backlog（条件触发）
 | 任务 | 触发条件 |
@@ -116,4 +115,4 @@
 
 ---
 
-*最后更新: 2026-03-04*
+*最后更新: 2026-03-06*
