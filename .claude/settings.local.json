@@ -11,7 +11,16 @@
       "Bash(npx next:*)",
       "WebFetch(domain:ai.google.dev)",
       "WebFetch(domain:github.com)",
-      "mcp__plugin_claude-mem_mcp-search__save_memory"
+      "mcp__plugin_claude-mem_mcp-search__save_memory",
+      "WebFetch(domain:langchain-ai.github.io)",
+      "WebFetch(domain:sdk.vercel.ai)",
+      "WebFetch(domain:mp.weixin.qq.com)",
+      "WebFetch(domain:zh.wikipedia.org)",
+      "WebFetch(domain:developers.google.com)",
+      "WebFetch(domain:web.dev)",
+      "WebFetch(domain:www.ruanyifeng.com)",
+      "WebFetch(domain:ruanyifeng.com)",
+      "WebFetch(domain:platform.openai.com)"
     ]
   }
 }

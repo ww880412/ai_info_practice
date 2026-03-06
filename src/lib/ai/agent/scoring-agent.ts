@@ -69,7 +69,7 @@ function buildScoringPrompt(
 **内容长度**: ${originalContent.length} 字符
 
 **内容摘要**（前 3000 字符）:
-${originalContent.content.slice(0, 3000)}
+${JSON.stringify(originalContent.content.slice(0, 3000))}
 
 ---
 
