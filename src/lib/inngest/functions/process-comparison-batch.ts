@@ -45,7 +45,11 @@ export const processComparisonBatch = inngest.createFunction(
           const entry = await prisma.entry.findUnique({
             where: { id: entryId },
             include: {
-              practiceTask: true, // P1-2 Fix: Load practice task relation
+              practiceTask: {
+                include: {
+                  steps: true, // P1-2 Fix: Load nested steps for complete baseline
+                },
+              },
               reasoningTraces: {
                 orderBy: { createdAt: 'desc' },
                 take: 1,
@@ -72,7 +76,9 @@ export const processComparisonBatch = inngest.createFunction(
           if (latestTrace) {
             try {
               const metadata = JSON.parse(latestTrace.metadata);
-              originalMode = metadata.executionMode || 'two-step';
+              // Convert snake_case to kebab-case for consistency
+              const executionMode = metadata.executionMode || 'two_step';
+              originalMode = executionMode.replace('_', '-') as 'two-step' | 'tool-calling';
             } catch {
               // Fallback to opposite of target if metadata parsing fails
               originalMode = targetMode === 'two-step' ? 'tool-calling' : 'two-step';
@@ -94,7 +100,7 @@ export const processComparisonBatch = inngest.createFunction(
               difficulty: entry.practiceTask.difficulty,
               estimatedTime: entry.practiceTask.estimatedTime,
               prerequisites: entry.practiceTask.prerequisites,
-              steps: [], // Steps not needed for comparison
+              steps: entry.practiceTask.steps || [], // P1-2 Fix: Include loaded steps
             } : null,
             summaryStructure: entry.summaryStructure,
             keyPointsNew: entry.keyPointsNew,
