@@ -108,17 +108,17 @@ export const processComparisonBatch = inngest.createFunction(
         });
 
         results.push(result);
-
-        // Update progress
+      } catch (error) {
+        console.error(`Failed to process entry ${entryId}:`, error);
+        // Continue with next entry
+      } finally {
+        // Always update progress, even on failure
         await step.run(`update-progress-${i}`, async () => {
           await prisma.comparisonBatch.update({
             where: { id: batchId },
             data: { progress: i + 1 },
           });
         });
-      } catch (error) {
-        console.error(`Failed to process entry ${entryId}:`, error);
-        // Continue with next entry
       }
     }
 
@@ -128,13 +128,35 @@ export const processComparisonBatch = inngest.createFunction(
         where: { batchId },
       });
 
+      if (comparisons.length === 0) {
+        // No successful comparisons
+        await prisma.comparisonBatch.update({
+          where: { id: batchId },
+          data: {
+            status: 'failed',
+            stats: {
+              originalWins: 0,
+              comparisonWins: 0,
+              ties: 0,
+              avgScoreDiff: 0,
+              dimensionBreakdown: {
+                completeness: 0,
+                accuracy: 0,
+                relevance: 0,
+                clarity: 0,
+                actionability: 0,
+              },
+            } as any,
+          },
+        });
+        return;
+      }
+
       const originalWins = comparisons.filter(c => c.winner === 'original').length;
       const comparisonWins = comparisons.filter(c => c.winner === 'comparison').length;
       const ties = comparisons.filter(c => c.winner === 'tie').length;
 
-      const avgScoreDiff = comparisons.length > 0
-        ? comparisons.reduce((sum, c) => sum + c.scoreDiff, 0) / comparisons.length
-        : 0;
+      const avgScoreDiff = comparisons.reduce((sum, c) => sum + c.scoreDiff, 0) / comparisons.length;
 
       // Calculate dimension breakdown
       const dimensionBreakdown = {
@@ -145,6 +167,8 @@ export const processComparisonBatch = inngest.createFunction(
         actionability: 0,
       };
 
+      let actionabilityCount = 0;
+
       comparisons.forEach(c => {
         const compScore = c.comparisonScore as any;
         const origScore = c.originalScore as any;
@@ -154,13 +178,18 @@ export const processComparisonBatch = inngest.createFunction(
         dimensionBreakdown.clarity += compScore.dimensions.clarity - origScore.dimensions.clarity;
         if (compScore.dimensions.actionability !== null && origScore.dimensions.actionability !== null) {
           dimensionBreakdown.actionability += compScore.dimensions.actionability - origScore.dimensions.actionability;
+          actionabilityCount++;
         }
       });
 
       // Average dimension differences
-      Object.keys(dimensionBreakdown).forEach(key => {
-        dimensionBreakdown[key as keyof typeof dimensionBreakdown] /= comparisons.length;
-      });
+      dimensionBreakdown.completeness /= comparisons.length;
+      dimensionBreakdown.accuracy /= comparisons.length;
+      dimensionBreakdown.relevance /= comparisons.length;
+      dimensionBreakdown.clarity /= comparisons.length;
+      dimensionBreakdown.actionability = actionabilityCount > 0
+        ? dimensionBreakdown.actionability / actionabilityCount
+        : 0;
 
       const stats = {
         originalWins,
