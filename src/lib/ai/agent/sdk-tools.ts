@@ -10,6 +10,8 @@ import { generateJSON, generateText } from '../generate';
 import { findSimilarEntries } from '@/lib/ai/deduplication';
 import { selectToolPipeline } from './route-strategy';
 import { getContentDepth, getFieldsGuidance } from './content-depth';
+import { evaluateDecisionQuality, type ScoringInput } from './scoring-agent';
+import type { NormalizedAgentIngestDecision } from './ingest-contract';
 
 /**
  * 工具执行时的共享上下文
@@ -397,6 +399,40 @@ ${content.slice(0, 30000)}`;
             evaluationsSummary: Object.keys(evaluations),
           },
         };
+      },
+    }),
+
+    evaluate_quality: tool({
+      description: '评估 AI 决策输出的质量（完整性、准确性、相关性、清晰度、可操作性）',
+      inputSchema: z.object({
+        decision: z.record(z.unknown()).describe('AI 决策输出（NormalizedAgentIngestDecision）'),
+        originalTitle: z.string().describe('原始内容标题'),
+        originalContent: z.string().describe('原始内容文本'),
+      }),
+      execute: async ({ decision, originalTitle, originalContent }: { decision: Record<string, unknown>; originalTitle: string; originalContent: string }) => {
+        try {
+          const scoringInput: ScoringInput = {
+            decision: decision as NormalizedAgentIngestDecision,
+            originalContent: {
+              title: originalTitle,
+              content: originalContent,
+              length: originalContent.length,
+            },
+          };
+
+          const evaluation = await evaluateDecisionQuality(scoringInput);
+
+          return {
+            success: true,
+            data: evaluation,
+            message: `质量评分完成。总分: ${evaluation.overallScore}/100`,
+          };
+        } catch (error) {
+          return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          };
+        }
       },
     }),
   };
