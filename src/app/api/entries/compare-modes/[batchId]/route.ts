@@ -3,10 +3,10 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { batchId: string } }
+  { params }: { params: Promise<{ batchId: string }> }
 ) {
   try {
-    const { batchId } = params;
+    const { batchId } = await params;
 
     const batch = await prisma.comparisonBatch.findUnique({
       where: { id: batchId },

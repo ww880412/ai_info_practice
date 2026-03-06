@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { ReActAgent } from '@/lib/ai/agent/engine';
 import { getAgentConfig } from '@/lib/ai/agent/get-config';
 import { compareDecisions } from '@/lib/ai/agent/comparison';
+import { normalizeAgentIngestDecision } from '@/lib/ai/agent/ingest-contract';
 import type { ParseResult } from '@/lib/parser';
 
 export const processComparisonBatch = inngest.createFunction(
@@ -37,28 +38,52 @@ export const processComparisonBatch = inngest.createFunction(
 
       try {
         const result = await step.run(`process-entry-${i}`, async () => {
-          // Fetch entry with parse result
+          // Fetch entry
           const entry = await prisma.entry.findUnique({
             where: { id: entryId },
-            include: {
-              reasoningTraces: {
-                orderBy: { createdAt: 'desc' },
-                take: 1,
-              },
-            },
           });
 
           if (!entry) {
             throw new Error(`Entry ${entryId} not found`);
           }
 
-          // Get original decision from latest reasoning trace
-          const latestTrace = entry.reasoningTraces[0];
-          if (!latestTrace) {
-            throw new Error(`No reasoning trace found for entry ${entryId}`);
+          // P1-4 Fix: Resolve and set credential if entry has one
+          if (entry.credentialId) {
+            const { resolveCredential, setServerConfig } = await import('@/lib/ai/client');
+            const config = await resolveCredential(entry.credentialId);
+            if (config.apiKey) {
+              setServerConfig({ apiKey: config.apiKey, model: config.model });
+            }
           }
 
-          const originalDecision = JSON.parse(latestTrace.finalResult);
+          // P1-2 Fix: Read original decision from Entry fields, not from trace
+          // This ensures we always compare against the canonical result
+          const originalDecisionRaw = {
+            contentType: entry.contentType,
+            techDomain: entry.techDomain,
+            aiTags: entry.aiTags,
+            coreSummary: entry.coreSummary,
+            keyPoints: entry.keyPoints,
+            practiceValue: entry.practiceValue,
+            summaryStructure: entry.summaryStructure,
+            keyPointsNew: entry.keyPointsNew,
+            boundaries: entry.boundaries,
+            confidence: entry.confidence,
+            difficulty: entry.difficulty,
+            sourceTrust: entry.sourceTrust,
+            timeliness: entry.timeliness,
+            contentForm: entry.contentForm,
+            extractedMetadata: entry.extractedMetadata,
+          };
+
+          // P1-3 Fix: Normalize the original decision to match comparison decision schema
+          const originalDecision = normalizeAgentIngestDecision(originalDecisionRaw, {
+            contentLength: entry.originalContent?.length || 0,
+          });
+
+          if (!originalDecision) {
+            throw new Error(`Failed to normalize original decision for entry ${entryId}`);
+          }
 
           // Reconstruct ParseResult
           const parseResult: ParseResult = {
@@ -108,17 +133,17 @@ export const processComparisonBatch = inngest.createFunction(
         });
 
         results.push(result);
-      } catch (error) {
-        console.error(`Failed to process entry ${entryId}:`, error);
-        // Continue with next entry
-      } finally {
-        // Always update progress, even on failure
+
+        // P2-1 Fix: Only increment progress on success
         await step.run(`update-progress-${i}`, async () => {
           await prisma.comparisonBatch.update({
             where: { id: batchId },
             data: { progress: i + 1 },
           });
         });
+      } catch (error) {
+        console.error(`Failed to process entry ${entryId}:`, error);
+        // Continue with next entry (progress not incremented for failures)
       }
     }
 
