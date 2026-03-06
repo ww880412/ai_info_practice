@@ -28,36 +28,58 @@ export const processComparisonBatch = inngest.createFunction(
     const config = await getAgentConfig();
     const agent = new ReActAgent(config);
 
-    // Determine original mode (opposite of target)
-    const originalMode = targetMode === 'two-step' ? 'tool-calling' : 'two-step';
+    // Store default config for credential reset
+    const { getServerConfig, setServerConfig } = await import('@/lib/ai/client');
+    const defaultConfig = getServerConfig();
 
     // Process each entry
     const results = [];
+    let successCount = 0; // P2-1 Fix: Track successful comparisons separately
+
     for (let i = 0; i < entryIds.length; i++) {
       const entryId = entryIds[i];
 
       try {
         const result = await step.run(`process-entry-${i}`, async () => {
-          // Fetch entry
+          // Fetch entry with relations
           const entry = await prisma.entry.findUnique({
             where: { id: entryId },
+            include: {
+              practiceTask: true, // P1-2 Fix: Load practice task relation
+              reasoningTraces: {
+                orderBy: { createdAt: 'desc' },
+                take: 1,
+              },
+            },
           });
 
           if (!entry) {
             throw new Error(`Entry ${entryId} not found`);
           }
 
-          // P1-4 Fix: Resolve and set credential if entry has one
+          // P1-1 Fix: Resolve and set credential if entry has one
           if (entry.credentialId) {
-            const { resolveCredential, setServerConfig } = await import('@/lib/ai/client');
-            const config = await resolveCredential(entry.credentialId);
-            if (config.apiKey) {
-              setServerConfig({ apiKey: config.apiKey, model: config.model });
+            const { resolveCredential } = await import('@/lib/ai/client');
+            const credConfig = await resolveCredential(entry.credentialId);
+            if (credConfig.apiKey) {
+              setServerConfig({ apiKey: credConfig.apiKey, model: credConfig.model });
             }
           }
 
-          // P1-2 Fix: Read original decision from Entry fields, not from trace
-          // This ensures we always compare against the canonical result
+          // P1-3 Fix: Derive originalMode from persisted execution data
+          let originalMode: 'two-step' | 'tool-calling' = 'two-step';
+          const latestTrace = entry.reasoningTraces[0];
+          if (latestTrace) {
+            try {
+              const metadata = JSON.parse(latestTrace.metadata);
+              originalMode = metadata.executionMode || 'two-step';
+            } catch {
+              // Fallback to opposite of target if metadata parsing fails
+              originalMode = targetMode === 'two-step' ? 'tool-calling' : 'two-step';
+            }
+          }
+
+          // P1-2 Fix: Build complete original decision including practice task
           const originalDecisionRaw = {
             contentType: entry.contentType,
             techDomain: entry.techDomain,
@@ -65,6 +87,15 @@ export const processComparisonBatch = inngest.createFunction(
             coreSummary: entry.coreSummary,
             keyPoints: entry.keyPoints,
             practiceValue: entry.practiceValue,
+            practiceReason: entry.practiceTask?.summary || null, // Reconstruct from task
+            practiceTask: entry.practiceTask ? {
+              title: entry.practiceTask.title,
+              summary: entry.practiceTask.summary,
+              difficulty: entry.practiceTask.difficulty,
+              estimatedTime: entry.practiceTask.estimatedTime,
+              prerequisites: entry.practiceTask.prerequisites,
+              steps: [], // Steps not needed for comparison
+            } : null,
             summaryStructure: entry.summaryStructure,
             keyPointsNew: entry.keyPointsNew,
             boundaries: entry.boundaries,
@@ -76,7 +107,7 @@ export const processComparisonBatch = inngest.createFunction(
             extractedMetadata: entry.extractedMetadata,
           };
 
-          // P1-3 Fix: Normalize the original decision to match comparison decision schema
+          // Normalize the original decision
           const originalDecision = normalizeAgentIngestDecision(originalDecisionRaw, {
             contentLength: entry.originalContent?.length || 0,
           });
@@ -100,6 +131,9 @@ export const processComparisonBatch = inngest.createFunction(
             parseResult,
             targetMode
           );
+
+          // P1-1 Fix: Reset server config to default after processing
+          setServerConfig(defaultConfig);
 
           // Compare decisions
           const comparison = await compareDecisions(
@@ -133,16 +167,19 @@ export const processComparisonBatch = inngest.createFunction(
         });
 
         results.push(result);
+        successCount++; // P2-1 Fix: Increment only on success
 
-        // P2-1 Fix: Only increment progress on success
+        // Update progress with success count
         await step.run(`update-progress-${i}`, async () => {
           await prisma.comparisonBatch.update({
             where: { id: batchId },
-            data: { progress: i + 1 },
+            data: { progress: successCount },
           });
         });
       } catch (error) {
         console.error(`Failed to process entry ${entryId}:`, error);
+        // P1-1 Fix: Reset config even on error
+        setServerConfig(defaultConfig);
         // Continue with next entry (progress not incremented for failures)
       }
     }
