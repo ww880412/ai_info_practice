@@ -65,8 +65,9 @@ export const processComparisonBatch = inngest.createFunction(
             title: entry.title || '',
             content: entry.originalContent || '',
             sourceType: entry.sourceType,
-            length: entry.originalContent?.length || 0,
           };
+
+          const contentLength = entry.originalContent?.length || 0;
 
           // Process with target mode
           const comparisonDecision = await agent.processWithMode(
@@ -82,7 +83,7 @@ export const processComparisonBatch = inngest.createFunction(
             {
               title: parseResult.title,
               content: parseResult.content,
-              length: parseResult.length,
+              length: contentLength,
             }
           );
 

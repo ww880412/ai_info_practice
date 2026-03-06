@@ -5,9 +5,7 @@ import { inngest } from '@/lib/inngest/client';
 
 const RequestSchema = z.object({
   entryIds: z.array(z.string()).min(1, 'At least one entry ID is required'),
-  targetMode: z.enum(['two-step', 'tool-calling'], {
-    errorMap: () => ({ message: 'targetMode must be either two-step or tool-calling' }),
-  }),
+  targetMode: z.enum(['two-step', 'tool-calling']),
 });
 
 export async function POST(request: NextRequest) {
@@ -16,8 +14,9 @@ export async function POST(request: NextRequest) {
     const validation = RequestSchema.safeParse(body);
 
     if (!validation.success) {
+      const firstError = validation.error.issues[0];
       return NextResponse.json(
-        { error: validation.error.errors[0].message },
+        { error: firstError.message || 'targetMode must be either two-step or tool-calling' },
         { status: 400 }
       );
     }

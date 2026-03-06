@@ -20,8 +20,7 @@ describe('ReActAgent mode switching', () => {
     const input: ParseResult = {
       title: 'Test',
       content: 'Test content for mode switching',
-      sourceType: 'LINK',
-      length: 100,
+      sourceType: 'WEBPAGE',
     };
 
     // Should not throw
@@ -34,8 +33,7 @@ describe('ReActAgent mode switching', () => {
     const input: ParseResult = {
       title: 'Test',
       content: 'Test content for mode switching',
-      sourceType: 'LINK',
-      length: 100,
+      sourceType: 'WEBPAGE',
     };
 
     // Should not throw
