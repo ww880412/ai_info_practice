@@ -405,18 +405,18 @@ ${content.slice(0, 30000)}`;
     evaluate_quality: tool({
       description: '评估 AI 决策输出的质量（完整性、准确性、相关性、清晰度、可操作性）',
       inputSchema: z.object({
-        decision: z.record(z.unknown()).describe('AI 决策输出（NormalizedAgentIngestDecision）'),
-        originalTitle: z.string().describe('原始内容标题'),
-        originalContent: z.string().describe('原始内容文本'),
+        decision: z.string().describe('AI 决策输出的 JSON 字符串'),
       }),
-      execute: async ({ decision, originalTitle, originalContent }: { decision: Record<string, unknown>; originalTitle: string; originalContent: string }) => {
+      execute: async ({ decision }: { decision: string }) => {
         try {
+          const parsedDecision = JSON.parse(decision);
+
           const scoringInput: ScoringInput = {
-            decision: decision as NormalizedAgentIngestDecision,
+            decision: parsedDecision as unknown as NormalizedAgentIngestDecision,
             originalContent: {
-              title: originalTitle,
-              content: originalContent,
-              length: originalContent.length,
+              title: ctx.input.title || '',
+              content: ctx.input.content || '',
+              length: ctx.input.content?.length || 0,
             },
           };
 

@@ -72,10 +72,11 @@ describe('scoring-agent', () => {
     it('evaluates KNOWLEDGE type decision', async () => {
       const mockDecision: NormalizedAgentIngestDecision = {
         contentType: 'TECH_PRINCIPLE',
-        techDomain: 'LLM',
-        aiTags: ['LLM', 'Transformer'],
+        techDomain: 'OTHER',
+        aiTags: ['Transformer', 'Architecture'],
         coreSummary: '这是一篇关于 Transformer 架构的技术原理文章',
-        keyPoints: {
+        keyPoints: ['核心洞察1', '核心洞察2'],
+        keyPointsNew: {
           core: ['核心洞察1', '核心洞察2'],
           extended: ['补充细节1'],
         },
@@ -98,6 +99,7 @@ describe('scoring-agent', () => {
         sourceTrust: 'HIGH',
         timeliness: 'RECENT',
         contentForm: 'TEXTUAL',
+        confidence: 0.85,
         extractedMetadata: {},
       };
 
@@ -140,7 +142,8 @@ describe('scoring-agent', () => {
         techDomain: 'AGENT',
         aiTags: ['Agent', 'LangChain'],
         coreSummary: '这是一篇关于如何构建 LangChain Agent 的教程',
-        keyPoints: {
+        keyPoints: ['核心洞察：Agent 需要工具调用能力'],
+        keyPointsNew: {
           core: ['核心洞察：Agent 需要工具调用能力'],
           extended: ['补充：可以使用 OpenAI Functions'],
         },
@@ -174,6 +177,7 @@ describe('scoring-agent', () => {
         sourceTrust: 'HIGH',
         timeliness: 'RECENT',
         contentForm: 'CODE_HEAVY',
+        confidence: 0.88,
         extractedMetadata: {
           codeExamples: [
             { language: 'python', code: 'from langchain import Agent', description: '导入' },

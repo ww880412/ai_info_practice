@@ -9,10 +9,15 @@ import type { NormalizedAgentIngestDecision } from '../src/lib/ai/agent/ingest-c
 // Test case 1: KNOWLEDGE type content
 const knowledgeDecision: NormalizedAgentIngestDecision = {
   contentType: 'TECH_PRINCIPLE',
-  techDomain: 'LLM',
-  aiTags: ['LLM', 'Transformer', 'Attention'],
+  techDomain: 'OTHER',
+  aiTags: ['Transformer', 'Attention', 'Architecture'],
   coreSummary: 'Transformer 是一种基于自注意力机制的神经网络架构，彻底改变了 NLP 领域。核心创新在于抛弃了 RNN 的序列依赖，通过并行计算大幅提升训练效率。',
-  keyPoints: {
+  keyPoints: [
+    '核心洞察：自注意力机制的本质是矩阵乘法，可以并行计算',
+    '反直觉发现：位置编码比 RNN 的隐式位置信息更有效',
+    '关键突破：多头注意力允许模型关注不同的语义子空间',
+  ],
+  keyPointsNew: {
     core: [
       '核心洞察：自注意力机制的本质是矩阵乘法，可以并行计算',
       '反直觉发现：位置编码比 RNN 的隐式位置信息更有效',
@@ -43,6 +48,7 @@ const knowledgeDecision: NormalizedAgentIngestDecision = {
   sourceTrust: 'HIGH',
   timeliness: 'CLASSIC',
   contentForm: 'TEXTUAL',
+  confidence: 0.85,
   extractedMetadata: {},
 };
 
@@ -102,7 +108,11 @@ const actionableDecision: NormalizedAgentIngestDecision = {
   techDomain: 'AGENT',
   aiTags: ['Agent', 'LangChain', 'Tool Calling'],
   coreSummary: '本教程介绍如何使用 LangChain 构建一个具有工具调用能力的 AI Agent，包括环境配置、工具定义、Agent 创建和运行测试。',
-  keyPoints: {
+  keyPoints: [
+    '核心洞察：Agent 的本质是 LLM + 工具调用 + 推理循环',
+    '关键发现：工具描述的质量直接影响 Agent 的决策准确性',
+  ],
+  keyPointsNew: {
     core: [
       '核心洞察：Agent 的本质是 LLM + 工具调用 + 推理循环',
       '关键发现：工具描述的质量直接影响 Agent 的决策准确性',
@@ -160,6 +170,7 @@ const actionableDecision: NormalizedAgentIngestDecision = {
   sourceTrust: 'HIGH',
   timeliness: 'RECENT',
   contentForm: 'CODE_HEAVY',
+  confidence: 0.88,
   extractedMetadata: {
     codeExamples: [
       {

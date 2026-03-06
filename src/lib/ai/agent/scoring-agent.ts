@@ -64,7 +64,7 @@ function buildScoringPrompt(
 
 ## 原始内容
 
-**标题**: ${originalContent.title}
+**标题**: ${JSON.stringify(originalContent.title)}
 
 **内容长度**: ${originalContent.length} 字符
 
@@ -86,7 +86,7 @@ ${JSON.stringify(decision, null, 2)}
 ### 1. 完整性 (Completeness) - 0-100 分
 评估是否提取了所有关键信息：
 - coreSummary 是否覆盖核心要点（30%）
-- keyPoints.core 核心洞察是否完整（25%）
+- keyPointsNew.core 核心洞察是否完整（25%）
 - summaryStructure.fields 结构化字段是否齐全（25%）
 - boundaries 适用边界是否明确（10%）
 - extractedMetadata 元数据是否提取（10%）
@@ -101,7 +101,7 @@ ${JSON.stringify(decision, null, 2)}
 ### 3. 相关性 (Relevance) - 0-100 分
 评估提取信息的相关性：
 - 核心相关：coreSummary 是否聚焦核心（40%）
-- 去冗余：keyPoints 是否去除重复和无关信息（30%）
+- 去冗余：keyPointsNew 是否去除重复和无关信息（30%）
 - 结构匹配：summaryStructure.type 是否匹配内容特征（30%）
 
 ### 4. 清晰度 (Clarity) - 0-100 分
@@ -109,7 +109,7 @@ ${JSON.stringify(decision, null, 2)}
 - 语言质量：中文表达是否流畅（30%）
 - 逻辑清晰：summaryStructure.fields 是否逻辑连贯（30%）
 - 术语规范：技术术语使用是否准确（20%）
-- 可读性：keyPoints 是否简洁明了（20%）
+- 可读性：keyPointsNew 是否简洁明了（20%）
 
 ${isPracticeActionable ? `
 ### 5. 可操作性 (Actionability) - 0-100 分
@@ -141,15 +141,15 @@ ${isPracticeActionable ? `
   },
   "issues": [
     "coreSummary 过于简略，未提及核心概念 X",
-    "keyPoints.core 第 3 条与原文不符",
+    "keyPointsNew.core 第 3 条与原文不符",
     "summaryStructure 缺少 'mechanism' 字段"
   ],
   "suggestions": [
     "补充核心概念 X 的定义",
-    "修正 keyPoints.core 第 3 条",
+    "修正 keyPointsNew.core 第 3 条",
     "增加 mechanism 字段说明工作原理"
   ],
-  "reasoning": "整体质量良好。完整性方面，coreSummary 覆盖了主要内容，但对核心概念 X 的描述不够深入。准确性方面，大部分信息与原文一致，但 keyPoints.core 第 3 条存在偏差。相关性和清晰度表现优秀。建议补充核心概念定义，修正不准确的关键点。"
+  "reasoning": "整体质量良好。完整性方面，coreSummary 覆盖了主要内容，但对核心概念 X 的描述不够深入。准确性方面，大部分信息与原文一致，但 keyPointsNew.core 第 3 条存在偏差。相关性和清晰度表现优秀。建议补充核心概念定义，修正不准确的关键点。"
 }
 \`\`\`
 
