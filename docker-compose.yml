@@ -44,6 +44,12 @@ services:
       LOCAL_PROXY_URL: ${LOCAL_PROXY_URL:-http://host.docker.internal:8045/v1}
       LOCAL_PROXY_KEY: ${LOCAL_PROXY_KEY}
       LOCAL_PROXY_MODEL: ${LOCAL_PROXY_MODEL:-gemini-3.1-pro-high}
+      # CRS Provider configuration
+      USE_CRS_PROVIDER: ${USE_CRS_PROVIDER:-false}
+      CRS_BASE_URL: ${CRS_BASE_URL}
+      CRS_API_KEY: ${CRS_API_KEY}
+      CRS_MODEL: ${CRS_MODEL:-gpt-5.4}
+      CRS_REASONING_EFFORT: ${CRS_REASONING_EFFORT:-xhigh}
     depends_on:
       postgres:
         condition: service_healthy

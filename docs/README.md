@@ -1,7 +1,7 @@
 # AI Practice Hub 文档中心
 
-> 版本: v1.1
-> 更新日期: 2026-02-25
+> 版本: v1.2
+> 更新日期: 2026-03-04
 
 ---
 
@@ -15,29 +15,32 @@
 | [Agent 协作规范](guides/AGENT_COLLABORATION_GUIDE.md) | 协作与交接规范 | Agent / 开发者 |
 | [项目状态](PROJECT_STATUS.md) | 当前阶段进展与建议 | 所有人 |
 
-### 📋 规划与阶段治理
+### 📋 活跃规划文档
 
 | 文档 | 说明 | 状态 |
 |---|---|---|
-| [迭代设计文档](plans/2026-02-21-iteration-design.md) | 系统迭代设计 | ✅ 已完成 |
-| [知识 Agent 设计](plans/2026-02-21-knowledge-agent-design.md) | AI 处理管道设计 | ✅ 已完成 |
-| [动态摘要实现](plans/2026-02-22-dynamic-summary-implementation.md) | 动态摘要系统 | ✅ 已完成 |
-| [知识系统白皮书](plans/2026-02-22-knowledge-system-whitepaper.md) | 系统设计理念 | 📖 参考文档 |
-| [知识库布局模块设计](plans/2026-02-24-library-layout-modules-design.md) | 知识库布局系统 | ✅ 已完成 |
-| [系统性升级设计](plans/2026-02-25-systematic-upgrade-design.md) | 系统性升级总体设计 | 🚧 进行中 |
-| [Batch 1 实现](plans/2026-02-25-batch1-implementation.md) | 第一批升级任务 | ✅ 已完成 |
-| [Batch 2 实现](plans/2026-02-25-batch2-implementation.md) | 第二批升级任务 | ✅ 已完成 |
-| [Batch 3 实现](plans/2026-02-25-batch3-implementation.md) | 第三批升级任务 | 🚧 进行中 |
+| [ReAct Agent Phase 2 渐进式实施](plans/2026-03-02-react-agent-phase2-progressive.md) | Phase 2 总体规划 | 🚧 进行中 |
+| [Local Proxy 集成](plans/2026-03-01-local-proxy-integration.md) | 本地代理集成方案 | 📖 参考文档 |
+
+### 📖 参考文档（已完成）
+
+| 文档 | 说明 |
+|---|---|
+| [迭代设计文档](plans/2026-02-21-iteration-design.md) | 系统迭代设计 |
+| [知识 Agent 设计](plans/2026-02-21-knowledge-agent-design.md) | AI 处理管道设计 |
+| [动态摘要实现](plans/2026-02-22-dynamic-summary-implementation.md) | 动态摘要系统 |
+| [知识系统白皮书](plans/2026-02-22-knowledge-system-whitepaper.md) | 系统设计理念 |
+| [知识库布局模块设计](plans/2026-02-24-library-layout-modules-design.md) | 知识库布局系统 |
+| [系统性升级设计](plans/2026-02-25-systematic-upgrade-design.md) | 系统性升级总体设计 |
+| [框架重构计划](plans/2026-02-27-framework-refactor-plan.md) | ReAct Agent 框架重构 |
 
 ### 📦 归档文档
 
-| 文档 | 说明 | 归档日期 |
-|---|---|---|
-| [Phase 1 实现计划](archive/2026-Q1/2026-02-21-phase1-implementation.md) | 基础功能实现 | 2026-02-25 |
-| [知识 Agent 实现](archive/2026-Q1/2026-02-21-knowledge-agent-implementation.md) | Agent 引擎实现细节 | 2026-02-25 |
-| [知识库批量删除](archive/2026-Q1/2026-02-22-library-batch-delete.md) | 批量删除功能 | 2026-02-25 |
-| [Agent 透明度计划](archive/2026-Q1/2026-02-23-agent-transparency-plan.md) | Agent 可观测性 | 2026-02-25 |
-| [前端层级计划](archive/2026-Q1/2026-02-23-frontend-hierarchy-plan.md) | 前端架构优化 | 2026-02-25 |
+| 目录 | 说明 |
+|---|---|
+| [archive/2026-Q1/](archive/2026-Q1/) | 2026 Q1 已完成的实现计划 |
+| [archive/2026-Q1/react-agent-phase2/](archive/2026-Q1/react-agent-phase2/) | Phase 2 各子阶段实施计划 |
+| [archive/react-agent-iterations/](archive/react-agent-iterations/) | ReAct Agent 迭代历史（v1-v2.12） |
 
 ### 🏗 架构文档
 
@@ -53,26 +56,20 @@
 
 ```text
 docs/
-├── README.md
-├── PROJECT_STATUS.md
-├── DOCUMENTATION_STANDARDS.md
-├── guides/
+├── README.md                    # 本文件
+├── PROJECT_STATUS.md            # 项目状态报告
+├── DOCUMENTATION_STANDARDS.md   # 文档规范
+├── guides/                      # 使用指南
 │   ├── AGENT_ONBOARDING_CHECKLIST.md
 │   └── AGENT_COLLABORATION_GUIDE.md
-├── plans/
-│   └── YYYY-MM-DD-*.md
-├── architecture/
-└── archive/
-    └── 2026-Q1/
+├── plans/                       # 活跃规划（进行中/参考）
+├── architecture/                # 架构设计
+└── archive/                     # 归档
+    ├── 2026-Q1/                 # 已完成的实现计划
+    │   └── react-agent-phase2/  # Phase 2 子阶段计划
+    └── react-agent-iterations/  # ReAct Agent 迭代历史
 ```
-
-### 📖 使用指南
-
-| 文档 | 说明 |
-|---|---|
-| [Agent 接手清单](guides/AGENT_ONBOARDING_CHECKLIST.md) | 标准接手流程 |
-| [Agent 协作规范](guides/AGENT_COLLABORATION_GUIDE.md) | 协作与交接规范 |
 
 ---
 
-*最后更新: 2026-02-25*
+*最后更新: 2026-03-04*

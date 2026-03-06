@@ -10,7 +10,7 @@ import type {
 } from '@ai-sdk/provider';
 
 const DEFAULT_CRS_BASE_URL = 'https://ls.xingchentech.asia/openai';
-const DEFAULT_CRS_MODEL = 'gpt-5.3-codex';
+const DEFAULT_CRS_MODEL = 'gpt-5.4';
 const DEFAULT_REASONING_EFFORT = 'xhigh';
 const ALLOWED_CRS_DOMAINS = ['ls.xingchentech.asia'];
 const VALID_REASONING_EFFORTS = ['low', 'medium', 'high', 'xhigh'] as const;
