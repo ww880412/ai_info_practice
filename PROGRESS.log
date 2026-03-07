@@ -254,3 +254,61 @@
 **下次会话**：
 - 无待办事项
 - Phase 2c 提示词优化待开始
+
+## 2026-03-07 会话：CRS Provider 集成修复
+
+### 问题诊断
+1. CRS API 返回 400 错误：
+   - `input` 字段必须是数组格式，不能是字符串
+   - 必须添加 `stream: true` 参数
+   - `reasoning_effort` 参数不被支持
+
+2. "CRS returned non-JSON response (status 200)"：
+   - CRS API 强制要求流式响应（SSE 格式）
+   - 原代码期望 JSON 响应，无法处理 SSE
+
+3. "No output generated" 错误：
+   - CRS 不支持结构化输出（Output.object）
+   - tool-calling 模式要求模型输出符合 schema 的 JSON
+   - 导致 Vercel AI SDK 抛出 AI_NoOutputGeneratedError
+
+4. /library 页面无法访问：
+   - 数据库缺少 `originalExecutionMode` 字段
+   - Prisma Client 版本不一致
+
+### 解决方案
+1. **实现 SSE 流式响应解析**（src/lib/ai/providers/crs.ts）：
+   - 使用 ReadableStream API 读取响应流
+   - 解析 Server-Sent Events 格式
+   - 提取 `response.output_text.delta` 事件累积输出
+   - 处理 `response.created` 和 `response.done` 事件
+
+2. **修复 API 参数**：
+   - `input`: 始终返回数组格式
+   - `stream`: 设置为 `true`
+   - 移除 `reasoning_effort` 参数
+
+3. **自动禁用 tool-calling**（src/lib/ai/agent/get-config.ts）：
+   - 检测 `USE_CRS_PROVIDER=true` 环境变量
+   - 自动将 `useToolCalling` 设置为 `false`
+   - 强制使用 two-step 模式
+
+4. **数据库同步**：
+   - 运行 `prisma db push` 同步 schema
+   - 重新构建 Docker 镜像包含最新 Prisma Client
+
+### 测试结果
+- ✅ CRS API 成功调用并返回流式响应
+- ✅ SSE 解析正确提取输出文本（500+ 字符）
+- ✅ 自动禁用 tool-calling，使用 two-step 模式
+- ✅ /library 页面正常访问
+- ⚠️ Inngest worker 在某些情况下处理较慢（待优化）
+
+### 代码变更
+- `src/lib/ai/providers/crs.ts`: +120 行（SSE 解析器）
+- `src/lib/ai/agent/get-config.ts`: +3 行（CRS 检测）
+- `src/lib/ai/agent/engine.ts`: +10 行（调试日志）
+
+### 提交记录
+- 7bda652: fix(crs): implement SSE streaming support and disable tool-calling for CRS
+

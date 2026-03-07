@@ -2,10 +2,12 @@
 
 > 里程碑级状态索引。会话级交接细节记录在 `PROGRESS.log`。
 
-## 📍 当前状态（2026-03-06）
+## 📍 当前状态（2026-03-07）
 
 ### 最近完成
-- ✅ Phase 3a: 结果评分 Agent（经过 3 轮 Codex 评审，9/10 分通过）
+- ✅ CRS Provider SSE 流式响应支持（修复集成问题）
+- ✅ Agent 模式对比功能（经 9 轮 Codex 评审）
+- ✅ Phase 3a: 结果评分 Agent（经 3 轮 Codex 评审，9/10 分）
 
 ### 活跃分支
 - `main`（主线）
@@ -36,12 +38,15 @@
 #### 3. Provider 扩展（多模型支持）
 | Phase | 内容 | 状态 |
 |-------|------|------|
-| CRS Provider | CRS API 集成 | ✅ 已完成 |
+| CRS Provider | CRS API 集成（SSE 流式响应）| ✅ 已完成 |
 
 ### 当前待办
-1. **模式效果对比**: 使用评分 Agent 对比两步模式 vs tool-calling 模式（待实施）
-2. **Prompt Learning 流水线**: 将 Phase 2c 效果验证改造为自动化流水线（待规划）
-3. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
+1. **Prompt Learning 流水线**: 将 Phase 2c 效果验证改造为自动化流水线（待规划）
+2. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
+
+### 已知问题
+- CRS Provider 不支持结构化输出，tool-calling 模式已自动禁用
+- Inngest worker 在某些情况下可能处理较慢（待优化）
 
 ---
 
