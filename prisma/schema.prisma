@@ -76,6 +76,9 @@ model Entry {
   // Reasoning traces (1:many)
   reasoningTraces ReasoningTrace[]
 
+  // Original execution mode (for mode comparison baseline)
+  originalExecutionMode String? // 'two-step' or 'tool-calling'
+
   // Quality revision history (1:many)
   qualityHistories QualityRevision[] @relation("EntryQualityHistory")
 

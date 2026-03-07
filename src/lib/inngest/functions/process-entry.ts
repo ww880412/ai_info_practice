@@ -336,6 +336,25 @@ export const processEntry = inngest.createFunction(
 
       // Transaction to save all results
       await prisma.$transaction(async (tx) => {
+        // Get the latest reasoning trace to extract execution mode
+        const latestTrace = await tx.reasoningTrace.findFirst({
+          where: { entryId },
+          orderBy: { createdAt: 'desc' },
+          select: { metadata: true },
+        });
+
+        let originalExecutionMode: string | undefined;
+        if (latestTrace) {
+          try {
+            const metadata = JSON.parse(latestTrace.metadata);
+            // Convert snake_case to kebab-case for consistency
+            const executionMode = metadata.executionMode || 'two_step';
+            originalExecutionMode = executionMode.replace('_', '-');
+          } catch {
+            // Ignore parsing errors
+          }
+        }
+
         // Update Entry
         await tx.entry.update({
           where: { id: entryId },
@@ -347,6 +366,7 @@ export const processEntry = inngest.createFunction(
             coreSummary: decision.coreSummary,
             keyPoints: decision.keyPoints,
             practiceValue: decision.practiceValue,
+            originalExecutionMode, // Save original execution mode
             ...(dynamicSummaryEnabled
               ? {
                   keyPointsNew: validatedKeyPointsNew as unknown as Prisma.InputJsonValue,

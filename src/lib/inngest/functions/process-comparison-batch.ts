@@ -50,10 +50,6 @@ export const processComparisonBatch = inngest.createFunction(
                   steps: true, // P1-2 Fix: Load nested steps for complete baseline
                 },
               },
-              reasoningTraces: {
-                orderBy: { createdAt: 'desc' },
-                take: 1,
-              },
             },
           });
 
@@ -70,20 +66,10 @@ export const processComparisonBatch = inngest.createFunction(
             }
           }
 
-          // P1-3 Fix: Derive originalMode from persisted execution data
-          let originalMode: 'two-step' | 'tool-calling' = 'two-step';
-          const latestTrace = entry.reasoningTraces[0];
-          if (latestTrace) {
-            try {
-              const metadata = JSON.parse(latestTrace.metadata);
-              // Convert snake_case to kebab-case for consistency
-              const executionMode = metadata.executionMode || 'two_step';
-              originalMode = executionMode.replace('_', '-') as 'two-step' | 'tool-calling';
-            } catch {
-              // Fallback to opposite of target if metadata parsing fails
-              originalMode = targetMode === 'two-step' ? 'tool-calling' : 'two-step';
-            }
-          }
+          // P1-3 Fix: Read originalMode from Entry field (immutable baseline)
+          const originalMode: 'two-step' | 'tool-calling' =
+            (entry.originalExecutionMode as 'two-step' | 'tool-calling') ||
+            (targetMode === 'two-step' ? 'tool-calling' : 'two-step');
 
           // P1-2 Fix: Build complete original decision including practice task
           const originalDecisionRaw = {
