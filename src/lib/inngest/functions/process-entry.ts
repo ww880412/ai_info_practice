@@ -347,11 +347,14 @@ export const processEntry = inngest.createFunction(
         if (latestTrace) {
           try {
             const metadata = JSON.parse(latestTrace.metadata);
-            // Convert snake_case to kebab-case for consistency
-            const executionMode = metadata.executionMode || 'two_step';
-            originalExecutionMode = executionMode.replace('_', '-');
+            // Only set if executionMode exists in metadata
+            // Do not fabricate default value - leave as undefined if missing
+            if (metadata.executionMode) {
+              // Convert snake_case to kebab-case for consistency
+              originalExecutionMode = metadata.executionMode.replace('_', '-');
+            }
           } catch {
-            // Ignore parsing errors
+            // Ignore parsing errors - leave originalExecutionMode as undefined
           }
         }
 
