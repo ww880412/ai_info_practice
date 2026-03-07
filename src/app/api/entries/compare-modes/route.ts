@@ -23,16 +23,29 @@ export async function POST(request: NextRequest) {
 
     const { entryIds, targetMode } = validation.data;
 
-    // Verify all entries exist
+    // Verify all entries exist and have originalExecutionMode
     const entries = await prisma.entry.findMany({
       where: { id: { in: entryIds } },
-      select: { id: true },
+      select: { id: true, originalExecutionMode: true },
     });
 
     if (entries.length !== entryIds.length) {
       return NextResponse.json(
         { error: 'Some entry IDs do not exist' },
         { status: 404 }
+      );
+    }
+
+    // Filter out entries without originalExecutionMode (legacy or classifier-fallback entries)
+    const entriesWithBaseline = entries.filter((e) => e.originalExecutionMode !== null);
+    const missingBaselineCount = entries.length - entriesWithBaseline.length;
+
+    if (missingBaselineCount > 0) {
+      return NextResponse.json(
+        {
+          error: `${missingBaselineCount} entr${missingBaselineCount === 1 ? 'y' : 'ies'} missing baseline execution mode. Only entries processed with Agent can be compared.`,
+        },
+        { status: 400 }
       );
     }
 
