@@ -404,6 +404,13 @@ ${buildSemanticSnapshot(input.content, STEP2_INPUT_LIMIT)}`;
         }),
       });
 
+      console.log('[Agent] aiGenerateText result:', {
+        hasOutput: !!result.output,
+        hasSteps: !!result.steps,
+        stepsLength: result.steps?.length,
+        outputKeys: result.output ? Object.keys(result.output).join(',') : 'none',
+      });
+
       // 从 result.steps 构建 ReasoningStep[] 并收集工具调用遥测
       result.steps.forEach((step, index) => {
         const stepToolCalls = step.toolCalls ?? [];
@@ -499,6 +506,11 @@ ${buildSemanticSnapshot(input.content, STEP2_INPUT_LIMIT)}`;
     } catch (error) {
       // 工具调用失败时回退到两步模式，记录失败信息
       const err = error as Error;
+      console.error('[Agent] Tool calling error:', {
+        name: err.name,
+        message: err.message,
+        stack: err.stack?.split('\n').slice(0, 3).join('\n'),
+      });
       console.warn('Tool calling failed, falling back to two-step mode:', err.message);
 
       const partialStats = this.buildToolCallStats(toolCallTelemetry);

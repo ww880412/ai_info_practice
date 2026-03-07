@@ -33,8 +33,8 @@ export interface CRSMessage {
 
 export interface CRSResponsesRequest {
   model: string;
-  input: string | CRSMessage[];
-  reasoning_effort?: ReasoningEffort;
+  input: CRSMessage[];
+  stream: boolean;
   store?: boolean;
   temperature?: number;
   max_output_tokens?: number;
@@ -379,6 +379,7 @@ export async function callCRSResponses(
   validateCRSUrl(config.baseUrl);
 
   const endpoint = buildResponsesEndpoint(config.baseUrl);
+
   const response = await fetch(endpoint, {
     method: 'POST',
     signal: options.abortSignal,
@@ -390,6 +391,122 @@ export async function callCRSResponses(
     body: JSON.stringify(request),
   });
 
+  if (!response.ok) {
+    const responseText = await response.text();
+    let rawBody: unknown = {};
+
+    if (responseText) {
+      try {
+        rawBody = JSON.parse(responseText);
+      } catch {
+        // ignore
+      }
+    }
+
+    const rawRecord = rawBody && typeof rawBody === 'object' ? (rawBody as Record<string, unknown>) : {};
+    const error = rawRecord.error;
+    const errorMessage =
+      typeof error === 'object' && error && 'message' in error
+        ? String((error as Record<string, unknown>).message)
+        : `HTTP ${response.status}`;
+
+    console.error('[CRS] Error response:', {
+      status: response.status,
+      statusText: response.statusText,
+      body: responseText.substring(0, 500),
+    });
+
+    throw new Error(`CRS API request failed (${response.status}): ${errorMessage}`);
+  }
+
+  // Handle streaming response
+  if (request.stream) {
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('Response body is not readable');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let outputText = '';
+    let responseId = '';
+    let responseModel = config.model;
+    let finishReason: string | undefined;
+    let usage: CRSResponsesUsage | undefined;
+    let createdAt: string | number | undefined;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim() || line.startsWith(':')) continue;
+
+          if (line.startsWith('event:')) {
+            continue;
+          }
+
+          if (line.startsWith('data:')) {
+            const dataStr = line.slice(5).trim();
+            if (dataStr === '[DONE]') continue;
+
+            try {
+              const data = JSON.parse(dataStr);
+
+              // Debug: log first few events
+              if (!responseId || outputText.length < 100) {
+                console.log('[CRS] Event type:', data.type, 'Keys:', Object.keys(data).join(','));
+              }
+
+              if (data.type === 'response.created' && data.response) {
+                responseId = data.response.id || responseId;
+                responseModel = data.response.model || responseModel;
+                createdAt = data.response.created_at || createdAt;
+              }
+
+              if (data.type === 'response.output_text.delta' && data.delta) {
+                outputText += data.delta;
+              }
+
+              if (data.type === 'response.done' && data.response) {
+                finishReason = data.response.status;
+                usage = data.response.usage;
+              }
+            } catch (e) {
+              console.warn('[CRS] Failed to parse SSE data:', dataStr.substring(0, 100));
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    console.log('[CRS] Stream complete. Output length:', outputText.length, 'Response ID:', responseId);
+
+    const data: CRSResponsesOutput = {
+      id: responseId,
+      model: responseModel,
+      output_text: outputText,
+      finish_reason: finishReason,
+      usage,
+      created_at: createdAt,
+      status: finishReason,
+    };
+
+    return {
+      data,
+      body: { output_text: outputText },
+      headers: headersToRecord(response.headers),
+    };
+  }
+
+  // Handle non-streaming response (fallback)
   const responseText = await response.text();
   let rawBody: unknown = {};
 
@@ -433,7 +550,7 @@ export async function callCRSResponses(
   };
 }
 
-export function convertPromptToCRSInput(prompt: LanguageModelV3Prompt): string | CRSMessage[] {
+export function convertPromptToCRSInput(prompt: LanguageModelV3Prompt): CRSMessage[] {
   const messages: CRSMessage[] = [];
 
   for (const message of prompt) {
@@ -453,10 +570,6 @@ export function convertPromptToCRSInput(prompt: LanguageModelV3Prompt): string |
     messages.push({ role: message.role, content });
   }
 
-  if (messages.length === 1 && messages[0]?.role === 'user') {
-    return messages[0].content;
-  }
-
   return messages;
 }
 
@@ -474,7 +587,7 @@ class CRSLanguageModel implements LanguageModelV3 {
     const request: CRSResponsesRequest = {
       model: this.config.model,
       input: convertPromptToCRSInput(options.prompt),
-      reasoning_effort: this.config.reasoningEffort,
+      stream: true,
       store: this.config.disableStorage === undefined ? undefined : !this.config.disableStorage,
       temperature: options.temperature,
       max_output_tokens: options.maxOutputTokens,
@@ -488,6 +601,12 @@ class CRSLanguageModel implements LanguageModelV3 {
     });
 
     const text = data.output_text || '';
+
+    console.log('[CRS] doGenerate result:', {
+      hasText: !!text,
+      textLength: text.length,
+      contentLength: text ? 1 : 0,
+    });
 
     return {
       content: text ? [{ type: 'text', text }] : [],
