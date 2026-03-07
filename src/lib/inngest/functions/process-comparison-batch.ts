@@ -67,9 +67,15 @@ export const processComparisonBatch = inngest.createFunction(
           }
 
           // P1-3 Fix: Read originalMode from Entry field (immutable baseline)
-          const originalMode: 'two-step' | 'tool-calling' =
-            (entry.originalExecutionMode as 'two-step' | 'tool-calling') ||
-            (targetMode === 'two-step' ? 'tool-calling' : 'two-step');
+          // Fail closed: reject entries without baseline instead of fabricating mode
+          if (!entry.originalExecutionMode) {
+            throw new Error(
+              `Entry ${entryId} missing originalExecutionMode. ` +
+              `Only entries processed with Agent can be compared.`
+            );
+          }
+
+          const originalMode = entry.originalExecutionMode as 'two-step' | 'tool-calling';
 
           // P1-2 Fix: Build complete original decision including practice task
           const originalDecisionRaw = {
