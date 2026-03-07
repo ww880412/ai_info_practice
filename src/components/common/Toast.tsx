@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useReducer, useCallback } from "react";
+import { createContext, useCallback, useContext, useEffect, useReducer, useState } from "react";
 import { createPortal } from "react-dom";
 
 type ToastType = "success" | "error" | "info";
@@ -66,7 +66,11 @@ function ToastContainer({
   toasts: Toast[];
   onRemove: (id: string) => void;
 }) {
-  const mounted = typeof document !== "undefined";
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (!mounted) return null;
 

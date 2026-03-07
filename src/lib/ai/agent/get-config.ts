@@ -5,13 +5,8 @@ import type { AgentConfig } from './types';
 /**
  * Phase 2a: 从环境变量读取工具调用开关
  * 默认启用，设置 REACT_AGENT_USE_TOOLS=false 可禁用
- * CRS provider 不支持结构化输出，自动禁用 tool-calling
  */
-function readUseToolCallingFromEnv(): boolean {
-  // CRS provider 不支持结构化输出，强制禁用 tool-calling
-  if (process.env.USE_CRS_PROVIDER === 'true') {
-    return false;
-  }
+export function readUseToolCallingFromEnv(): boolean {
   return process.env.REACT_AGENT_USE_TOOLS !== 'false';
 }
 

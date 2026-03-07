@@ -6,6 +6,7 @@ import {
   type ConfidenceLevel,
   type SourceType,
 } from "@/lib/entry/metadata-display";
+import { formatEntryDateTime } from "@/lib/entry/format-datetime";
 
 interface SummaryMeta {
   fieldConfidence?: Record<string, ConfidenceLevel>;
@@ -158,7 +159,7 @@ export function MetadataPanel({
 
       {summaryStructure?.meta?.extractedAt && (
         <div className="text-xs text-secondary pt-2 border-t border-border">
-          Extracted at: {new Date(summaryStructure.meta.extractedAt).toLocaleString()}
+          Extracted at: {formatEntryDateTime(summaryStructure.meta.extractedAt)}
         </div>
       )}
     </div>

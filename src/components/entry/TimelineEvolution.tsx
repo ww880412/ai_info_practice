@@ -4,11 +4,16 @@
  */
 
 interface TimelineEvent {
-  date: string;
+  marker: string;
+  markerVariant?: 'date' | 'stage';
   version?: string;
-  title: string;
-  description: string;
+  title?: string;
+  description?: string;
   significance?: 'major' | 'minor' | 'patch';
+  details?: Array<{
+    label: string;
+    value: string;
+  }>;
 }
 
 interface TimelineEvolutionData {
@@ -54,10 +59,16 @@ export function TimelineEvolution({ data }: TimelineEvolutionProps) {
 
               {/* Event content */}
               <div className="space-y-1">
-                {/* Date and badges */}
+                {/* Marker and badges */}
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-medium text-secondary">
-                    {event.date}
+                  <span
+                    className={
+                      event.markerVariant === 'stage'
+                        ? "text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full font-medium"
+                        : "text-xs font-medium text-secondary"
+                    }
+                  >
+                    {event.marker}
                   </span>
                   {event.version && (
                     <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full font-mono">
@@ -72,10 +83,30 @@ export function TimelineEvolution({ data }: TimelineEvolutionProps) {
                 </div>
 
                 {/* Title */}
-                <h5 className="font-medium text-foreground">{event.title}</h5>
+                {event.title && (
+                  <h5 className="font-medium text-foreground">{event.title}</h5>
+                )}
 
                 {/* Description */}
-                <p className="text-sm text-secondary">{event.description}</p>
+                {event.description && (
+                  <p className="text-sm text-secondary">{event.description}</p>
+                )}
+
+                {/* Stage-based details */}
+                {event.details && event.details.length > 0 && (
+                  <dl className="space-y-2 pt-1">
+                    {event.details.map((detail) => (
+                      <div key={`${event.marker}-${detail.label}`} className="space-y-0.5">
+                        <dt className="text-[11px] font-medium uppercase tracking-wide text-secondary">
+                          {detail.label}
+                        </dt>
+                        <dd className="text-sm text-foreground">
+                          {detail.value}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
               </div>
             </div>
           ))}

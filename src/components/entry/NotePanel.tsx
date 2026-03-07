@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useEntryNotes } from "@/hooks/useEntryNotes";
 import { useToast } from "@/components/common/Toast";
+import { formatEntryDateTime } from "@/lib/entry/format-datetime";
 
 interface NotePanelProps {
   entryId: string;
@@ -62,7 +63,7 @@ export function NotePanel({ entryId }: NotePanelProps) {
             <div key={note.id} className="p-3 bg-gray-50 rounded border border-gray-200">
               <p className="text-sm whitespace-pre-wrap">{note.content}</p>
               <p className="text-xs text-gray-500 mt-2">
-                {new Date(note.createdAt).toLocaleString()}
+                {formatEntryDateTime(note.createdAt)}
               </p>
             </div>
           ))

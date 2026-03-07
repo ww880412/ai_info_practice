@@ -364,16 +364,57 @@ export function DynamicSummary({
     const record = toObject(value);
     if (!record) return null;
 
+    const timelineDetailLabels: Array<[string, string]> = [
+      ['initialApproach', 'Initial Approach'],
+      ['problem', 'Problem'],
+      ['iteration', 'Iteration'],
+      ['finalChoice', 'Final Choice'],
+      ['result', 'Result'],
+    ];
+
     const events = Array.isArray(record.events)
-      ? record.events.map((e) => {
+      ? record.events.map((e, index) => {
           const event = toObject(e);
           if (!event) return null;
+
+          const stage = toString(event.stage);
+          const date = toString(event.date);
+          const title = toString(event.title);
+          const description = toString(event.description);
           const significance = toString(event.significance);
+
+          if (stage) {
+            const details = timelineDetailLabels
+              .map(([key, label]) => {
+                const detailValue = toString(event[key]);
+                if (!detailValue) return null;
+                return {
+                  label,
+                  value: detailValue,
+                };
+              })
+              .filter((detail): detail is NonNullable<typeof detail> => detail !== null);
+
+            if (details.length === 0) return null;
+
+            return {
+              marker: stage,
+              markerVariant: 'stage' as const,
+              version: toString(event.version) || undefined,
+              details,
+            };
+          }
+
+          if (!date && !title && !description) {
+            return null;
+          }
+
           return {
-            date: toString(event.date),
+            marker: date || `Event ${index + 1}`,
+            markerVariant: 'date' as const,
             version: toString(event.version) || undefined,
-            title: toString(event.title),
-            description: toString(event.description),
+            title: title || undefined,
+            description: description || undefined,
             significance: (['major', 'minor', 'patch'].includes(significance)
               ? significance as 'major' | 'minor' | 'patch'
               : undefined),

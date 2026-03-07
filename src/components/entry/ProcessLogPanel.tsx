@@ -7,6 +7,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Clock, AlertCircle, CheckCircle, Loader2, RotateCw, ChevronRight } from "lucide-react";
+import { formatEntryDateTime } from "@/lib/entry/format-datetime";
 
 type AttemptStatus = "SUCCESS" | "FAILED" | "RUNNING";
 
@@ -145,7 +146,7 @@ export function ProcessLogPanel({ entryId }: ProcessLogPanelProps) {
                       </div>
                     </div>
                     <span className="text-xs text-secondary">
-                      {new Date(attempt.startedAt).toLocaleString()}
+                      {formatEntryDateTime(attempt.startedAt)}
                     </span>
                   </div>
 

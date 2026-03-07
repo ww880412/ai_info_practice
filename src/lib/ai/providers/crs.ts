@@ -1,3 +1,6 @@
+import {
+  UnsupportedFunctionalityError,
+} from '@ai-sdk/provider';
 import type {
   JSONObject,
   LanguageModelV3,
@@ -6,6 +9,7 @@ import type {
   LanguageModelV3GenerateResult,
   LanguageModelV3Prompt,
   LanguageModelV3StreamResult,
+  SharedV3Warning,
   LanguageModelV3Usage,
 } from '@ai-sdk/provider';
 
@@ -31,11 +35,49 @@ export interface CRSMessage {
   content: string;
 }
 
+export interface CRSFunctionCall {
+  type: 'function_call';
+  call_id: string;
+  name: string;
+  arguments: string;
+}
+
+export interface CRSFunctionCallOutput {
+  type: 'function_call_output';
+  call_id: string;
+  output: string;
+}
+
+export interface CRSFunctionTool {
+  type: 'function';
+  name: string;
+  description?: string;
+  parameters: JSONObject;
+  strict?: boolean;
+}
+
+type CRSResponsesInput = Array<CRSMessage | CRSFunctionCall | CRSFunctionCallOutput>;
+
 export interface CRSResponsesRequest {
   model: string;
-  input: CRSMessage[];
+  input: CRSResponsesInput;
   stream: boolean;
   store?: boolean;
+  text?: {
+    format:
+      | {
+          type: 'json_schema';
+          name: string;
+          description?: string;
+          schema: JSONObject;
+          strict?: boolean;
+        }
+      | {
+          type: 'json_object';
+        };
+  };
+  tools?: CRSFunctionTool[];
+  tool_choice?: 'auto' | 'none' | 'required' | { type: 'function'; name: string };
   temperature?: number;
   max_output_tokens?: number;
   top_p?: number;
@@ -63,6 +105,7 @@ export interface CRSResponsesOutput {
   id: string;
   model: string;
   output_text: string;
+  output?: Array<Record<string, unknown>>;
   finish_reason?: string;
   usage?: CRSResponsesUsage;
   created_at?: string | number;
@@ -434,6 +477,7 @@ export async function callCRSResponses(
     let finishReason: string | undefined;
     let usage: CRSResponsesUsage | undefined;
     let createdAt: string | number | undefined;
+    const outputItems: Array<Record<string, unknown>> = [];
 
     try {
       while (true) {
@@ -473,9 +517,20 @@ export async function callCRSResponses(
                 outputText += data.delta;
               }
 
-              if (data.type === 'response.done' && data.response) {
+              if (
+                data.type === 'response.output_item.done'
+                && data.item
+                && typeof data.item === 'object'
+              ) {
+                outputItems.push(data.item as Record<string, unknown>);
+              }
+
+              if ((data.type === 'response.done' || data.type === 'response.completed') && data.response) {
                 finishReason = data.response.status;
                 usage = data.response.usage;
+                responseId = data.response.id || responseId;
+                responseModel = data.response.model || responseModel;
+                createdAt = data.response.created_at || createdAt;
               }
             } catch (e) {
               console.warn('[CRS] Failed to parse SSE data:', dataStr.substring(0, 100));
@@ -493,6 +548,7 @@ export async function callCRSResponses(
       id: responseId,
       model: responseModel,
       output_text: outputText,
+      output: outputItems,
       finish_reason: finishReason,
       usage,
       created_at: createdAt,
@@ -501,7 +557,7 @@ export async function callCRSResponses(
 
     return {
       data,
-      body: { output_text: outputText },
+      body: { output_text: outputText, output: outputItems },
       headers: headersToRecord(response.headers),
     };
   }
@@ -550,8 +606,8 @@ export async function callCRSResponses(
   };
 }
 
-export function convertPromptToCRSInput(prompt: LanguageModelV3Prompt): CRSMessage[] {
-  const messages: CRSMessage[] = [];
+export function convertPromptToCRSInput(prompt: LanguageModelV3Prompt): CRSResponsesInput {
+  const messages: CRSResponsesInput = [];
 
   for (const message of prompt) {
     if (message.role === 'system') {
@@ -561,16 +617,155 @@ export function convertPromptToCRSInput(prompt: LanguageModelV3Prompt): CRSMessa
       continue;
     }
 
-    const content = message.content
-      .map((part) => convertPartToText(part))
+    const textParts = message.content
+      .map((part) => {
+        const record = part as { type?: string };
+        if (record.type === 'tool-call' || record.type === 'tool-result') {
+          return '';
+        }
+        return convertPartToText(part);
+      })
       .filter((part) => part.length > 0)
       .join('\n');
 
-    if (!content) continue;
-    messages.push({ role: message.role, content });
+    if (textParts) {
+      messages.push({ role: message.role, content: textParts });
+    }
+
+    for (const part of message.content) {
+      if (!part || typeof part !== 'object') continue;
+      const record = part as {
+        type?: string;
+        toolCallId?: string;
+        toolName?: string;
+        input?: unknown;
+        output?: unknown;
+      };
+
+      if (record.type === 'tool-call' && record.toolCallId && record.toolName) {
+        messages.push({
+          type: 'function_call',
+          call_id: record.toolCallId,
+          name: record.toolName,
+          arguments: safeStringify(record.input ?? {}),
+        });
+      }
+
+      if (record.type === 'tool-result' && record.toolCallId) {
+        messages.push({
+          type: 'function_call_output',
+          call_id: record.toolCallId,
+          output: safeStringify(record.output ?? {}),
+        });
+      }
+    }
   }
 
   return messages;
+}
+
+function prepareCRSTools(
+  tools: LanguageModelV3CallOptions['tools'],
+  toolChoice: LanguageModelV3CallOptions['toolChoice']
+): {
+  tools: CRSFunctionTool[] | undefined;
+  toolChoice: CRSResponsesRequest['tool_choice'] | undefined;
+  warnings: SharedV3Warning[];
+} {
+  const warnings: SharedV3Warning[] = [];
+
+  if (!tools?.length) {
+    return { tools: undefined, toolChoice: undefined, warnings };
+  }
+
+  const responseTools: CRSFunctionTool[] = [];
+
+  for (const tool of tools) {
+    if (tool.type !== 'function') {
+      warnings.push({
+        type: 'unsupported',
+        feature: `provider-defined tool ${'id' in tool ? String(tool.id) : 'unknown'}`,
+      });
+      continue;
+    }
+
+    responseTools.push({
+      type: 'function',
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.inputSchema as JSONObject,
+      ...(tool.strict != null ? { strict: tool.strict } : {}),
+    });
+  }
+
+  if (!responseTools.length) {
+    return { tools: undefined, toolChoice: undefined, warnings };
+  }
+
+  if (!toolChoice) {
+    return { tools: responseTools, toolChoice: undefined, warnings };
+  }
+
+  switch (toolChoice.type) {
+    case 'auto':
+    case 'none':
+    case 'required':
+      return { tools: responseTools, toolChoice: toolChoice.type, warnings };
+    case 'tool':
+      return {
+        tools: responseTools,
+        toolChoice: { type: 'function', name: toolChoice.toolName },
+        warnings,
+      };
+    default: {
+      throw new UnsupportedFunctionalityError({
+        functionality: `tool choice type: ${String((toolChoice as { type?: string }).type)}`,
+      });
+    }
+  }
+}
+
+function extractCRSContent(
+  output: Array<Record<string, unknown>> | undefined,
+  fallbackText: string
+): Array<
+  | { type: 'text'; text: string }
+  | { type: 'tool-call'; toolCallId: string; toolName: string; input: string }
+> {
+  const content: Array<
+    | { type: 'text'; text: string }
+    | { type: 'tool-call'; toolCallId: string; toolName: string; input: string }
+  > = [];
+
+  if (Array.isArray(output)) {
+    for (const item of output) {
+      if (item.type === 'function_call' && typeof item.name === 'string') {
+        content.push({
+          type: 'tool-call',
+          toolCallId:
+            typeof item.call_id === 'string'
+              ? item.call_id
+              : typeof item.id === 'string'
+                ? item.id
+                : `crs-tool-call-${content.length}`,
+          toolName: item.name,
+          input: typeof item.arguments === 'string' ? item.arguments : '{}',
+        });
+        continue;
+      }
+
+      const itemText = extractOutputText(item);
+      if (itemText) {
+        content.push({ type: 'text', text: itemText });
+      }
+    }
+  }
+
+  if (!content.some((item) => item.type === 'text') && fallbackText) {
+    content.push({ type: 'text', text: fallbackText });
+  }
+
+  return content;
 }
 
 class CRSLanguageModel implements LanguageModelV3 {
@@ -584,11 +779,33 @@ class CRSLanguageModel implements LanguageModelV3 {
   }
 
   async doGenerate(options: LanguageModelV3CallOptions): Promise<LanguageModelV3GenerateResult> {
+    const { tools, toolChoice, warnings } = prepareCRSTools(options.tools, options.toolChoice);
     const request: CRSResponsesRequest = {
       model: this.config.model,
       input: convertPromptToCRSInput(options.prompt),
       stream: true,
       store: this.config.disableStorage === undefined ? undefined : !this.config.disableStorage,
+      ...(tools ? { tools } : {}),
+      ...(toolChoice ? { tool_choice: toolChoice } : {}),
+      ...(
+        options.responseFormat?.type === 'json'
+          ? {
+              text: {
+                format: options.responseFormat.schema
+                  ? {
+                      type: 'json_schema' as const,
+                      name: options.responseFormat.name ?? 'response',
+                      description: options.responseFormat.description,
+                      schema: options.responseFormat.schema as JSONObject,
+                      strict: true,
+                    }
+                  : {
+                      type: 'json_object' as const,
+                    },
+              },
+            }
+          : {}
+      ),
       temperature: options.temperature,
       max_output_tokens: options.maxOutputTokens,
       top_p: options.topP,
@@ -601,16 +818,21 @@ class CRSLanguageModel implements LanguageModelV3 {
     });
 
     const text = data.output_text || '';
+    const content = extractCRSContent(data.output, text);
+    const hasToolCalls = content.some((part) => part.type === 'tool-call');
 
     console.log('[CRS] doGenerate result:', {
       hasText: !!text,
       textLength: text.length,
-      contentLength: text ? 1 : 0,
+      contentLength: content.length,
+      hasToolCalls,
     });
 
     return {
-      content: text ? [{ type: 'text', text }] : [],
-      finishReason: mapFinishReason(data.finish_reason),
+      content,
+      finishReason: hasToolCalls
+        ? { unified: 'tool-calls', raw: data.finish_reason ?? 'tool_calls' }
+        : mapFinishReason(data.finish_reason),
       usage: toV3Usage(data.usage),
       request: { body: request },
       response: {
@@ -620,7 +842,7 @@ class CRSLanguageModel implements LanguageModelV3 {
         headers,
         body,
       },
-      warnings: [],
+      warnings,
     };
   }
 

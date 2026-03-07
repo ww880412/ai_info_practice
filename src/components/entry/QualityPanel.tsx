@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Gauge, History, RotateCcw, Save, X } from "lucide-react";
+import { formatEntryDateTime } from "@/lib/entry/format-datetime";
 
 type DimensionKey = "sourceTrust" | "timeliness" | "completeness" | "contentForm" | "difficulty";
 
@@ -291,7 +292,7 @@ export function QualityPanel({ entryId }: QualityPanelProps) {
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {history.map((h) => (
               <div key={h.id} className="text-xs text-secondary">
-                <span className="text-primary">{new Date(h.changedAt).toLocaleString()}</span>
+                <span className="text-primary">{formatEntryDateTime(h.changedAt)}</span>
                 {h.changes.map((c, i) => (
                   <span key={i} className="ml-2">{c}</span>
                 ))}
