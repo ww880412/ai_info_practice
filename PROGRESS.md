@@ -6,9 +6,9 @@
 
 ### 最近完成
 - ✅ CRS Provider SSE 流式响应支持（修复集成问题）
-- ⚠️ Agent 模式对比功能（后端 Codex Round 5 评审中，前端未实施）
+- ✅ Agent 模式对比功能后端（经 Codex Round 6 评审，8.9/10 分，生产就绪）
   - ✅ Prisma Schema + API Routes + Inngest 任务
-  - ✅ Codex Round 5 P1 修复（originalExecutionMode 不可变基线）
+  - ✅ Codex Round 4-6 评审通过（P1 问题全部修复）
   - ❌ 前端 UI（Library 批量选择、对比结果页面）
 - ✅ Phase 3a: 结果评分 Agent（经 3 轮 Codex 评审，9/10 分）
 
