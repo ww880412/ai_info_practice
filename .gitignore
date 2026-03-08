@@ -52,3 +52,4 @@ next-env.d.ts
 /prisma/dev.db
 /src/app/api/debug/
 /日志/
+/日记/

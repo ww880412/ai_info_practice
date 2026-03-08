@@ -6,7 +6,9 @@
 
 ### 最近完成
 - ✅ CRS Provider SSE 流式响应支持（修复集成问题）
-- ✅ Agent 模式对比功能（经 9 轮 Codex 评审）
+- ⚠️ Agent 模式对比功能（后端完成，前端未实施）
+  - ✅ Prisma Schema + API Routes + Inngest 任务
+  - ❌ 前端 UI（Library 批量选择、对比结果页面）
 - ✅ Phase 3a: 结果评分 Agent（经 3 轮 Codex 评审，9/10 分）
 
 ### 活跃分支
@@ -41,8 +43,10 @@
 | CRS Provider | CRS API 集成（SSE 流式响应）| ✅ 已完成 |
 
 ### 当前待办
-1. **Prompt Learning 流水线**: 将 Phase 2c 效果验证改造为自动化流水线（待规划）
-2. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
+1. **mode-comparison 前端 UI**: 完成批量选择、对比结果页面（3-4h）
+2. **trace-summary 修复**: 修复 entry 详情页 tool-calling 结果不可见（已规划）
+3. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
+4. **Prompt Learning 流水线**: 将 Phase 2c 效果验证改造为自动化流水线（待规划）
 
 ### 已知问题
 - CRS Provider 不支持结构化输出，tool-calling 模式已自动禁用
@@ -92,8 +96,8 @@
 ## 🔜 项目待办
 
 ### 当前冲刺
-1. **模式效果对比**: 使用评分 Agent 对比两步模式 vs tool-calling 模式（待实施）
-2. **Prompt Learning 流水线**: 自动化提示词优化验证（待规划）
+1. **mode-comparison 前端 UI**: 完成批量选择、对比结果页面（3-4h）
+2. **trace-summary 修复**: 修复 entry 详情页 tool-calling 结果不可见（已规划）
 3. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
 
 ### Backlog（条件触发）
@@ -105,7 +109,7 @@
 | OpenTelemetry 监控 | 性能问题出现 |
 
 ### 功能增强
-- 模式效果对比（基于评分 Agent）
+- Prompt Learning 流水线（自动化提示词优化）
 - E2E 测试补充
 
 ---
@@ -113,17 +117,24 @@
 ## 📚 规划文档索引
 
 ### 框架重构
-- [Framework Refactor Plan](docs/plans/2026-02-27-framework-refactor-plan.md) - Phase 0-4 + 后续 5-8
+- [Framework Refactor Plan](docs/archive/2026-Q1/completed-plans/2026-02-27-framework-refactor-plan.md) - Phase 0-4 + 后续 5-8
 
 ### ReAct Agent 升级
 - [Phase 1 最终方案](docs/archive/2026-Q1/react-agent-phase2/2026-03-01-react-agent-upgrade-v2.13-final.md) - 接口重构
-- [Phase 2 渐进式实施](docs/plans/2026-03-02-react-agent-phase2-progressive.md) - Phase 2a-2d 规划
+- [Phase 2 渐进式实施](docs/archive/2026-Q1/completed-plans/2026-03-02-react-agent-phase2-progressive.md) - Phase 2a-2d 规划
 - [15 轮迭代复盘](docs/retrospectives/2026-03-02-react-agent-upgrade-15-iterations.md) - 经验总结
+
+### 活跃规划
+- [mode-comparison 设计](docs/plans/2026-03-06-mode-comparison-design.md) - 模式对比功能设计
+- [mode-comparison 实施](docs/plans/2026-03-06-mode-comparison-implementation.md) - 实施计划（后端已完成）
+- [trace-summary 修复](docs/plans/2026-03-07-trace-summary-tool-calling.md) - 详情页可观测性提升
 
 ### 归档
 - [react-agent-iterations/](docs/archive/react-agent-iterations/) - v1-v2.12 迭代历史
 - [react-agent-phase2/](docs/archive/2026-Q1/react-agent-phase2/) - Phase 2 子阶段实施计划
+- [codex-reviews/](docs/archive/2026-Q1/codex-reviews/) - Codex 评审记录
+- [completed-plans/](docs/archive/2026-Q1/completed-plans/) - 已完成规划文档
 
 ---
 
-*最后更新: 2026-03-06*
+*最后更新: 2026-03-08*
