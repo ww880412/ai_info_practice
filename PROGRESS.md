@@ -45,6 +45,13 @@
 
 ### 当前待办
 1. **mode-comparison 前端 UI**: 完成批量选择、对比结果页面（3-4h）
+   - 后端已完成 Codex Round 6 评审（8.9/10，生产就绪）
+   - Task 7: useComparisonBatch Hook
+   - Task 8: Library 批量操作
+   - Task 9: 对比结果页面
+   - Task 10: 详细对比视图
+   - Task 11: 集成测试
+   - Task 12: 文档与清理
 2. **trace-summary 修复**: 修复 entry 详情页 tool-calling 结果不可见（已规划）
 3. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
 4. **Prompt Learning 流水线**: 将 Phase 2c 效果验证改造为自动化流水线（待规划）
@@ -98,8 +105,11 @@
 
 ### 当前冲刺
 1. **mode-comparison 前端 UI**: 完成批量选择、对比结果页面（3-4h）
+   - 后端已完成 Codex Round 6 评审（8.9/10，生产就绪）
+   - Task 7-12: 前端 Hook + 组件 + 页面 + 测试
 2. **trace-summary 修复**: 修复 entry 详情页 tool-calling 结果不可见（已规划）
 3. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
+4. **mode-comparison 回归测试**: process-entry 不可变基线测试（P2，非阻塞）
 
 ### Backlog（条件触发）
 | 任务 | 触发条件 |
