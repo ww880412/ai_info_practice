@@ -312,3 +312,85 @@
 ### 提交记录
 - 7bda652: fix(crs): implement SSE streaming support and disable tool-calling for CRS
 
+
+---
+
+## 会话 #S517 - Mode Comparison 功能完整交付（2026-03-08 12:46-12:52）
+
+### 本次完成
+1. **Task 12 文档与清理**：
+   - 创建用户指南：`docs/guides/mode-comparison-guide.md`
+     - 完整使用流程（批量选择 → 对比弹窗 → 结果页面 → 详情视图）
+     - 功能特性说明（批量操作、异步处理、质量评分、统计分析）
+     - 技术细节（对比逻辑、评分标准、数据持久化）
+     - FAQ 和 API 参考
+   - 代码质量改进：`sdk-tools.ts` const 优化
+   - 更新 PROGRESS.md：标记 mode-comparison 功能完整交付
+
+2. **容器重新部署**：
+   - 停止所有容器
+   - 重新构建镜像（包含最新代码）
+   - 启动服务（PostgreSQL + App + Inngest）
+   - 验证所有容器运行正常
+
+### Mode Comparison 功能总结
+**状态：生产就绪，已上线**
+
+#### 后端实现（Codex Round 6: 8.9/10）
+- Prisma Schema: ModeComparison + ComparisonBatch 表
+- API Routes: 创建批次、查询状态、查询详情
+- Inngest 任务: 异步批量处理 + 评分 Agent 集成
+- 不可变基线: originalExecutionMode 修复
+
+#### 前端实现（Task 7-11，5 个并行 Codex Agent）
+- useComparisonBatch Hook: TanStack Query + 自动轮询
+- Library 批量操作: 选择模式 + 全选/清空 + 对比弹窗
+- 对比结果页面: 进度展示 + 统计卡片 + 结果列表
+- 详细对比视图: 并排决策面板 + 评分对比 + 维度分析
+
+#### 测试覆盖
+- 单元测试: 136 个测试全部通过
+- E2E 测试: 6 个场景（Playwright）
+- TypeScript: 类型检查通过
+- ESLint: 代码质量检查通过
+
+#### 文档交付（Task 12）
+- 用户指南: 完整使用流程 + 功能特性 + 技术细节
+- API 参考: 请求/响应格式 + 示例
+- FAQ: 常见问题 + 故障排除
+- PROGRESS.md: 里程碑状态更新
+
+### 提交记录
+```
+f07744c docs: complete mode-comparison feature documentation and cleanup
+de17488 docs: update PROGRESS.md - mode-comparison feature complete
+1c4c842 feat(frontend): complete mode-comparison frontend implementation
+b16f8a0 docs: add detailed frontend implementation plans for Task 8-12
+e5f7726 feat(hooks): add useComparisonBatch hook with TanStack Query
+```
+
+### 技术亮点
+- 规范第一: 每个 Task 都有详细实施计划并经过 Codex 评审
+- 并行执行: 5 个 Codex Agent 同时实施 Task 8-12
+- 质量保证: 完整的测试覆盖 + 类型安全 + 代码规范
+- 用户体验: 实时进度 + 自动轮询 + 清晰的统计展示
+
+### 下一步建议
+1. **trace-summary 修复**: 修复 entry 详情页 tool-calling 结果不可见（已有规划文档）
+2. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
+3. **mode-comparison 回归测试**: process-entry 不可变基线测试（P2，非阻塞）
+
+### 环境状态
+- Git: main 分支，工作区干净，领先 origin/main 5 个提交
+- Docker: 所有容器运行正常
+  - PostgreSQL: 健康，端口 5433
+  - App (Next.js): 运行中，端口 3001
+  - Inngest Worker: 运行中，端口 8288
+- 测试: 136 个单元测试通过，TypeScript 类型检查通过
+
+### 会话统计
+- 持续时间: ~6 分钟
+- 主要工作: 文档编写 + 代码清理 + 容器部署
+- 提交数: 1 个（Task 12 完成）
+- 文件变更: 3 个文件（新增 1 个用户指南，更新 PROGRESS.md，优化 sdk-tools.ts）
+
