@@ -195,7 +195,7 @@ ${sampledContent}
       execute: async () => {
         const content = getContent();
         const title = ctx.input.title || '';
-        let classification = ctx.shared.classification;
+        const classification = ctx.shared.classification;
 
         // M2 修复：如果缺少分类，返回明确错误提示让模型先调用 classify_content
         if (!classification) {
