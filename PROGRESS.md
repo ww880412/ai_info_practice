@@ -6,10 +6,11 @@
 
 ### 最近完成
 - ✅ CRS Provider SSE 流式响应支持（修复集成问题）
-- ✅ Agent 模式对比功能后端（经 Codex Round 6 评审，8.9/10 分，生产就绪）
-  - ✅ Prisma Schema + API Routes + Inngest 任务
-  - ✅ Codex Round 4-6 评审通过（P1 问题全部修复）
-  - ❌ 前端 UI（Library 批量选择、对比结果页面）
+- ✅ Agent 模式对比功能（完整实现，前后端）
+  - ✅ 后端：Prisma Schema + API Routes + Inngest 任务（Codex Round 6 评审，8.9/10）
+  - ✅ 前端：批量选择 + 对比弹窗 + 结果页面 + 详情页面（Task 7-11 完成）
+  - ✅ E2E 测试：6 个测试场景，覆盖完整流程
+  - ✅ 单元测试：136 个测试全部通过
 - ✅ Phase 3a: 结果评分 Agent（经 3 轮 Codex 评审，9/10 分）
 
 ### 活跃分支
@@ -44,14 +45,14 @@
 | CRS Provider | CRS API 集成（SSE 流式响应）| ✅ 已完成 |
 
 ### 当前待办
-1. **mode-comparison 前端 UI**: 完成批量选择、对比结果页面（3-4h）
-   - 后端已完成 Codex Round 6 评审（8.9/10，生产就绪）
-   - Task 7: useComparisonBatch Hook
-   - Task 8: Library 批量操作
-   - Task 9: 对比结果页面
-   - Task 10: 详细对比视图
-   - Task 11: 集成测试
-   - Task 12: 文档与清理
+1. ~~**mode-comparison 前端 UI**: 完成批量选择、对比结果页面（3-4h）~~ ✅ 已完成
+   - ~~后端已完成 Codex Round 6 评审（8.9/10，生产就绪）~~
+   - ~~Task 7: useComparisonBatch Hook~~
+   - ~~Task 8: Library 批量操作~~
+   - ~~Task 9: 对比结果页面~~
+   - ~~Task 10: 详细对比视图~~
+   - ~~Task 11: 集成测试~~
+   - ⏳ Task 12: 文档与清理（待完成）
 2. **trace-summary 修复**: 修复 entry 详情页 tool-calling 结果不可见（已规划）
 3. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
 4. **Prompt Learning 流水线**: 将 Phase 2c 效果验证改造为自动化流水线（待规划）
