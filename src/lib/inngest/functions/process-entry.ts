@@ -338,25 +338,34 @@ export const processEntry = inngest.createFunction(
 
       // Transaction to save all results
       await prisma.$transaction(async (tx) => {
-        // Get the latest reasoning trace to extract execution mode
-        const latestTrace = await tx.reasoningTrace.findFirst({
-          where: { entryId },
-          orderBy: { createdAt: 'desc' },
-          select: { metadata: true },
+        // Read current Entry to check if originalExecutionMode is already set
+        const currentEntry = await tx.entry.findUnique({
+          where: { id: entryId },
+          select: { originalExecutionMode: true },
         });
 
+        // Only derive originalExecutionMode if not already set (immutable baseline)
         let originalExecutionMode: string | undefined;
-        if (latestTrace) {
-          try {
-            const metadata = JSON.parse(latestTrace.metadata);
-            // Only set if executionMode exists in metadata
-            // Do not fabricate default value - leave as undefined if missing
-            if (metadata.executionMode) {
-              // Convert snake_case to kebab-case for consistency
-              originalExecutionMode = metadata.executionMode.replace('_', '-');
+        if (!currentEntry?.originalExecutionMode) {
+          // Get the latest reasoning trace to extract execution mode
+          const latestTrace = await tx.reasoningTrace.findFirst({
+            where: { entryId },
+            orderBy: { createdAt: 'desc' },
+            select: { metadata: true },
+          });
+
+          if (latestTrace) {
+            try {
+              const metadata = JSON.parse(latestTrace.metadata);
+              // Only set if executionMode exists in metadata
+              // Do not fabricate default value - leave as undefined if missing
+              if (metadata.executionMode) {
+                // Convert snake_case to kebab-case for consistency
+                originalExecutionMode = metadata.executionMode.replace('_', '-');
+              }
+            } catch {
+              // Ignore parsing errors - leave originalExecutionMode as undefined
             }
-          } catch {
-            // Ignore parsing errors - leave originalExecutionMode as undefined
           }
         }
 
@@ -371,7 +380,8 @@ export const processEntry = inngest.createFunction(
             coreSummary: decision.coreSummary,
             keyPoints: decision.keyPoints,
             practiceValue: decision.practiceValue,
-            originalExecutionMode, // Save original execution mode
+            // Only update originalExecutionMode if it was just derived (not already set)
+            ...(originalExecutionMode ? { originalExecutionMode } : {}),
             ...(dynamicSummaryEnabled
               ? {
                   keyPointsNew: validatedKeyPointsNew as unknown as Prisma.InputJsonValue,
