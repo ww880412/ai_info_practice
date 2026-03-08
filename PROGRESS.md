@@ -2,12 +2,13 @@
 
 > 里程碑级状态索引。会话级交接细节记录在 `PROGRESS.log`。
 
-## 📍 当前状态（2026-03-07）
+## 📍 当前状态（2026-03-08）
 
 ### 最近完成
 - ✅ CRS Provider SSE 流式响应支持（修复集成问题）
-- ⚠️ Agent 模式对比功能（后端完成，前端未实施）
+- ⚠️ Agent 模式对比功能（后端 Codex Round 5 评审中，前端未实施）
   - ✅ Prisma Schema + API Routes + Inngest 任务
+  - ✅ Codex Round 5 P1 修复（originalExecutionMode 不可变基线）
   - ❌ 前端 UI（Library 批量选择、对比结果页面）
 - ✅ Phase 3a: 结果评分 Agent（经 3 轮 Codex 评审，9/10 分）
 
