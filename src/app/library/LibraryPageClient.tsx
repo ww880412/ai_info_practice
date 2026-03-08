@@ -9,6 +9,7 @@ import { getGroupImportState } from "@/lib/library/group-import";
 import { flattenGroupOptions } from "@/lib/library/group-options";
 import { EntryCard } from "@/components/library/EntryCard";
 import { EntryFilters } from "@/components/library/EntryFilters";
+import { CompareModesDialog } from "@/components/library/CompareModesDialog";
 import GroupSidebar from "@/components/library/GroupSidebar";
 import { TagSidebar } from "@/components/library/TagSidebar";
 import { IngestDialog } from "@/components/ingest/IngestDialog";
@@ -101,6 +102,8 @@ export default function LibraryPage() {
   const [targetGroupId, setTargetGroupId] = useState<string>("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [isCompareDialogOpen, setIsCompareDialogOpen] = useState(false);
 
   const selectedGroupId = searchParams.get("groupId");
 
@@ -201,6 +204,25 @@ export default function LibraryPage() {
     });
   };
 
+  const clearSelection = () => {
+    setSelectedIds([]);
+  };
+
+  const exitSelectionMode = () => {
+    setIsSelectionMode(false);
+    setIsCompareDialogOpen(false);
+    setSelectedIds([]);
+    setTargetGroupId("");
+  };
+
+  const toggleSelectionMode = () => {
+    if (isSelectionMode) {
+      exitSelectionMode();
+      return;
+    }
+    setIsSelectionMode(true);
+  };
+
   const handleBatchDelete = () => {
     if (selectedCount === 0 || batchDeleteEntries.isPending) return;
     setShowDeleteConfirm(true);
@@ -226,6 +248,12 @@ export default function LibraryPage() {
         },
       }
     );
+  };
+
+  const handleCompareSuccess = () => {
+    setSelectedIds([]);
+    setTargetGroupId("");
+    setIsSelectionMode(false);
   };
 
   const handleAiTagsChange = (tags: string[]) => {
@@ -277,13 +305,27 @@ export default function LibraryPage() {
           <h1 className="text-2xl font-bold">Knowledge Base</h1>
           <p className="text-sm text-secondary mt-1">{total} entries collected</p>
         </div>
-        <button
-          onClick={() => setIngestOpen(true)}
-          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary-hover transition-colors"
-        >
-          <Plus size={16} />
-          Add
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleSelectionMode}
+            disabled={entries.length === 0 && !isSelectionMode}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+              isSelectionMode
+                ? "border-primary bg-primary text-white hover:bg-primary-hover"
+                : "border-border bg-background text-foreground hover:bg-accent"
+            }`}
+          >
+            {isSelectionMode ? "退出选择" : "批量选择"}
+          </button>
+          <button
+            onClick={() => setIngestOpen(true)}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:bg-primary-hover transition-colors"
+          >
+            <Plus size={16} />
+            Add
+          </button>
+        </div>
       </div>
 
       <div className="rounded-xl border border-border bg-card p-3 sm:p-4 space-y-3">
@@ -528,21 +570,29 @@ export default function LibraryPage() {
         </aside>
 
         <section className="space-y-4 min-w-0">
-          {entries.length > 0 && (
+          {isSelectionMode && entries.length > 0 && (
             <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
-              <label className="inline-flex items-center gap-2 text-sm text-secondary">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
-                  disabled={batchDeleteEntries.isPending}
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                />
-                Select all on this page
-              </label>
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-sm text-secondary">已选择 {selectedCount} 个条目</span>
+                <button
+                  type="button"
+                  onClick={() => toggleSelectAllOnPage(true)}
+                  disabled={allSelected || entryIds.length === 0}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-secondary transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  全选
+                </button>
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  disabled={selectedCount === 0}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-secondary transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  清空
+                </button>
+              </div>
 
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-secondary">{selectedCount} selected</span>
+              <div className="flex flex-wrap items-center gap-3">
                 <select
                   value={targetGroupId}
                   onChange={(e) => setTargetGroupId(e.target.value)}
@@ -565,12 +615,28 @@ export default function LibraryPage() {
                   {addEntriesToGroup.isPending ? "Importing..." : "Import to selected group"}
                 </button>
                 <button
+                  type="button"
+                  onClick={() => setIsCompareDialogOpen(true)}
+                  disabled={selectedCount === 0 || batchDeleteEntries.isPending}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  模式对比 ({selectedCount})
+                </button>
+                <button
                   onClick={handleBatchDelete}
                   disabled={selectedCount === 0 || batchDeleteEntries.isPending}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-950/20"
                 >
                   <Trash2 size={14} />
                   {batchDeleteEntries.isPending ? "Deleting..." : "Delete selected"}
+                </button>
+                <button
+                  type="button"
+                  onClick={exitSelectionMode}
+                  disabled={batchDeleteEntries.isPending || addEntriesToGroup.isPending}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  退出选择
                 </button>
               </div>
             </div>
@@ -614,7 +680,7 @@ export default function LibraryPage() {
                   key={entry.id}
                   entry={entry}
                   onClick={(id) => router.push(`/entry/${id}`)}
-                  showSelection
+                  showSelection={isSelectionMode}
                   selected={selectedIdsOnPage.includes(entry.id)}
                   onSelectChange={toggleSelectEntry}
                 />
@@ -653,6 +719,13 @@ export default function LibraryPage() {
       </div>
 
       <IngestDialog open={ingestOpen} onClose={() => setIngestOpen(false)} />
+
+      <CompareModesDialog
+        open={isCompareDialogOpen}
+        onOpenChange={setIsCompareDialogOpen}
+        selectedEntryIds={selectedIdsOnPage}
+        onSuccess={handleCompareSuccess}
+      />
 
       <ConfirmDialog
         isOpen={showDeleteConfirm}

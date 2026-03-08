@@ -93,16 +93,30 @@ export function EntryCard({
     entry.processStatus === "PENDING" ||
     entry.processStatus === "PARSING" ||
     entry.processStatus === "AI_PROCESSING";
+  const handleCardClick = () => {
+    if (showSelection) {
+      onSelectChange?.(entry.id, !selected);
+      return;
+    }
+    onClick(entry.id);
+  };
 
   return (
     <div
-      onClick={() => onClick(entry.id)}
-      className={`bg-card border rounded-lg p-4 hover:border-primary/50 hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-200 ${
+      onClick={handleCardClick}
+      data-testid="entry-card"
+      className={`bg-card border rounded-lg p-4 cursor-pointer transition-all duration-200 ${
         entry.knowledgeStatus === "TO_REVIEW"
           ? "border-yellow-300 dark:border-yellow-700"
           : entry.knowledgeStatus === "DEPRECATED"
             ? "border-red-300 dark:border-red-700"
             : "border-border"
+      } ${
+        showSelection
+          ? selected
+            ? "bg-primary/5 ring-2 ring-primary/30"
+            : "hover:bg-accent/40"
+          : "hover:border-primary/50 hover:shadow-md hover:scale-[1.02]"
       }`}
     >
       {/* Header */}
