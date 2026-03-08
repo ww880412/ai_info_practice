@@ -374,6 +374,14 @@ export function DynamicSummary({
 
     const events = Array.isArray(record.events)
       ? record.events.map((e, index) => {
+          if (typeof e === 'string') {
+            return {
+              marker: `Event ${index + 1}`,
+              markerVariant: 'date' as const,
+              description: e,
+            };
+          }
+
           const event = toObject(e);
           if (!event) return null;
 
@@ -422,10 +430,34 @@ export function DynamicSummary({
         }).filter((e): e is NonNullable<typeof e> => e !== null)
       : [];
 
-    if (events.length === 0) return null;
+    const stageEvents = toStringArray(record.stages).map((stage, index) => ({
+      marker: `Stage ${index + 1}`,
+      markerVariant: 'stage' as const,
+      description: stage,
+    }));
+
+    const mergedEvents = [...stageEvents, ...events];
+
+    const insight = toString(record.insight) || toString(record.finalInsight) || undefined;
+
+    if (
+      mergedEvents.length === 0
+      && !toString(record.background)
+      && !toString(record.decisionLogic)
+      && !toString(record.outcome)
+      && !insight
+      && !toString(record.currentStatus)
+      && !toString(record.futureOutlook)
+    ) {
+      return null;
+    }
 
     return {
-      events,
+      events: mergedEvents,
+      background: toString(record.background) || undefined,
+      decisionLogic: toString(record.decisionLogic) || undefined,
+      outcome: toString(record.outcome) || undefined,
+      insight,
       currentStatus: toString(record.currentStatus) || undefined,
       futureOutlook: toString(record.futureOutlook) || undefined,
     };

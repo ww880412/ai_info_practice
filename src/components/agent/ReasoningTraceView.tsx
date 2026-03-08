@@ -11,8 +11,28 @@ interface ReasoningStep {
   reasoning: string;
 }
 
+interface TraceMetadata {
+  executionIntent?: 'tool_calling' | 'two_step';
+  executionMode?: 'tool_calling' | 'two_step';
+  twoStepReason?: 'tool_calling_disabled' | 'fallback_after_tool_error' | 'configured_two_step';
+  fallback?: {
+    triggered?: boolean;
+    fromMode?: 'tool_calling';
+    reason?: 'tool_calling_error';
+    errorName?: string;
+    errorMessage?: string;
+  };
+  toolCallStats?: {
+    total?: number;
+    success?: number;
+    failed?: number;
+    byTool?: Record<string, unknown>;
+  };
+}
+
 interface ReasoningTraceViewProps {
   steps: ReasoningStep[];
+  metadata?: TraceMetadata | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -119,7 +139,13 @@ function ObservationView({ raw }: { raw: string }) {
   );
 }
 
-export function ReasoningTraceView({ steps }: ReasoningTraceViewProps) {
+function formatExecutionMode(value?: 'tool_calling' | 'two_step') {
+  if (value === 'tool_calling') return 'Tool Calling';
+  if (value === 'two_step') return 'Two Step';
+  return 'Unknown';
+}
+
+export function ReasoningTraceView({ steps, metadata }: ReasoningTraceViewProps) {
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
 
   if (!steps || steps.length === 0) {
@@ -132,6 +158,51 @@ export function ReasoningTraceView({ steps }: ReasoningTraceViewProps) {
 
   return (
     <div className="space-y-4">
+      {metadata && (
+        <div className="space-y-3">
+          <div className="grid gap-3 md:grid-cols-4">
+            <div className="rounded-lg border border-border bg-muted/30 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Intent</div>
+              <div className="mt-1 text-sm font-medium">{formatExecutionMode(metadata.executionIntent)}</div>
+            </div>
+            <div className="rounded-lg border border-border bg-muted/30 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Actual Mode</div>
+              <div className="mt-1 text-sm font-medium">{formatExecutionMode(metadata.executionMode)}</div>
+            </div>
+            <div className="rounded-lg border border-border bg-muted/30 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Fallback Reason</div>
+              <div className="mt-1 text-sm font-medium">{metadata.twoStepReason || 'none'}</div>
+            </div>
+            <div className="rounded-lg border border-border bg-muted/30 p-3">
+              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Tool Calls</div>
+              <div className="mt-1 text-sm font-medium">
+                {metadata.toolCallStats
+                  ? `${metadata.toolCallStats.total ?? 0} / ${metadata.toolCallStats.success ?? 0} / ${metadata.toolCallStats.failed ?? 0}`
+                  : '0 / 0 / 0'}
+              </div>
+            </div>
+          </div>
+
+          {metadata.fallback?.triggered && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900/50 dark:bg-amber-950/20">
+              <div className="font-medium text-amber-800 dark:text-amber-200">
+                Fallback triggered
+              </div>
+              {metadata.fallback.errorName && (
+                <div className="mt-1 text-amber-900 dark:text-amber-100">
+                  {metadata.fallback.errorName}
+                </div>
+              )}
+              {metadata.fallback.errorMessage && (
+                <div className="mt-1 text-amber-800/90 dark:text-amber-200/90">
+                  {metadata.fallback.errorMessage}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <h3 className="font-semibold text-lg">推理过程</h3>
 
       <div className="space-y-2">

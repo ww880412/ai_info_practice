@@ -21,10 +21,10 @@ import { isDynamicSummaryEnabled } from '@/config/flags';
 import { buildConfidenceScore } from '@/lib/ai/agent/confidence';
 import { isLegacyClassifierFallbackEnabled } from '@/lib/ai/fallback-policy';
 import {
-  SummaryStructureSchema,
   KeyPointsSchema,
   BoundariesSchema,
 } from '@/lib/ai/agent/schemas';
+import { normalizeSummaryStructureForPersistence } from '@/lib/ai/agent/summary-structure';
 import { downloadFromUrl } from '@/lib/storage';
 import type { Prisma, ProcessStatus, SourceType } from '@prisma/client';
 
@@ -328,11 +328,13 @@ export const processEntry = inngest.createFunction(
           : { applicable: [], notApplicable: [] }
         : { applicable: [], notApplicable: [] };
 
-      const validatedSummaryStructure = decision.summaryStructure
-        ? SummaryStructureSchema.safeParse(decision.summaryStructure).success
-          ? decision.summaryStructure
-          : { type: 'generic', fields: { summary: decision.coreSummary, keyPoints: decision.keyPoints } }
-        : { type: 'generic', fields: { summary: decision.coreSummary, keyPoints: decision.keyPoints } };
+      const validatedSummaryStructure = normalizeSummaryStructureForPersistence(
+        decision.summaryStructure,
+        {
+          coreSummary: decision.coreSummary,
+          keyPoints: decision.keyPoints,
+        }
+      );
 
       // Transaction to save all results
       await prisma.$transaction(async (tx) => {

@@ -124,16 +124,55 @@ const ComparisonMatrixSchema = z.object({
 });
 
 // Timeline Evolution schema
+const TimelineEvolutionStageEventSchema = z.object({
+  stage: z.string(),
+  version: z.string().optional(),
+  initialApproach: z.string().optional(),
+  problem: z.string().optional(),
+  iteration: z.string().optional(),
+  finalChoice: z.string().optional(),
+  result: z.string().optional(),
+}).refine((value) =>
+  Boolean(
+    value.initialApproach
+    || value.problem
+    || value.iteration
+    || value.finalChoice
+    || value.result
+  ), {
+  message: 'stage timeline event requires at least one detail field',
+});
+
+const TimelineEvolutionDateEventSchema = z.object({
+  date: z.string(),
+  version: z.string().optional(),
+  title: z.string(),
+  description: z.string(),
+  significance: z.enum(['major', 'minor', 'patch']).optional(),
+});
+
 const TimelineEvolutionSchema = z.object({
-  events: z.array(z.object({
-    date: z.string(),
-    version: z.string().optional(),
-    title: z.string(),
-    description: z.string(),
-    significance: z.enum(['major', 'minor', 'patch']).optional(),
-  })),
+  events: z.array(
+    z.union([
+      TimelineEvolutionStageEventSchema,
+      TimelineEvolutionDateEventSchema,
+      z.string(),
+    ])
+  ).optional(),
+  stages: z.array(z.string()).optional(),
+  background: z.string().optional(),
   currentStatus: z.string().optional(),
+  decisionLogic: z.string().optional(),
+  outcome: z.string().optional(),
+  insight: z.string().optional(),
+  finalInsight: z.string().optional(),
   futureOutlook: z.string().optional(),
+}).refine((value) => {
+  const eventCount = value.events?.length ?? 0;
+  const stageCount = value.stages?.length ?? 0;
+  return eventCount > 0 || stageCount > 0;
+}, {
+  message: 'timeline-evolution requires at least one event or stage',
 });
 
 // Map type to schema

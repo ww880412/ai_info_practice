@@ -438,6 +438,17 @@ ${content.slice(0, 30000)}`;
   };
 }
 
+export function createToolCallingTools(ctx: ToolExecutionContext) {
+  const allTools = createSDKTools(ctx);
+
+  return {
+    classify_content: allTools.classify_content,
+    extract_summary: allTools.extract_summary,
+    extract_code: allTools.extract_code,
+    extract_version: allTools.extract_version,
+  };
+}
+
 /**
  * SDK 工具集类型
  */

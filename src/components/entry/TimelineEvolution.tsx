@@ -18,6 +18,10 @@ interface TimelineEvent {
 
 interface TimelineEvolutionData {
   events: TimelineEvent[];
+  background?: string;
+  decisionLogic?: string;
+  outcome?: string;
+  insight?: string;
   currentStatus?: string;
   futureOutlook?: string;
 }
@@ -39,7 +43,14 @@ const significanceLabels = {
 };
 
 export function TimelineEvolution({ data }: TimelineEvolutionProps) {
-  const { events, currentStatus, futureOutlook } = data;
+  const { events, background, decisionLogic, outcome, insight, currentStatus, futureOutlook } = data;
+
+  const contextCards = [
+    background ? { label: 'Background', value: background, className: 'bg-slate-50 border-slate-200 dark:bg-slate-900/20 dark:border-slate-800' } : null,
+    decisionLogic ? { label: 'Decision Logic', value: decisionLogic, className: 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800' } : null,
+    outcome ? { label: 'Outcome', value: outcome, className: 'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800' } : null,
+    insight ? { label: 'Insight', value: insight, className: 'bg-indigo-50 border-indigo-200 dark:bg-indigo-900/20 dark:border-indigo-800' } : null,
+  ].filter((card): card is NonNullable<typeof card> => card !== null);
 
   return (
     <div className="space-y-4">
@@ -112,6 +123,22 @@ export function TimelineEvolution({ data }: TimelineEvolutionProps) {
           ))}
         </div>
       </div>
+
+      {contextCards.length > 0 && (
+        <div className="grid gap-3 md:grid-cols-2">
+          {contextCards.map((card) => (
+            <div
+              key={card.label}
+              className={`rounded-lg border px-4 py-3 ${card.className}`}
+            >
+              <div className="text-xs font-medium uppercase tracking-wide text-secondary">
+                {card.label}
+              </div>
+              <p className="mt-1 text-sm text-foreground">{card.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Current Status */}
       {currentStatus && (

@@ -6,8 +6,8 @@ import { getModel } from '../client';
 import { prisma } from "../../prisma";
 import { stringifyObservation } from "../../trace/observation";
 import { normalizeAgentIngestDecision, type NormalizedAgentIngestDecision } from './ingest-contract';
-import { createSDKTools, createToolExecutionContext } from './sdk-tools';
-import { DecisionSchema } from './decision-schema';
+import { createToolCallingTools, createToolExecutionContext } from './sdk-tools';
+import { ToolCallingDecisionSchema } from './decision-schema';
 import { getContentDepth, getFieldsGuidance } from './content-depth';
 
 interface ParsedAction {
@@ -367,7 +367,7 @@ export class ReActAgent implements IAgentEngine {
 
     // 创建工具执行上下文，传入运行时配置
     const ctx = createToolExecutionContext(entryId, input, this.config);
-    const tools = createSDKTools(ctx);
+    const tools = createToolCallingTools(ctx);
 
     const systemPrompt = `你是知识管理助手。分析输入内容并生成结构化决策。
 
@@ -376,11 +376,30 @@ export class ReActAgent implements IAgentEngine {
 - extract_summary: 提取详细摘要
 - extract_code: 提取代码片段（适用于教程）
 - extract_version: 提取版本信息（适用于工具推荐）
-- check_duplicate: 检查重复内容
-- route_to_strategy: 选择处理策略
 
 请先调用 classify_content 分析内容类型，然后根据类型调用相应工具。
-最后输出符合 schema 的决策结果。`;
+最后输出符合 schema 的决策结果。
+
+最终输出必须是“扁平的顶层对象”，不要返回额外包装层。
+
+禁止返回这类结构：
+- { "decision": {...}, "summary": {...}, "tags": [...] }
+- { "result": {...} }
+- { "analysis": {...} }
+
+必须直接输出这些顶层字段（缺失时也尽量补全，而不是包进子对象）：
+- contentType
+- techDomain
+- aiTags
+- coreSummary
+- keyPoints
+- summaryStructure
+- boundaries
+- practiceValue
+- practiceReason
+- practiceTask
+
+如果工具结果里已经有上述信息，请直接合并成最终顶层对象，不要重复包装。`;
 
     const userPrompt = `分析以下内容：
 
@@ -400,7 +419,7 @@ ${buildSemanticSnapshot(input.content, STEP2_INPUT_LIMIT)}`;
         toolChoice: 'auto',
         stopWhen: stepCountIs(this.config.maxIterations),
         output: Output.object({
-          schema: DecisionSchema,
+          schema: ToolCallingDecisionSchema,
         }),
       });
 

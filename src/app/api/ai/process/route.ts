@@ -22,10 +22,10 @@ import {
 import type { ParseResult } from "@/lib/parser";
 import type { Prisma, ProcessStatus } from "@prisma/client";
 import {
-  SummaryStructureSchema,
   KeyPointsSchema,
   BoundariesSchema,
 } from "@/lib/ai/agent/schemas";
+import { normalizeSummaryStructureForPersistence } from "@/lib/ai/agent/summary-structure";
 
 function shouldAllowLegacyClassifierFallback(): boolean {
   return isLegacyClassifierFallbackEnabled(process.env.ALLOW_CLASSIFIER_FALLBACK);
@@ -269,11 +269,13 @@ export async function POST(request: NextRequest) {
         : { applicable: [], notApplicable: [] }
       : { applicable: [], notApplicable: [] };
 
-    const validatedSummaryStructure = decision.summaryStructure
-      ? SummaryStructureSchema.safeParse(decision.summaryStructure).success
-        ? decision.summaryStructure
-        : { type: "generic", fields: { summary: decision.coreSummary, keyPoints: decision.keyPoints } }
-      : { type: "generic", fields: { summary: decision.coreSummary, keyPoints: decision.keyPoints } };
+    const validatedSummaryStructure = normalizeSummaryStructureForPersistence(
+      decision.summaryStructure,
+      {
+        coreSummary: decision.coreSummary,
+        keyPoints: decision.keyPoints,
+      }
+    );
 
     await prisma.entry.update({
       where: { id: targetEntryId },

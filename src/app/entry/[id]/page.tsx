@@ -571,7 +571,7 @@ export default function EntryDetailPage() {
               )}
 
               {traceData?.steps && traceData.steps.length > 0 ? (
-                <ReasoningTraceView steps={traceData.steps} />
+                <ReasoningTraceView steps={traceData.steps} metadata={traceData.metadata} />
               ) : (
                 !traceLoading && (
                   <p className="text-xs text-secondary">

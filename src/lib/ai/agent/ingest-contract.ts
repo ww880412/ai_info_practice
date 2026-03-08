@@ -8,6 +8,7 @@ import type {
   TrustLevel,
 } from "@prisma/client";
 import type { ExtractedMetadata } from "./schemas";
+import { normalizeSummaryStructureForPersistence } from "./summary-structure";
 
 export interface NormalizedPracticeStep {
   order: number;
@@ -764,37 +765,15 @@ function enforceKeyPointDensity(params: {
   };
 }
 
-function buildFallbackSummaryFields(coreSummary: string, keyPoints: string[]): Record<string, unknown> {
-  return {
-    summary: coreSummary,
-    keyPoints,
-  };
-}
-
 function normalizeSummaryStructure(
   value: unknown,
   coreSummary: string,
   keyPoints: string[]
 ): NormalizedSummaryStructure {
-  const fallbackFields = buildFallbackSummaryFields(coreSummary, keyPoints);
-  const record = toObject(value);
-
-  if (!record) {
-    return {
-      type: "generic",
-      fields: fallbackFields,
-    };
-  }
-
-  const type = normalizeSummaryStructureType(record.type) ?? "generic";
-  const fields = toObject(record.fields) ?? fallbackFields;
-  const reasoning = toStringValue(record.reasoning) || undefined;
-
-  return {
-    type,
-    fields,
-    reasoning,
-  };
+  return normalizeSummaryStructureForPersistence(value, {
+    coreSummary,
+    keyPoints,
+  });
 }
 
 export function normalizeAgentIngestDecision(
