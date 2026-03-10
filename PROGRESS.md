@@ -32,6 +32,7 @@
 
 ### 活跃分支
 - `main`（主线，最新部署）
+- `codex/task4-client-integration`（Settings Task 4，待 Task 1 完成后合并）
 
 ### 重构脉络总览
 
@@ -61,11 +62,21 @@
 |-------|------|------|
 | CRS Provider | CRS API 集成（SSE 流式响应）| ✅ 已完成 |
 
+### 进行中
+1. **Settings 多 Provider 凭证管理**（Phase 3，进行中）
+   - ✅ Task 4: AI Client Integration（2026-03-11，codex/task4-client-integration）
+     - isActive 检查已添加到 resolveCredential
+     - getDefaultCredential 辅助函数（支持 gemini/crs/openai-compatible）
+     - 12 个单元测试全部通过
+     - 注：依赖 Task 1 数据库迁移完成
+   - ⏳ Task 1: Database Schema Extension（待执行）
+   - ⏳ Task 2: SSRF Protection Module（待执行）
+   - ⏳ Task 3: API Routes（待执行）
+   - ⏳ Task 5: Frontend Components（待执行）
+   - ⏳ Task 6: Seeding & Migration（待执行）
+   - ⏳ Task 7: Testing & Documentation（待执行）
+
 ### 当前待办
-1. **Settings 多 Provider 凭证管理**（Phase 3，已规划）
-   - 支持多个 Provider（Gemini, CRS, 未来扩展）
-   - 安全的凭证存储（DB 加密）
-   - 与 .env 配置打通
 2. **Entry 详情页对比历史 Tab**（Phase 2，待规划）
    - 从 Entry 视角查看对比历史
    - 显示对比时间、模式、得分

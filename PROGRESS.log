@@ -423,3 +423,39 @@ e5f7726 feat(hooks): add useComparisonBatch hook with TanStack Query
 
 **Next Steps**: Task 2 - SSRF Protection Module
 
+
+## 2026-03-11 07:46 - Task 4: AI Client Integration 完成
+
+### 执行内容
+- 创建分支 `codex/task4-client-integration`
+- 更新 `src/lib/ai/client.ts`:
+  - resolveCredential 函数添加 isActive 检查
+  - 检查条件：!credential || !credential.isValid || !credential.isActive
+- 创建 `src/lib/ai/get-default-credential.ts`:
+  - getDefaultCredential 函数实现
+  - 支持 gemini, crs, openai-compatible 三种 provider
+  - 确定性排序：isDefault desc, createdAt asc
+  - 环境变量 fallback 逻辑
+- 创建 `src/lib/ai/__tests__/get-default-credential.test.ts`:
+  - 12 个单元测试，全部通过
+  - 覆盖三种 provider 的默认凭证查询和 fallback
+  - 测试确定性排序和过滤逻辑
+- 提交 commit: 3e03504
+
+### 测试结果
+```
+✓ src/lib/ai/__tests__/get-default-credential.test.ts (12 tests) 3ms
+  Test Files  1 passed (1)
+       Tests  12 passed (12)
+```
+
+### 依赖关系
+- Task 4 依赖 Task 1（数据库 schema）完成
+- isActive 和 isDefault 字段需要先在 Prisma schema 中添加
+- 当前 TypeScript 编译有错误（预期，等待 Task 1）
+
+### 下一步
+- 执行 Task 1: Database Schema Extension
+- 完成后重新验证 Task 4 的类型检查
+- 按顺序执行 Task 2-7
+
