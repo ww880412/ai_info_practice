@@ -57,18 +57,29 @@ export async function generateJSON<T>(
     const model = getModel();
 
     if (schema) {
-      const { object } = await generateObject({
-        model,
-        schema,
-        prompt,
-      });
-      return object;
+      try {
+        const { object } = await generateObject({
+          model,
+          schema,
+          prompt,
+        });
+        return object;
+      } catch (error) {
+        // If generateObject fails due to JSON parsing, try text generation fallback
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('JSON parsing failed') || errorMessage.includes('could not parse')) {
+          console.warn('[generateJSON] generateObject failed, falling back to text generation:', errorMessage);
+          // Fall through to text generation fallback
+        } else {
+          throw error;
+        }
+      }
     }
 
     // Fallback: use text generation with JSON mode
     const { text } = await aiGenerateText({
       model,
-      prompt: `${prompt}\n\nRespond with valid JSON only, no markdown or explanations.`,
+      prompt: `${prompt}\n\n**CRITICAL**: Respond with ONLY a valid JSON object. Do NOT wrap it in markdown code blocks (\`\`\`json). Do NOT add any explanations before or after the JSON.`,
     });
 
     // Clean potential markdown code blocks
@@ -77,7 +88,14 @@ export async function generateJSON<T>(
       jsonText = jsonText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
     }
 
-    return JSON.parse(jsonText) as T;
+    const parsed = JSON.parse(jsonText);
+
+    // If schema is provided, validate the parsed result
+    if (schema) {
+      return schema.parse(parsed);
+    }
+
+    return parsed as T;
   });
 }
 

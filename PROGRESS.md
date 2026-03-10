@@ -46,9 +46,13 @@
 | CRS Provider | CRS API 集成（SSE 流式响应）| ✅ 已完成 |
 
 ### 当前待办
-1. **trace-summary 修复**: 修复 entry 详情页 tool-calling 结果不可见（已规划）
-2. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
-3. **Prompt Learning 流水线**: 将 Phase 2c 效果验证改造为自动化流水线（待规划）
+1. **mode-comparison 评分优化**: 修复 CRS Provider 评分 schema 验证问题（已完成调试，待优化）
+   - 问题：CRS 返回的 JSON 被 markdown 包裹，且 issues/suggestions 数组超限
+   - 临时方案：放宽 schema 限制（20个），使用 generateText + 手动清理
+   - 优化方向：改进 prompt 或切换评分模型
+2. **trace-summary 修复**: 修复 entry 详情页 tool-calling 结果不可见（已规划）
+3. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
+4. **Prompt Learning 流水线**: 将 Phase 2c 效果验证改造为自动化流水线（待规划）
 
 ### 已知问题
 - CRS Provider 不支持结构化输出，tool-calling 模式已自动禁用

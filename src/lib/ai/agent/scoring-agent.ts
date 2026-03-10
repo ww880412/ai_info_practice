@@ -12,9 +12,9 @@ export const QualityEvaluationSchema = z.object({
     clarity: z.number().min(0).max(100),
     actionability: z.number().min(0).max(100).nullable(),
   }),
-  issues: z.array(z.string()).max(10),
-  suggestions: z.array(z.string()).max(5),
-  reasoning: z.string().min(200).max(500),
+  issues: z.array(z.string()).max(20),
+  suggestions: z.array(z.string()).max(20),
+  reasoning: z.string().min(100).max(2000),
 });
 
 export type QualityEvaluation = z.infer<typeof QualityEvaluationSchema>;
@@ -42,11 +42,31 @@ export async function evaluateDecisionQuality(
   // Build scoring prompt
   const prompt = buildScoringPrompt(decision, originalContent);
 
-  // Call AI to generate evaluation
-  const result = await generateJSON<QualityEvaluation>(
-    prompt,
-    QualityEvaluationSchema
-  );
+  // Use text generation instead of generateJSON to avoid CRS markdown wrapping issues
+  const { generateText } = await import('@/lib/ai/generate');
+  const text = await generateText(prompt);
+
+  // Clean potential markdown code blocks (more aggressive)
+  let jsonText = text.trim();
+
+  // Remove markdown code blocks
+  if (jsonText.startsWith('```')) {
+    jsonText = jsonText.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?\s*```\s*$/, '');
+  }
+
+  // Remove any leading/trailing whitespace again
+  jsonText = jsonText.trim();
+
+  // Parse and validate
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch (error) {
+    console.error('[evaluateDecisionQuality] JSON parse failed. Text:', jsonText.substring(0, 200));
+    throw new Error(`Failed to parse AI response as JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  const result = QualityEvaluationSchema.parse(parsed);
 
   return result;
 }
@@ -156,9 +176,11 @@ ${isPracticeActionable ? `
 **评分原则**：
 - 严格对照原文，不要过于宽容
 - issues 和 suggestions 要具体，指出字段名和问题位置
-- reasoning 要简洁，200-500 字
+- reasoning 要简洁，100-1000 字，重点说明总体评价和主要问题
 - 总分计算：${isPracticeActionable
     ? 'completeness * 0.25 + accuracy * 0.25 + relevance * 0.2 + clarity * 0.15 + actionability * 0.15'
     : 'completeness * 0.3 + accuracy * 0.3 + relevance * 0.25 + clarity * 0.15'
-  }`;
+  }
+
+**重要**：请直接返回 JSON 对象，不要使用 markdown 代码块包裹。`;
 }
