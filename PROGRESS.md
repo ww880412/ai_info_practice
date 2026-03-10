@@ -54,7 +54,7 @@
 | CRS Provider | CRS API 集成（SSE 流式响应）| ✅ 已完成 |
 
 ### 当前待办
-1. **创建测试数据**: 运行 mode-comparison 批次，验证前端增强功能
+1. **Task 7 测试修复**: 修复 13 个失败的单元测试和 55 个 lint 错误（详见 TEST_REPORT.md）
 2. **trace-summary 修复**: 修复 entry 详情页 tool-calling 结果不可见（已规划）
 3. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
 
@@ -90,16 +90,24 @@
 
 ## 📊 测试覆盖
 
-| 模块 | 测试数 |
-|------|--------|
-| parser | 8 |
-| ai/agent | 18 |
-| gemini | 5 |
-| ingest | 7 |
-| entries | 2 |
-| sanitize | 10 |
-| deduplication | 7 |
-| **总计** | **57** |
+| 模块 | 测试数 | 状态 |
+|------|--------|------|
+| parser | 8 | ✅ 通过 |
+| ai/agent | 18 | ⚠️ 4 个失败 |
+| gemini | 5 | ✅ 通过 |
+| ingest | 7 | ✅ 通过 |
+| entries | 2 | ✅ 通过 |
+| sanitize | 10 | ✅ 通过 |
+| deduplication | 7 | ✅ 通过 |
+| comparison | 22 | ⚠️ 9 个失败 |
+| **总计** | **171** | **158 通过, 13 失败** |
+
+**最近测试**: 2026-03-10
+- ✅ Type Check: 通过
+- ❌ Lint: 55 errors, 16 warnings
+- ⚠️ Unit Tests: 92.4% 通过率 (158/171)
+
+详细报告: [TEST_REPORT.md](./TEST_REPORT.md)
 
 ---
 
