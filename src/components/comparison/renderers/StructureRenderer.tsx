@@ -14,7 +14,6 @@ interface StructureRendererProps {
  *
  * Routing logic:
  * - timeline-evolution → TwoStepTimelineRenderer
- * - narrative → ToolingTimelineRenderer
  * - other → GenericStructureRenderer
  *
  * Null-safe handling for all cases
@@ -25,8 +24,6 @@ export function StructureRenderer({ decision }: StructureRendererProps) {
   switch (type) {
     case 'timeline-evolution':
       return <TwoStepTimelineRenderer fields={fields} />;
-    case 'narrative':
-      return <ToolingTimelineRenderer fields={fields} />;
     default:
       return <GenericStructureRenderer fields={fields} />;
   }

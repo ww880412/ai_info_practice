@@ -10,6 +10,7 @@ import { useComparisonBatch, type ModeComparisonResult } from "@/hooks/useCompar
 import { normalizeDecision } from "@/lib/comparison/normalize";
 import { ClassificationCard } from "@/components/comparison/dimensions/ClassificationCard";
 import { SummaryCard } from "@/components/comparison/dimensions/SummaryCard";
+import { StructureCard } from "@/components/comparison/dimensions/StructureCard";
 import { KeyPointsCard } from "@/components/comparison/dimensions/KeyPointsCard";
 import { BoundariesCard } from "@/components/comparison/dimensions/BoundariesCard";
 import { MetadataCard } from "@/components/comparison/dimensions/MetadataCard";
@@ -223,6 +224,13 @@ export default function ComparisonDetailPage() {
           <SummaryCard
             original={normalizedOriginal}
             comparison={normalizedComparison}
+            originalMode={result.originalMode}
+            comparisonMode={result.comparisonMode}
+          />
+
+          <StructureCard
+            originalDecision={normalizedOriginal}
+            comparisonDecision={normalizedComparison}
             originalMode={result.originalMode}
             comparisonMode={result.comparisonMode}
           />
