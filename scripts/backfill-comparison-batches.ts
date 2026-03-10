@@ -4,7 +4,12 @@ const prisma = new PrismaClient();
 
 async function backfill() {
   const batches = await prisma.comparisonBatch.findMany({
-    where: { sourceMode: null },
+    where: {
+      OR: [
+        { sourceMode: null },
+        { targetMode: null }
+      ]
+    },
   });
 
   console.log(`Found ${batches.length} batches to backfill`);

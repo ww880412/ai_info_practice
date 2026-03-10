@@ -21,7 +21,7 @@ export async function GET(
 
     // If completed, fetch results
     let results = null;
-    if (batch.status === 'completed') {
+    if (batch.status === 'COMPLETED') {
       results = await prisma.modeComparison.findMany({
         where: { batchId },
         include: {
