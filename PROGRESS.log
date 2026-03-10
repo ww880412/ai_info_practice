@@ -394,3 +394,32 @@ e5f7726 feat(hooks): add useComparisonBatch hook with TanStack Query
 - 提交数: 1 个（Task 12 完成）
 - 文件变更: 3 个文件（新增 1 个用户指南，更新 PROGRESS.md，优化 sdk-tools.ts）
 
+
+## 2026-03-11 - Task 1: Database Schema Extension Completed
+
+**Branch**: codex/settings-schema-extension
+**Commit**: ac44a31
+
+**Changes Made**:
+- Extended ApiCredential model with 5 new fields:
+  - name (String?) - Human-readable credential name
+  - isDefault (Boolean, default false) - Default credential per provider
+  - isActive (Boolean, default true) - Soft delete flag
+  - validationError (String?) - Last validation error message
+  - config (Json?) - Provider-specific configuration
+  
+- Added 3 new indexes:
+  - @@unique([provider, name, isActive]) - Prevent duplicate names per provider
+  - @@index([provider, isActive, isDefault]) - Fast default lookup
+  - @@index([provider, isDefault, createdAt]) - Ordered credential listing
+
+- Updated provider comment to include 'crs' provider
+
+**Verification**:
+- Schema pushed to database successfully
+- Prisma client regenerated
+- New fields accessible in Prisma client
+- No breaking changes to existing schema
+
+**Next Steps**: Task 2 - SSRF Protection Module
+
