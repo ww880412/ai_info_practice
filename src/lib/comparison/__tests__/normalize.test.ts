@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeDecision, getEmptyDecision } from '../normalize';
 import type { NormalizedAgentIngestDecision } from '@/lib/ai/agent/ingest-contract';
+import { ContentType, TechDomain } from '@prisma/client';
 
 describe('normalizeDecision', () => {
   it('should handle null input', () => {
@@ -19,8 +20,8 @@ describe('normalizeDecision', () => {
 
   it('should normalize complete decision data', () => {
     const input: Partial<NormalizedAgentIngestDecision> = {
-      contentType: 'tutorial',
-      techDomain: 'frontend',
+      contentType: ContentType.TUTORIAL,
+      techDomain: TechDomain.AGENT,
       aiTags: ['react', 'typescript'],
       confidence: 0.95,
       coreSummary: 'A comprehensive React tutorial',
@@ -36,16 +37,16 @@ describe('normalizeDecision', () => {
         applicable: ['Web development'],
         notApplicable: ['Mobile development'],
       },
-      difficulty: 'intermediate',
-      sourceTrust: 'high',
-      timeliness: 'current',
-      contentForm: 'tutorial',
+      difficulty: 'MEDIUM',
+      sourceTrust: 'HIGH',
+      timeliness: 'RECENT',
+      contentForm: 'TEXTUAL',
     };
 
     const result = normalizeDecision(input);
 
-    expect(result.contentType).toBe('tutorial');
-    expect(result.techDomain).toBe('frontend');
+    expect(result.contentType).toBe(ContentType.TUTORIAL);
+    expect(result.techDomain).toBe(TechDomain.AGENT);
     expect(result.aiTags).toEqual(['react', 'typescript']);
     expect(result.confidence).toBe(0.95);
     expect(result.coreSummary).toBe('A comprehensive React tutorial');
@@ -53,12 +54,12 @@ describe('normalizeDecision', () => {
     expect(result.keyPoints.extended).toEqual(['Extended point 1']);
     expect(result.summaryStructure.type).toBe('timeline-evolution');
     expect(result.boundaries.applicable).toEqual(['Web development']);
-    expect(result.metadata.difficulty).toBe('intermediate');
+    expect(result.metadata.difficulty).toBe('MEDIUM');
   });
 
   it('should fallback to legacy keyPoints when keyPointsNew is missing', () => {
     const input: Partial<NormalizedAgentIngestDecision> = {
-      contentType: 'article',
+      contentType: ContentType.OPINION,
       keyPoints: ['Point 1', 'Point 2', 'Point 3'],
     };
 
@@ -70,7 +71,7 @@ describe('normalizeDecision', () => {
 
   it('should prefer keyPointsNew over legacy keyPoints', () => {
     const input: Partial<NormalizedAgentIngestDecision> = {
-      contentType: 'article',
+      contentType: ContentType.OPINION,
       keyPoints: ['Legacy point 1', 'Legacy point 2'],
       keyPointsNew: {
         core: ['New core point'],
@@ -86,7 +87,7 @@ describe('normalizeDecision', () => {
 
   it('should handle partial keyPointsNew with missing fields', () => {
     const input: Partial<NormalizedAgentIngestDecision> = {
-      contentType: 'article',
+      contentType: ContentType.OPINION,
       keyPointsNew: {
         core: ['Core point'],
         extended: undefined as any,
@@ -101,12 +102,12 @@ describe('normalizeDecision', () => {
 
   it('should provide default values for missing fields', () => {
     const input: Partial<NormalizedAgentIngestDecision> = {
-      contentType: 'article',
+      contentType: ContentType.OPINION,
     };
 
     const result = normalizeDecision(input);
 
-    expect(result.contentType).toBe('article');
+    expect(result.contentType).toBe(ContentType.OPINION);
     expect(result.techDomain).toBe('未知');
     expect(result.aiTags).toEqual([]);
     expect(result.confidence).toBeNull();
@@ -122,7 +123,7 @@ describe('normalizeDecision', () => {
 
   it('should handle empty summaryStructure', () => {
     const input: Partial<NormalizedAgentIngestDecision> = {
-      contentType: 'article',
+      contentType: ContentType.OPINION,
       summaryStructure: undefined,
     };
 
@@ -134,22 +135,22 @@ describe('normalizeDecision', () => {
 
   it('should handle partial summaryStructure', () => {
     const input: Partial<NormalizedAgentIngestDecision> = {
-      contentType: 'article',
+      contentType: ContentType.OPINION,
       summaryStructure: {
-        type: 'narrative',
+        type: 'generic',
         fields: undefined as any,
       },
     };
 
     const result = normalizeDecision(input);
 
-    expect(result.summaryStructure.type).toBe('narrative');
+    expect(result.summaryStructure.type).toBe('generic');
     expect(result.summaryStructure.fields).toEqual({});
   });
 
   it('should handle empty boundaries', () => {
     const input: Partial<NormalizedAgentIngestDecision> = {
-      contentType: 'article',
+      contentType: ContentType.OPINION,
       boundaries: undefined,
     };
 
@@ -161,7 +162,7 @@ describe('normalizeDecision', () => {
 
   it('should handle confidence as 0', () => {
     const input: Partial<NormalizedAgentIngestDecision> = {
-      contentType: 'article',
+      contentType: ContentType.OPINION,
       confidence: 0,
     };
 
@@ -172,7 +173,7 @@ describe('normalizeDecision', () => {
 
   it('should handle confidence as null', () => {
     const input: Partial<NormalizedAgentIngestDecision> = {
-      contentType: 'article',
+      contentType: ContentType.OPINION,
       confidence: null,
     };
 

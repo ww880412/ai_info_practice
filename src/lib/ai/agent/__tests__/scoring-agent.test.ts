@@ -3,9 +3,10 @@ import { evaluateDecisionQuality, QualityEvaluationSchema, type ScoringInput } f
 import type { NormalizedAgentIngestDecision } from '../ingest-contract';
 import * as generateModule from '@/lib/ai/generate';
 
-// Mock the generateJSON function
+// Mock the generate functions
 vi.mock('@/lib/ai/generate', () => ({
   generateJSON: vi.fn(),
+  generateText: vi.fn(),
 }));
 
 describe('scoring-agent', () => {
@@ -58,7 +59,7 @@ describe('scoring-agent', () => {
           clarity: 82,
           actionability: null,
         },
-        issues: Array(15).fill('Issue'), // Invalid: > 10
+        issues: Array(25).fill('Issue'), // Invalid: > 20
         suggestions: [],
         reasoning: 'Valid reasoning text. '.repeat(20),
       };
@@ -117,7 +118,7 @@ describe('scoring-agent', () => {
         reasoning: 'Overall quality is good. Completeness is high with all key fields present. Accuracy is verified against the original content. Relevance is strong with focused core summary. Clarity is acceptable with clear Chinese expression. This is a knowledge-type content so actionability is not evaluated.',
       };
 
-      vi.mocked(generateModule.generateJSON).mockResolvedValue(mockEvaluation);
+      vi.mocked(generateModule.generateText).mockResolvedValue(JSON.stringify(mockEvaluation));
 
       const input: ScoringInput = {
         decision: mockDecision,
@@ -199,7 +200,7 @@ describe('scoring-agent', () => {
         reasoning: 'Excellent quality for actionable content. Completeness is very high with all required fields including code examples. Accuracy is strong with correct classification and tags. Relevance is excellent with focused tutorial content. Clarity is good with clear step-by-step instructions. Actionability is solid with executable steps and code examples, though more detail would help.',
       };
 
-      vi.mocked(generateModule.generateJSON).mockResolvedValue(mockEvaluation);
+      vi.mocked(generateModule.generateText).mockResolvedValue(JSON.stringify(mockEvaluation));
 
       const input: ScoringInput = {
         decision: mockDecision,
@@ -272,7 +273,7 @@ describe('scoring-agent', () => {
         reasoning: 'Test evaluation with proper sanitization. The malicious content was properly escaped and did not affect the scoring process.',
       };
 
-      vi.mocked(generateModule.generateJSON).mockResolvedValue(mockEvaluation);
+      vi.mocked(generateModule.generateText).mockResolvedValue(JSON.stringify(mockEvaluation));
 
       const input: ScoringInput = {
         decision: maliciousDecision,
@@ -281,9 +282,9 @@ describe('scoring-agent', () => {
 
       const result = await evaluateDecisionQuality(input);
 
-      // Verify the prompt was called with generateJSON
-      expect(generateModule.generateJSON).toHaveBeenCalledTimes(1);
-      const callArgs = vi.mocked(generateModule.generateJSON).mock.calls[0];
+      // Verify the prompt was called with generateText
+      expect(generateModule.generateText).toHaveBeenCalledTimes(1);
+      const callArgs = vi.mocked(generateModule.generateText).mock.calls[0];
       const promptUsed = callArgs[0] as string;
 
       // Verify title and content are JSON-stringified (escaped)

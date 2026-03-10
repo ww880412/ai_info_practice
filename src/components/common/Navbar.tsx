@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { LayoutDashboard, BookOpen, Zap, Settings, Search } from "lucide-react";
+import { LayoutDashboard, BookOpen, Zap, Settings, Search, GitCompare } from "lucide-react";
 import { SearchDialog } from "./SearchDialog";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/library", label: "Knowledge Base", icon: BookOpen },
   { href: "/practice", label: "Practice", icon: Zap },
+  { href: "/comparison", label: "Comparison History", icon: GitCompare },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

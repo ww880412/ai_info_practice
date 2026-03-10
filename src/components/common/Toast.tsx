@@ -9,6 +9,10 @@ interface Toast {
   id: string;
   type: ToastType;
   message: string;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 interface ToastState {
@@ -20,7 +24,7 @@ type ToastAction =
   | { type: "REMOVE_TOAST"; payload: string };
 
 const ToastContext = createContext<{
-  showToast: (type: ToastType, message: string) => void;
+  showToast: (type: ToastType, message: string, action?: { label: string; onClick: () => void }) => void;
 } | null>(null);
 
 function toastReducer(state: ToastState, action: ToastAction): ToastState {
@@ -37,9 +41,9 @@ function toastReducer(state: ToastState, action: ToastAction): ToastState {
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(toastReducer, { toasts: [] });
 
-  const showToast = useCallback((type: ToastType, message: string) => {
+  const showToast = useCallback((type: ToastType, message: string, action?: { label: string; onClick: () => void }) => {
     const id = Math.random().toString(36).substring(7);
-    dispatch({ type: "ADD_TOAST", payload: { id, type, message } });
+    dispatch({ type: "ADD_TOAST", payload: { id, type, message, action } });
 
     // Auto dismiss after 3 seconds
     setTimeout(() => {
@@ -102,6 +106,17 @@ function ToastItem({
       className={`${bgColor} text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] max-w-[500px] animate-slide-in`}
     >
       <span className="flex-1">{toast.message}</span>
+      {toast.action && (
+        <button
+          onClick={() => {
+            toast.action?.onClick();
+            onRemove(toast.id);
+          }}
+          className="text-white underline hover:no-underline transition-all font-medium"
+        >
+          {toast.action.label}
+        </button>
+      )}
       <button
         onClick={() => onRemove(toast.id)}
         className="text-white hover:text-gray-200 transition-colors"

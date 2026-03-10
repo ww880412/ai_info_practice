@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Loader2, X } from "lucide-react";
 import { useComparisonBatch } from "@/hooks/useComparisonBatch";
+import { useToast } from "@/components/common/Toast";
 
 interface CompareModesDialogProps {
   open: boolean;
@@ -20,6 +21,7 @@ export function CompareModesDialog({
   onSuccess,
 }: CompareModesDialogProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const [targetMode, setTargetMode] = useState<"two-step" | "tool-calling">("tool-calling");
   const { createBatch, createMutation } = useComparisonBatch();
 
@@ -50,7 +52,10 @@ export function CompareModesDialog({
         onSuccess: (data) => {
           onOpenChange(false);
           onSuccess?.();
-          router.push(`/comparison/${data.batchId}`);
+          showToast("success", `对比任务已创建，预计 ${data.estimatedTime} 完成`, {
+            label: "查看详情",
+            onClick: () => router.push(`/comparison/${data.batchId}`),
+          });
         },
       }
     );

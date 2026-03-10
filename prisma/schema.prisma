@@ -288,6 +288,18 @@ enum AttemptStatus {
   RUNNING
 }
 
+enum ComparisonMode {
+  TWO_STEP
+  TOOL_CALLING
+}
+
+enum BatchStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 // ─────────────── Group ───────────────
 
 model Group {
@@ -478,16 +490,20 @@ model ComparisonBatch {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Batch configuration
-  targetMode    String   // Target mode to compare against
-  entryCount    Int      // Total number of entries
+  // Comparison modes
+  sourceMode  ComparisonMode  // Baseline mode
+  targetMode  ComparisonMode  // Comparison mode
 
-  // Execution status
-  status        String   // 'pending' | 'processing' | 'completed' | 'failed'
-  progress      Int      @default(0)  // Number of processed entries
+  entryCount  Int
+  status      BatchStatus     @default(PENDING)
+  progress    Int             @default(0)  // Percentage: 0-100
+  processedCount Int          @default(0)  // Actual processed entries
 
   // Statistics
-  stats         Json?    // Batch statistics (win rate, avg score diff, etc.)
+  winRate     Float?
+  avgScoreDiff Float?
+  stats       Json?
 
   @@index([status])
+  @@index([createdAt, id])  // Composite index for stable sorting
 }
