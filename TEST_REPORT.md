@@ -6,11 +6,11 @@
 
 ### ✅ Unit Tests
 - **Status**: 4 test files failed, 32 passed (36 total)
-- **Tests**: 13 failed, 158 passed (171 total)
-- **Duration**: 1.55s
+- **Tests**: 20 failed, 151 passed (171 total)
+- **Duration**: 1.61s
 
 ### ❌ Type Check
-- **Status**: PASSED (no type errors found)
+- **Status**: FAILED (type errors in comparison normalize tests)
 
 ### ❌ Lint Check
 - **Status**: FAILED
@@ -20,44 +20,61 @@
 
 ## Detailed Test Failures
 
-### 1. Unit Test Failures (13 tests)
+### 1. Unit Test Failures (20 tests)
 
 #### A. BatchHistoryList Component (4 failures)
 **File**: `src/components/comparison/BatchHistoryList.test.tsx`
 
 1. **Load more batches on button click** - Unable to find "Showing 3 of 3 batches" text
 2. **Show loading state** - Unable to find "Loading..." text
-3. **Show error message on fetch failure** - Test passed
-4. **Exponential backoff on retry** - Unable to find "Retry 2/" text
+3. **Exponential backoff on retry** - Unable to find "Retry 2/" text
+4. **Reset retry count on successful load** - Unstable due to retry state not clearing in time
 
-**Root Cause**: Text rendering issues in test environment, likely related to async state updates.
+**Root Cause**: Async timing + fake timers mismatch with state updates; text is split across elements in DOM.
 
 #### B. Scoring Agent Tests (4 failures)
 **File**: `src/lib/ai/agent/__tests__/scoring-agent.test.ts`
 
-1. **Rejects evaluation with too many issues**
-2. **Evaluates KNOWLEDGE type decision**
-3. **Evaluates ACTIONABLE type decision**
-4. **Sanitizes content in prompt**
+1. **Rejects evaluation with too many issues** - Schema now allows longer list
+2. **Evaluates KNOWLEDGE type decision** - Missing `generateText` export in mock
+3. **Evaluates ACTIONABLE type decision** - Missing `generateText` export in mock
+4. **Sanitizes content in prompt** - Missing `generateText` export in mock
 
-**Root Cause**: Missing `generateText` export in mock. Mock needs to be updated to include `generateText` function.
+**Root Cause**: Mock missing `generateText`; schema constraint changed.
 
-#### C. API Route Tests (2 failures)
+#### C. API Route Tests (7 failures)
 **File**: `src/app/api/comparison/batches/route.test.ts`
 
-1. **Return batches with pagination info** - Expected 1 batch, got 3
-2. **Filter by status** - Expected 1 batch, got 0
+All 7 tests failing with:
+```
+Can't reach database server at `localhost:5433`
+```
 
-**Root Cause**: Test database not properly isolated between tests. Need to add proper cleanup.
+**Root Cause**: DB not available in local test run (docker daemon access denied).
 
-#### D. Query Batches Tests (3 failures)
+#### D. Query Batches Tests (5 failures)
 **File**: `src/lib/comparison/__tests__/query-batches.test.ts`
 
-1. **Return batches sorted by createdAt desc** - Expected 2 batches, got 3
-2. **Filter by status** - Expected 1 batch, got 0
-3. **Respect limit and offset** - Expected 5, got 4
+All 5 tests failing with:
+```
+Can't reach database server at `localhost:5433`
+```
 
-**Root Cause**: Same as API route tests - database state leaking between tests.
+**Root Cause**: DB not available in local test run (docker daemon access denied).
+
+---
+
+## Type Check Failures
+
+**File**: `src/lib/comparison/__tests__/normalize.test.ts`
+
+Errors are due to lowercase string enums not matching updated types:
+- `"tutorial"`, `"article"` not assignable to `ContentType`
+- `"frontend"` not assignable to `TechDomain`
+- `"intermediate"` not assignable to `Difficulty`
+- `"high"` not assignable to `TrustLevel`
+- `"current"` not assignable to `Timeliness`
+- `"narrative"` not assignable to `SummaryStructureType`
 
 ---
 
@@ -75,20 +92,19 @@
 - `src/lib/comparison/query-batches.ts` (1 error)
 - `src/lib/comparison/__tests__/normalize.test.ts` (2 errors)
 
-**Fix**: Replace `any` with proper types (e.g., `unknown`, specific interfaces).
+**Fix**: Replace `any` with proper types (`unknown`, specific interfaces, or generics).
 
 #### 2. React Hooks Issue (1 error)
 **File**: `src/components/common/Toast.tsx:76`
 **Error**: Calling setState synchronously within an effect
 
 ```typescript
-// Current (line 76):
 useEffect(() => {
   setMounted(true);
 }, []);
-
-// Fix: Use useLayoutEffect or move to component body
 ```
+
+**Fix**: Use `useLayoutEffect` or remove effect entirely.
 
 #### 3. Import Style Issues (2 errors)
 **File**: `trigger-comparison.js`
@@ -103,9 +119,7 @@ useEffect(() => {
 **Fix**: Replace `any` types with proper types.
 
 ### Warnings (16 warnings)
-- Unused variables in test files
-- Unused imports
-- Can be safely ignored or cleaned up
+- Unused variables/imports across test and script files
 
 ---
 
@@ -139,19 +153,19 @@ useEffect(() => {
 
 ### High Priority
 
-1. **Test Database Isolation**: Tests are not properly cleaning up between runs, causing state leakage
-2. **Mock Configuration**: `generateText` not exported in test mocks
-3. **React Hook Warning**: Toast component has setState in useEffect
+1. **DB-dependent tests fail without Postgres** (docker daemon access denied)
+2. **Mock configuration** missing `generateText` export
+3. **React hook warning** in Toast component
 
 ### Medium Priority
 
-4. **TypeScript `any` Usage**: 48 instances of `any` type need proper typing
-5. **Component Test Flakiness**: BatchHistoryList tests failing due to async rendering issues
+4. **TypeScript `any` usage** (48 instances)
+5. **BatchHistoryList test flakiness** (async timer/text matcher issues)
 
 ### Low Priority
 
-6. **Unused Variables**: 16 warnings about unused variables/imports
-7. **Import Style**: 2 files using CommonJS require() instead of ES6 imports
+6. **Unused variables** warnings (16)
+7. **CommonJS import style** in `trigger-comparison.js`
 
 ---
 
@@ -159,26 +173,20 @@ useEffect(() => {
 
 ### Immediate Fixes Required
 
-1. **Fix test database isolation**:
-   ```typescript
-   // Add to each test file
-   beforeEach(async () => {
-     await prisma.comparisonBatch.deleteMany({});
-   });
-   ```
+1. **Ensure DB available for Prisma tests**
+   - Start Postgres via Docker before `vitest run`.
+   - Alternatively mock Prisma for unit tests.
 
-2. **Update mock configuration**:
+2. **Update mock configuration**
    ```typescript
-   // In scoring-agent.test.ts
    vi.mock('@/lib/ai/generate', () => ({
      generateJSON: vi.fn(),
-     generateText: vi.fn(), // Add this
+     generateText: vi.fn(),
    }));
    ```
 
-3. **Fix Toast component**:
+3. **Fix Toast component**
    ```typescript
-   // Use useLayoutEffect instead
    useLayoutEffect(() => {
      setMounted(true);
    }, []);
@@ -186,14 +194,11 @@ useEffect(() => {
 
 ### Type Safety Improvements
 
-4. **Replace `any` types** in:
-   - `useComparisonBatch.ts` and its tests
-   - `process-comparison-batch.ts`
-   - API route tests
+4. **Replace `any` types** in hooks, Inngest, and comparison utilities
 
 ### Test Improvements
 
-5. **Add proper async handling** in BatchHistoryList tests:
+5. **Use async matchers** in BatchHistoryList tests
    ```typescript
    await waitFor(() => {
      expect(screen.getByText(/Showing 3 of 3 batches/)).toBeInTheDocument();
@@ -206,11 +211,11 @@ useEffect(() => {
 
 **Overall Status**: ⚠️ **NEEDS FIXES**
 
-The comparison history feature is functionally complete and working in production, but has:
-- 13 failing unit tests (mostly due to test infrastructure issues)
-- 55 lint errors (mostly TypeScript `any` usage)
-- 0 type errors
+The comparison history feature is functionally complete and works in the UI, but:
+- 20 unit tests fail (DB dependency + missing mock + async tests)
+- Type check fails in normalize tests (enum casing)
+- Lint fails with 55 errors (mostly `any` usage)
 
-**Recommendation**: Fix high-priority issues before merging to main. Medium and low priority issues can be addressed in follow-up PRs.
+**Recommendation**: Fix high-priority issues before marking Task 7 complete.
 
-**Estimated Fix Time**: 2-3 hours
+**Estimated Fix Time**: 2-4 hours
