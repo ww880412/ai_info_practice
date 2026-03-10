@@ -1,13 +1,15 @@
 # Settings Multi-Provider Implementation Plan
 
-> **Version**: 1.0
+> **Version**: 1.1 (Revised after Codex Review)
 > **Date**: 2026-03-11
-> **Status**: Draft (Pending Codex Review)
+> **Status**: Ready for Execution (Codex Score: 7.4/10 → Expected 9/10 after fixes)
 > **Design Doc**: [2026-03-11-settings-multi-provider.md](./2026-03-11-settings-multi-provider.md) (v1.2, Codex 8.8/10)
 
 ## Overview
 
 Implement Settings page for multi-provider credential management based on approved design document. Extends existing `ApiCredential` table, reuses encryption system, adds UI for CRUD operations.
+
+**Estimated Time**: 16-24h (revised from 13-19h based on Codex feedback)
 
 ## Task Breakdown
 
@@ -134,13 +136,64 @@ export function validateBaseUrl(provider: string, baseUrl: string): {
 
 ### Task 3: API Routes (3-4h)
 
-**Objective**: Implement CRUD endpoints for credentials
+**Objective**: Implement CRUD endpoints for credentials with comprehensive validation
 
 **Files**:
 - `src/app/api/settings/credentials/route.ts` (GET, POST)
 - `src/app/api/settings/credentials/[id]/route.ts` (PUT, DELETE)
 - `src/app/api/settings/credentials/[id]/validate/route.ts` (POST)
+- `src/lib/settings/validation.ts` (NEW - request validation)
 - `src/app/api/settings/credentials/route.test.ts`
+
+**Request Validation Module**:
+```typescript
+// src/lib/settings/validation.ts
+const PROVIDER_ALLOWLIST = ['gemini', 'crs', 'openai-compatible'];
+
+export function validateCredentialRequest(data: any): { valid: boolean; errors: Record<string, string> } {
+  const errors: Record<string, string> = {};
+
+  // Provider validation
+  if (!data.provider || !PROVIDER_ALLOWLIST.includes(data.provider)) {
+    errors.provider = `Provider must be one of: ${PROVIDER_ALLOWLIST.join(', ')}`;
+  }
+
+  // Name validation (1-50 chars, alphanumeric + spaces/dashes)
+  if (data.name && !/^[a-zA-Z0-9\s\-]{1,50}$/.test(data.name)) {
+    errors.name = 'Name must be 1-50 characters (alphanumeric, spaces, dashes only)';
+  }
+
+  // API key validation
+  if (!data.apiKey || data.apiKey.length < 8) {
+    errors.apiKey = 'API key is required and must be at least 8 characters';
+  }
+
+  // Base URL validation (if provided)
+  if (data.baseUrl) {
+    try {
+      new URL(data.baseUrl);
+    } catch {
+      errors.baseUrl = 'Invalid URL format';
+    }
+  }
+
+  // Config validation (if provided)
+  if (data.config) {
+    if (data.config.temperature !== undefined) {
+      if (typeof data.config.temperature !== 'number' || data.config.temperature < 0 || data.config.temperature > 2) {
+        errors.config = 'Temperature must be between 0 and 2';
+      }
+    }
+    if (data.config.maxTokens !== undefined) {
+      if (typeof data.config.maxTokens !== 'number' || data.config.maxTokens < 1) {
+        errors.config = 'Max tokens must be a positive number';
+      }
+    }
+  }
+
+  return { valid: Object.keys(errors).length === 0, errors };
+}
+```
 
 **Endpoints**:
 
@@ -150,12 +203,29 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
 
   // Validate input
+  const { valid, errors } = validateCredentialRequest(body);
+  if (!valid) {
+    return NextResponse.json({ error: { code: 'INVALID_PARAMS', message: 'Validation failed', details: errors } }, { status: 400 });
+  }
+
   const { provider, name, apiKey, baseUrl, model, config, isDefault, validate } = body;
+
+  // Check for duplicate name
+  if (name) {
+    const existing = await prisma.apiCredential.findFirst({
+      where: { provider, name, isActive: true },
+    });
+    if (existing) {
+      return NextResponse.json({ error: { code: 'DUPLICATE_NAME', message: 'A credential with this name already exists' } }, { status: 400 });
+    }
+  }
 
   // SSRF check
   if (baseUrl) {
     const { valid, error } = validateBaseUrl(provider, baseUrl);
-    if (!valid) return NextResponse.json({ error: { code: 'SSRF_BLOCKED', message: error } }, { status: 400 });
+    if (!valid) {
+      return NextResponse.json({ error: { code: 'SSRF_BLOCKED', message: error } }, { status: 400 });
+    }
   }
 
   // Encrypt API key
@@ -195,7 +265,9 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  return NextResponse.json({ data: serializeCredential(credential) });
+  // IMPORTANT: Never return encryptedKey
+  const { encryptedKey: _, ...safeCredential } = credential;
+  return NextResponse.json({ data: safeCredential });
 }
 ```
 
@@ -243,12 +315,22 @@ async function validateCredential(credentialId: string): Promise<{ isValid: bool
   try {
     if (credential.provider === 'gemini') {
       // Test with Gemini API
-      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + apiKey);
+      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + apiKey, {
+        signal: AbortSignal.timeout(5000),  // 5s timeout
+      });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
     } else if (credential.provider === 'crs') {
       // Test with CRS API
-      const response = await fetch(credential.baseUrl + '/health', {
+      const response = await fetch((credential.baseUrl || process.env.CRS_BASE_URL) + '/health', {
         headers: { 'Authorization': `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    } else if (credential.provider === 'openai-compatible') {
+      // Test with OpenAI-compatible API
+      const response = await fetch((credential.baseUrl || 'http://localhost:8080') + '/v1/models', {
+        headers: { 'Authorization': `Bearer ${apiKey}` },
+        signal: AbortSignal.timeout(5000),
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
     }
@@ -262,10 +344,17 @@ async function validateCredential(credentialId: string): Promise<{ isValid: bool
 
 **Acceptance Criteria**:
 - [ ] All endpoints implemented
+- [ ] Request validation enforced (provider, name, apiKey, baseUrl, config)
+- [ ] Duplicate name check works
 - [ ] SSRF protection enforced
 - [ ] Transaction for default updates
 - [ ] Soft delete working
-- [ ] Validation logic tested
+- [ ] Validation logic tested (all 3 providers)
+- [ ] Validation timeout enforced (5s)
+- [ ] encryptedKey NEVER returned in responses
+- [ ] lastValidatedAt updated on validation
+- [ ] lastUsedAt updated on credential use
+- [ ] Error codes match design (INVALID_PARAMS, DUPLICATE_NAME, SSRF_BLOCKED, etc.)
 - [ ] Unit tests pass
 
 ---
@@ -431,6 +520,17 @@ interface CredentialCardProps {
 }
 
 export function CredentialCard({ credential, onEdit, onDelete, onTest, onSetDefault }: CredentialCardProps) {
+  const getStatusBadge = () => {
+    if (!credential.lastValidatedAt) {
+      return <span className="text-yellow-600">⚠️ Not validated</span>;
+    }
+    if (credential.isValid) {
+      const timeAgo = formatDistanceToNow(new Date(credential.lastValidatedAt));
+      return <span className="text-green-600">✅ Valid (tested {timeAgo} ago)</span>;
+    }
+    return <span className="text-red-600">❌ Invalid</span>;
+  };
+
   return (
     <div className="border rounded p-4 mb-4">
       <div className="flex justify-between items-start">
@@ -443,11 +543,7 @@ export function CredentialCard({ credential, onEdit, onDelete, onTest, onSetDefa
 
         <div className="flex gap-2">
           {credential.isDefault && <span className="badge">Default</span>}
-          {credential.isValid ? (
-            <span className="text-green-600">✅ Valid</span>
-          ) : (
-            <span className="text-red-600">❌ Invalid</span>
-          )}
+          {getStatusBadge()}
         </div>
       </div>
 
@@ -607,13 +703,15 @@ export function CredentialForm({ mode, credential, onSubmit, onCancel }: Credent
 
 ---
 
-### Task 6: Seeding & Migration (1h)
+### Task 6: Seeding, Migration & Auto-Repair (1-2h)
 
-**Objective**: Seed credentials from .env and backfill existing records
+**Objective**: Seed credentials from .env, backfill existing records, and implement auto-repair for multiple defaults
 
 **Files**:
 - `scripts/seed-credentials.ts`
 - `scripts/backfill-credentials.ts`
+- `src/lib/settings/auto-repair.ts` (NEW)
+- `src/app/api/settings/repair/route.ts` (NEW - manual trigger)
 
 **Seed Script**:
 ```typescript
@@ -622,6 +720,13 @@ import { prisma } from '../src/lib/prisma';
 import { encryptApiKey, getKeyHint } from '../src/lib/crypto';
 
 async function seedCredentials() {
+  // Check if DB is empty
+  const existingCount = await prisma.apiCredential.count();
+  if (existingCount > 0) {
+    console.log(`Database already has ${existingCount} credentials, skipping seed`);
+    return;
+  }
+
   const credentials = [];
 
   // Gemini
@@ -653,12 +758,13 @@ async function seedCredentials() {
     });
   }
 
+  if (credentials.length === 0) {
+    console.log('No credentials in .env, skipping seed');
+    return;
+  }
+
   for (const cred of credentials) {
-    await prisma.apiCredential.upsert({
-      where: { id: 'seed-' + cred.provider },
-      update: cred,
-      create: { ...cred, id: 'seed-' + cred.provider },
-    });
+    await prisma.apiCredential.create({ data: cred });
   }
 
   console.log(`Seeded ${credentials.length} credentials`);
@@ -667,7 +773,54 @@ async function seedCredentials() {
 seedCredentials();
 ```
 
-**Backfill Script**:
+**Auto-Repair Function**:
+```typescript
+// src/lib/settings/auto-repair.ts
+import { prisma } from '@/lib/prisma';
+
+export async function repairDefaultCredentials() {
+  const providers = ['gemini', 'crs', 'openai-compatible'];
+  const repairs: string[] = [];
+
+  for (const provider of providers) {
+    const defaults = await prisma.apiCredential.findMany({
+      where: { provider, isActive: true, isDefault: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (defaults.length > 1) {
+      // Keep oldest, unset others
+      const toUnset = defaults.slice(1).map(d => d.id);
+      await prisma.apiCredential.updateMany({
+        where: { id: { in: toUnset } },
+        data: { isDefault: false },
+      });
+      repairs.push(`${provider}: kept ${defaults[0].id}, unset ${toUnset.length} others`);
+    }
+  }
+
+  return repairs;
+}
+
+// Call on app start (add to src/app/layout.tsx or middleware)
+// Or expose as API endpoint for manual trigger
+```
+
+**Manual Trigger Endpoint**:
+```typescript
+// src/app/api/settings/repair/route.ts
+import { repairDefaultCredentials } from '@/lib/settings/auto-repair';
+
+export async function POST() {
+  const repairs = await repairDefaultCredentials();
+  return NextResponse.json({
+    data: {
+      repaired: repairs.length > 0,
+      repairs,
+    },
+  });
+}
+```
 ```typescript
 // scripts/backfill-credentials.ts
 async function backfillCredentials() {
@@ -676,23 +829,19 @@ async function backfillCredentials() {
   for (const cred of credentials) {
     const updates: any = {};
 
+    // Backfill name if missing
     if (!cred.name) {
       updates.name = `${cred.provider} ${cred.id.slice(0, 8)}`;
     }
 
-    if (cred.isDefault === null) {
-      // Set first credential per provider as default
-      const isFirst = await prisma.apiCredential.count({
-        where: {
-          provider: cred.provider,
-          createdAt: { lt: cred.createdAt },
-        },
-      }) === 0;
-      updates.isDefault = isFirst;
-    }
-
-    if (cred.isActive === null) {
-      updates.isActive = true;
+    // Backfill isDefault (set first credential per provider as default)
+    // Note: Check for undefined, not null (fields have default values)
+    const defaultCount = await prisma.apiCredential.count({
+      where: { provider: cred.provider, isDefault: true },
+    });
+    if (defaultCount === 0) {
+      // No default exists, make this one default
+      updates.isDefault = true;
     }
 
     if (Object.keys(updates).length > 0) {
@@ -710,10 +859,11 @@ backfillCredentials();
 ```
 
 **Acceptance Criteria**:
-- [ ] Seed script works
-- [ ] Backfill script works
+- [ ] Seed script only runs on empty DB
+- [ ] Backfill script works correctly (checks for missing defaults, not null values)
 - [ ] Existing credentials preserved
-- [ ] Default flags set correctly
+- [ ] Default flags set correctly (one per provider)
+- [ ] Auto-repair function implemented and tested
 
 ---
 
@@ -765,10 +915,15 @@ backfillCredentials();
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
 | Migration fails | Low | High | Test on staging first, backup DB |
-| SSRF bypass | Low | High | Comprehensive allowlist testing |
-| Encryption key leak | Low | Critical | Never log decrypted keys, audit code |
-| Multiple defaults | Medium | Low | Auto-repair function on app start |
-| Soft delete not enforced | Medium | Medium | Add isActive checks everywhere |
+| SSRF bypass | Low | High | Comprehensive allowlist testing, private IP blocking |
+| Encryption key leak | Low | Critical | Never log decrypted keys, audit code, use KEY_ENCRYPTION_SECRET |
+| Multiple defaults | Medium | Low | Auto-repair function on app start + manual trigger |
+| Soft delete not enforced | Medium | Medium | Add isActive checks in all credential resolution paths |
+| Missing KEY_ENCRYPTION_SECRET | Medium | Critical | Check on app start, show clear error message |
+| Allowlist misconfiguration | Medium | High | Provide clear examples in .env.example, validate on startup |
+| Validation API rate limits | Low | Medium | Add timeout (5s), handle rate limit errors gracefully |
+| DNS rebinding attack | Low | High | Validate resolved IP after DNS lookup (future enhancement) |
+| Seed/backfill creating duplicates | Low | Medium | Check for existing defaults before setting new ones |
 
 ---
 
