@@ -29,7 +29,7 @@ export function MetadataCard({
         <CardTitle>维度 6：元数据</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
             <h4 className="mb-3 text-sm font-medium">Original ({originalMode})</h4>
             <MetadataContent metadata={original.metadata} />

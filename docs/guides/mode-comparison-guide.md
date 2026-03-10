@@ -34,8 +34,44 @@
 点击任意结果卡片，进入详细对比页面：
 
 - **评分对比**: 总体评分和 5 个维度的对比
+- **6 个对比维度**: 详细展示决策内容的各个方面
 - **并排展示**: 原始模式和对比模式的决策详情
-- **差异高亮**: 清晰展示两种模式的差异
+- **响应式布局**: 支持桌面端和移动端查看
+
+#### 6 个对比维度
+
+1. **维度 1：基础分类**
+   - 内容类型 (contentType)
+   - 技术领域 (techDomain)
+   - AI 标签 (aiTags)
+   - 置信度 (confidence)
+
+2. **维度 2：核心摘要**
+   - 核心摘要文本 (coreSummary)
+   - 字符数统计
+   - 中英文自动识别
+
+3. **维度 3：关键要点**
+   - 核心要点 (core)
+   - 扩展要点 (extended)
+   - 列表形式展示
+
+4. **维度 4：结构化内容**
+   - 动态渲染不同类型的结构
+   - 支持 two-step 时间线
+   - 支持 tooling 时间线
+   - 未知类型自动降级为键值对展示
+
+5. **维度 5：边界定义**
+   - 适用场景 (applicable) - 绿色标记
+   - 不适用场景 (notApplicable) - 红色标记
+   - 列表形式展示
+
+6. **维度 6：元数据**
+   - 难度 (difficulty)
+   - 来源可信度 (sourceTrust)
+   - 时效性 (timeliness)
+   - 内容形式 (contentForm)
 
 ## 功能特性
 
@@ -119,6 +155,9 @@ Response: { data: { originalDecision, comparisonDecision, originalScore, compari
 - **CompareModesDialog**: 模式选择弹窗
 - **BatchStats**: 统计卡片组件
 - **ComparisonList**: 结果列表组件
+- **6 个维度卡片**: ClassificationCard, SummaryCard, KeyPointsCard, BoundariesCard, MetadataCard, StructureCard
+- **结构化渲染器**: TwoStepTimelineRenderer, ToolingTimelineRenderer, GenericStructureRenderer
+- **规范化层**: normalize.ts 统一数据格式，处理新旧字段兼容
 
 ### 后端实现
 - **Prisma Schema**: ModeComparison + ComparisonBatch 表
@@ -133,6 +172,11 @@ Response: { data: { originalDecision, comparisonDecision, originalScore, compari
 
 ---
 
-**文档版本**: v1.0
-**最后更新**: 2026-03-08
-**作者**: Claude (Opus 4.6)
+**文档版本**: v2.0
+**最后更新**: 2026-03-10
+**作者**: Claude (Sonnet 4.6)
+**更新内容**:
+- 新增 6 个对比维度详细说明
+- 新增结构化内容动态渲染说明
+- 新增响应式布局支持
+- 更新前端组件列表

@@ -209,41 +209,46 @@ export default function ComparisonDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Dimension Comparison Cards */}
-      <ClassificationCard
-        original={normalizedOriginal}
-        comparison={normalizedComparison}
-        originalMode={result.originalMode}
-        comparisonMode={result.comparisonMode}
-      />
+      {/* Dimension Comparison Cards - Responsive Grid */}
+      <div className="space-y-6">
+        <h2 className="text-xl font-semibold">详细维度对比</h2>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ClassificationCard
+            original={normalizedOriginal}
+            comparison={normalizedComparison}
+            originalMode={result.originalMode}
+            comparisonMode={result.comparisonMode}
+          />
 
-      <SummaryCard
-        original={normalizedOriginal}
-        comparison={normalizedComparison}
-        originalMode={result.originalMode}
-        comparisonMode={result.comparisonMode}
-      />
+          <SummaryCard
+            original={normalizedOriginal}
+            comparison={normalizedComparison}
+            originalMode={result.originalMode}
+            comparisonMode={result.comparisonMode}
+          />
 
-      <KeyPointsCard
-        original={normalizedOriginal}
-        comparison={normalizedComparison}
-        originalMode={result.originalMode}
-        comparisonMode={result.comparisonMode}
-      />
+          <KeyPointsCard
+            original={normalizedOriginal}
+            comparison={normalizedComparison}
+            originalMode={result.originalMode}
+            comparisonMode={result.comparisonMode}
+          />
 
-      <BoundariesCard
-        original={normalizedOriginal}
-        comparison={normalizedComparison}
-        originalMode={result.originalMode}
-        comparisonMode={result.comparisonMode}
-      />
+          <BoundariesCard
+            original={normalizedOriginal}
+            comparison={normalizedComparison}
+            originalMode={result.originalMode}
+            comparisonMode={result.comparisonMode}
+          />
 
-      <MetadataCard
-        original={normalizedOriginal}
-        comparison={normalizedComparison}
-        originalMode={result.originalMode}
-        comparisonMode={result.comparisonMode}
-      />
+          <MetadataCard
+            original={normalizedOriginal}
+            comparison={normalizedComparison}
+            originalMode={result.originalMode}
+            comparisonMode={result.comparisonMode}
+          />
+        </div>
+      </div>
     </div>
   );
 }

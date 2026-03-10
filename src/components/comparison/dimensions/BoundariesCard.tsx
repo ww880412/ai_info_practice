@@ -28,7 +28,7 @@ export function BoundariesCard({
         <CardTitle>维度 5：边界定义</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
             <h4 className="mb-3 text-sm font-medium">Original ({originalMode})</h4>
             <BoundariesContent boundaries={original.boundaries} />

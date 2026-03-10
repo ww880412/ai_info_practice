@@ -28,7 +28,7 @@ export function KeyPointsCard({
         <CardTitle>维度 3：关键要点</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
             <h4 className="mb-3 text-sm font-medium">Original ({originalMode})</h4>
             <KeyPointsContent keyPoints={original.keyPoints} />

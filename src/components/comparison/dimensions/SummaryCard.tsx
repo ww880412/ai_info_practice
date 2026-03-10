@@ -28,7 +28,7 @@ export function SummaryCard({
         <CardTitle>维度 2：核心摘要</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
             <h4 className="mb-3 text-sm font-medium">Original ({originalMode})</h4>
             <SummaryContent summary={original.coreSummary} />
