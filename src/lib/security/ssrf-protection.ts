@@ -13,10 +13,10 @@ const PRIVATE_IP_RANGES = [
   /^192\.168\./,
   /^127\./,
   /^169\.254\./,
-  /^::1$/,
-  /^fe80:/,
-  /^fc00:/,
-  /^fd00:/,
+  /^\[?::1\]?$/,
+  /^\[?fe80:/i,
+  /^\[?fc00:/i,
+  /^\[?fd00:/i,
 ];
 
 function getAllowedBaseUrls(provider: string): RegExp[] {
@@ -44,7 +44,8 @@ function getAllowedBaseUrls(provider: string): RegExp[] {
         const hosts = process.env.OPENAI_COMPATIBLE_ALLOWLIST.split(',');
         hosts.forEach(host => {
           const trimmed = host.trim().replace(/\./g, '\\.');
-          patterns.push(new RegExp(`^https://${trimmed}`));
+          // Match URLs with or without authentication
+          patterns.push(new RegExp(`^https://(?:[^@]+@)?${trimmed}`));
         });
       }
       return patterns;
@@ -66,23 +67,31 @@ export function validateBaseUrl(provider: string, baseUrl: string): ValidationRe
     const url = new URL(baseUrl);
     const hostname = url.hostname;
 
-    // Check private IPs
-    if (PRIVATE_IP_RANGES.some(pattern => pattern.test(hostname))) {
-      return { valid: false, error: 'Private IP addresses are not allowed' };
-    }
-
-    // Check allowlist
+    // Check allowlist first (before private IP check)
+    // This allows localhost/127.0.0.1 for openai-compatible provider
     const patterns = getAllowedBaseUrls(provider);
     if (patterns.length === 0) {
       return { valid: false, error: `No allowlist configured for provider: ${provider}` };
     }
 
-    const valid = patterns.some(pattern => pattern.test(baseUrl));
+    const matchesAllowlist = patterns.some(pattern => pattern.test(baseUrl));
+
+    // If it matches allowlist, check if it's a private IP
+    // Only block private IPs that aren't explicitly allowed
+    if (matchesAllowlist) {
+      return { valid: true };
+    }
+
+    // Check private IPs for non-allowlisted URLs
+    if (PRIVATE_IP_RANGES.some(pattern => pattern.test(hostname))) {
+      return { valid: false, error: 'Private IP addresses are not allowed' };
+    }
+
     const warning = provider === 'openai-compatible' && baseUrl.startsWith('https://') && !baseUrl.startsWith('https://localhost')
       ? 'Custom HTTPS endpoints must be explicitly allowlisted via OPENAI_COMPATIBLE_ALLOWLIST'
       : undefined;
 
-    return { valid, warning, error: valid ? undefined : 'URL does not match allowlist patterns' };
+    return { valid: false, warning, error: 'URL does not match allowlist patterns' };
   } catch (error) {
     return { valid: false, error: 'Invalid URL format' };
   }
