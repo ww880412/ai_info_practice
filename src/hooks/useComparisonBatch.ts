@@ -20,6 +20,10 @@ export interface ModeComparisonResult {
   comparisonMode: string;
   winner: "original" | "comparison" | "tie";
   scoreDiff: number;
+  originalDecision?: any; // JSON field from database
+  comparisonDecision?: any; // JSON field from database
+  originalScore?: any; // JSON field from database
+  comparisonScore?: any; // JSON field from database
 }
 
 export interface BatchStats {

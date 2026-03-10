@@ -229,8 +229,8 @@ export default function ComparisonDetailPage() {
           />
 
           <StructureCard
-            originalDecision={normalizedOriginal}
-            comparisonDecision={normalizedComparison}
+            normalizedOriginal={normalizedOriginal}
+            normalizedComparison={normalizedComparison}
             originalMode={result.originalMode}
             comparisonMode={result.comparisonMode}
           />
