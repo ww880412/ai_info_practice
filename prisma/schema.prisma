@@ -368,7 +368,7 @@ model ApiCredential {
   id             String   @id @default(cuid())
   encryptedKey   String   @db.Text
   keyHint        String?  // Last 4 chars for display (e.g., "...abcd")
-  provider       String   @default("gemini")  // "gemini" | "openai-compatible"
+  provider       String   @default("gemini")  // "gemini" | "openai-compatible" | "crs"
   baseUrl        String?  // For openai-compatible providers (e.g., local proxy)
   model          String?
   isValid        Boolean  @default(true)
@@ -377,7 +377,17 @@ model ApiCredential {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  // New fields for multi-provider management
+  name            String?
+  isDefault       Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  validationError String?
+  config          Json?
+
+  @@unique([provider, name, isActive])
   @@index([isValid])
+  @@index([provider, isActive, isDefault])
+  @@index([provider, isDefault, createdAt])
 }
 
 // ─────────────── Entry Split Tables (B2.1) ───────────────
