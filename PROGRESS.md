@@ -5,12 +5,14 @@
 ## 📍 当前状态（2026-03-10）
 
 ### 最近完成
-- ✅ **Mode-Comparison 前端增强**（2026-03-10）
-  - ✅ 规范化层：统一新旧字段格式，处理数据兼容性
+- ✅ **Mode-Comparison 前端增强**（2026-03-10，已部署）
+  - ✅ 规范化层：统一新旧字段格式，处理数据兼容性（normalize.ts + 12 个单元测试）
   - ✅ 6 个对比维度卡片：基础分类、核心摘要、关键要点、结构化内容、边界定义、元数据
-  - ✅ 结构化内容动态渲染：支持 two-step/tooling 时间线，未知类型自动降级
-  - ✅ 响应式布局：桌面端双列，移动端单列，完整边界测试
+  - ✅ 结构化内容动态渲染：支持 timeline-evolution，未知类型自动降级（GenericStructureRenderer）
+  - ✅ 响应式布局：桌面端双列，移动端单列，完整边界测试（5 个场景）
   - ✅ 文档更新：用户指南 v2.0 + 边界测试报告
+  - ✅ Codex 评审：发现并修复 3 个 HIGH 级别问题（StructureCard 渲染、类型路由、字段匹配）
+  - ✅ 已合并到 main 并部署（28 个文件，4251+ 行代码）
 - ✅ CRS Provider SSE 流式响应支持（修复集成问题）
 - ✅ Agent 模式对比功能（完整实现，前后端，已上线）
   - ✅ 后端：Prisma Schema + API Routes + Inngest 任务（Codex Round 6 评审，8.9/10）
@@ -21,8 +23,7 @@
 - ✅ Phase 3a: 结果评分 Agent（经 3 轮 Codex 评审，9/10 分）
 
 ### 活跃分支
-- `feature/mode-comparison-normalize`（前端增强，待合并）
-- `main`（主线）
+- `main`（主线，最新部署）
 
 ### 重构脉络总览
 
@@ -53,13 +54,9 @@
 | CRS Provider | CRS API 集成（SSE 流式响应）| ✅ 已完成 |
 
 ### 当前待办
-1. **mode-comparison 评分优化**: 修复 CRS Provider 评分 schema 验证问题（已完成调试，待优化）
-   - 问题：CRS 返回的 JSON 被 markdown 包裹，且 issues/suggestions 数组超限
-   - 临时方案：放宽 schema 限制（20个），使用 generateText + 手动清理
-   - 优化方向：改进 prompt 或切换评分模型
+1. **创建测试数据**: 运行 mode-comparison 批次，验证前端增强功能
 2. **trace-summary 修复**: 修复 entry 详情页 tool-calling 结果不可见（已规划）
 3. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
-4. **Prompt Learning 流水线**: 将 Phase 2c 效果验证改造为自动化流水线（待规划）
 
 ### 已知问题
 - CRS Provider 不支持结构化输出，tool-calling 模式已自动禁用
@@ -150,4 +147,4 @@
 
 ---
 
-*最后更新: 2026-03-08*
+*最后更新: 2026-03-10*
