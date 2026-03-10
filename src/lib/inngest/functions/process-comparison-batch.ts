@@ -20,7 +20,7 @@ export const processComparisonBatch = inngest.createFunction(
     await step.run('update-batch-status', async () => {
       await prisma.comparisonBatch.update({
         where: { id: batchId },
-        data: { status: 'processing' },
+        data: { status: 'PROCESSING' },
       });
     });
 
@@ -167,11 +167,15 @@ export const processComparisonBatch = inngest.createFunction(
         results.push(result);
         successCount++; // P2-1 Fix: Increment only on success
 
-        // Update progress with success count
+        // Update progress with success count and percentage
         await step.run(`update-progress-${i}`, async () => {
+          const progressPercentage = Math.round((successCount / entryIds.length) * 100);
           await prisma.comparisonBatch.update({
             where: { id: batchId },
-            data: { progress: successCount },
+            data: {
+              processedCount: successCount,
+              progress: progressPercentage,
+            },
           });
         });
       } catch (error) {
@@ -193,7 +197,7 @@ export const processComparisonBatch = inngest.createFunction(
         await prisma.comparisonBatch.update({
           where: { id: batchId },
           data: {
-            status: 'failed',
+            status: 'FAILED',
             stats: {
               originalWins: 0,
               comparisonWins: 0,
@@ -262,7 +266,7 @@ export const processComparisonBatch = inngest.createFunction(
       await prisma.comparisonBatch.update({
         where: { id: batchId },
         data: {
-          status: 'completed',
+          status: 'COMPLETED',
           stats: stats as any,
         },
       });

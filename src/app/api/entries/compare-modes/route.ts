@@ -52,10 +52,12 @@ export async function POST(request: NextRequest) {
     // Create comparison batch
     const batch = await prisma.comparisonBatch.create({
       data: {
-        targetMode,
+        sourceMode: 'TWO_STEP', // Default baseline mode (will be determined per entry)
+        targetMode: targetMode === 'two-step' ? 'TWO_STEP' : 'TOOL_CALLING',
         entryCount: entryIds.length,
-        status: 'pending',
+        status: 'PENDING',
         progress: 0,
+        processedCount: 0,
       },
     });
 
