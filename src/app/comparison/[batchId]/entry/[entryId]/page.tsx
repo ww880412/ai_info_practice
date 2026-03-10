@@ -7,6 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useComparisonBatch, type ModeComparisonResult } from "@/hooks/useComparisonBatch";
+import { normalizeDecision } from "@/lib/comparison/normalize";
+import { ClassificationCard } from "@/components/comparison/dimensions/ClassificationCard";
+import { SummaryCard } from "@/components/comparison/dimensions/SummaryCard";
+import { KeyPointsCard } from "@/components/comparison/dimensions/KeyPointsCard";
+import { BoundariesCard } from "@/components/comparison/dimensions/BoundariesCard";
+import { MetadataCard } from "@/components/comparison/dimensions/MetadataCard";
 
 type ScoreDimensions = {
   completeness: number | null;
@@ -57,6 +63,16 @@ export default function ComparisonDetailPage() {
     const records = (batchStatus?.results ?? []) as ComparisonRecord[];
     return records.find((item) => item.entryId === entryId || item.entry?.id === entryId);
   }, [batchStatus?.results, entryId]);
+
+  // Normalize decisions for comparison cards
+  const normalizedOriginal = useMemo(
+    () => normalizeDecision(result?.originalDecision),
+    [result?.originalDecision]
+  );
+  const normalizedComparison = useMemo(
+    () => normalizeDecision(result?.comparisonDecision),
+    [result?.comparisonDecision]
+  );
 
   if (batchQuery.isLoading) {
     return (
@@ -192,6 +208,42 @@ export default function ComparisonDetailPage() {
           })}
         </CardContent>
       </Card>
+
+      {/* Dimension Comparison Cards */}
+      <ClassificationCard
+        original={normalizedOriginal}
+        comparison={normalizedComparison}
+        originalMode={result.originalMode}
+        comparisonMode={result.comparisonMode}
+      />
+
+      <SummaryCard
+        original={normalizedOriginal}
+        comparison={normalizedComparison}
+        originalMode={result.originalMode}
+        comparisonMode={result.comparisonMode}
+      />
+
+      <KeyPointsCard
+        original={normalizedOriginal}
+        comparison={normalizedComparison}
+        originalMode={result.originalMode}
+        comparisonMode={result.comparisonMode}
+      />
+
+      <BoundariesCard
+        original={normalizedOriginal}
+        comparison={normalizedComparison}
+        originalMode={result.originalMode}
+        comparisonMode={result.comparisonMode}
+      />
+
+      <MetadataCard
+        original={normalizedOriginal}
+        comparison={normalizedComparison}
+        originalMode={result.originalMode}
+        comparisonMode={result.comparisonMode}
+      />
     </div>
   );
 }
