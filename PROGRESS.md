@@ -4,6 +4,18 @@
 
 ## 📍 当前状态（2026-03-11）
 
+### 进行中
+- 🔄 **Phase 2: Entry 详情页对比历史 Tab**（2026-03-11）
+  - ✅ Task 3: API Route - GET /api/entries/[id]/comparisons（已完成）
+    - ✅ 实现查询逻辑：验证 entry 存在，查询 ComparisonBatch 和 ModeComparison
+    - ✅ 支持查询参数：status, limit, offset, sort, order, from, to
+    - ✅ 返回响应包含 pageInfo（total, hasNext, nextOffset）
+    - ✅ 错误处理：404 for non-existent entry, 400 for invalid params
+    - ✅ 处理 in-progress 批次（nullable scores）
+    - ✅ 完整测试套件：11 个测试用例覆盖 happy path 和 error cases
+  - ⏳ Task 4: UI Components（待开始）
+  - ⏳ Task 5: Entry Page Integration（待开始）
+
 ### 最近完成
 - ✅ **Phase 3: Settings Multi-Provider Credential Management System**（2026-03-11，已合并到 main）
   - ✅ 所有 7 个任务完成并通过 Codex 评审
