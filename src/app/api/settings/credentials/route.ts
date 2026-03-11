@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { validateCredentialRequest } from '@/lib/settings/validation';
 import { validateBaseUrl } from '@/lib/security/ssrf-protection';
 import { encryptApiKey, getKeyHint } from '@/lib/crypto';

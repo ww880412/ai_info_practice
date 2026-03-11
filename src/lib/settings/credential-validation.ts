@@ -6,7 +6,7 @@
  */
 
 import { decryptApiKey } from '@/lib/crypto';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 
 const VALIDATION_TIMEOUT = 5000; // 5 seconds
 

@@ -4,6 +4,7 @@
  * Comprehensive test suite for URL validation and SSRF protection
  */
 
+import { describe, it, expect, afterEach } from 'vitest';
 import { validateBaseUrl } from '../ssrf-protection';
 
 describe('SSRF Protection', () => {
