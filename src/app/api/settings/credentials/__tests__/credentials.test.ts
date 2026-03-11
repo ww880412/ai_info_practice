@@ -2,9 +2,9 @@
  * Tests for API Credentials CRUD Endpoints
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { validateCredentialRequest } from '@/lib/settings/validation';
-import { encryptApiKey, decryptApiKey, getKeyHint } from '@/lib/settings/encryption';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { validateCredentialRequest, validateCredentialUpdate } from '@/lib/settings/validation';
+import { encryptApiKey, decryptApiKey, getKeyHint } from '@/lib/crypto';
 import { validateBaseUrl } from '@/lib/security/ssrf-protection';
 
 describe('Validation Module', () => {
