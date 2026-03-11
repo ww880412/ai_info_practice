@@ -505,6 +505,7 @@ model ComparisonBatch {
   targetMode  ComparisonMode  // Comparison mode
 
   entryCount  Int
+  entryIds    String[]        // Entry IDs included in this batch (for in-progress visibility)
   status      BatchStatus     @default(PENDING)
   progress    Int             @default(0)  // Percentage: 0-100
   processedCount Int          @default(0)  // Actual processed entries

@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
       data: {
         sourceMode: 'TWO_STEP', // Default baseline mode (will be determined per entry)
         targetMode: targetMode === 'two-step' ? 'TWO_STEP' : 'TOOL_CALLING',
+        entryIds: entryIds,
         entryCount: entryIds.length,
         status: 'PENDING',
         progress: 0,
