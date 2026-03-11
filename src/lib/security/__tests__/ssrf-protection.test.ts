@@ -182,10 +182,10 @@ describe('SSRF Protection', () => {
       expect(result.valid).toBe(true);
     });
 
-    it('should handle URLs with authentication', () => {
+    it('should reject URLs with authentication (userinfo bypass prevention)', () => {
       process.env.OPENAI_COMPATIBLE_ALLOWLIST = 'api.example.com';
       const result = validateBaseUrl('openai-compatible', 'https://user:pass@api.example.com');
-      expect(result.valid).toBe(true);
+      expect(result.valid).toBe(false);
     });
 
     afterEach(() => {
@@ -211,6 +211,109 @@ describe('SSRF Protection', () => {
 
     afterEach(() => {
       delete process.env.OPENAI_COMPATIBLE_ALLOWLIST;
+    });
+  });
+
+  describe('Security Bypass Prevention', () => {
+    describe('IPv6 Complete Range Coverage', () => {
+      const ipv6LinkLocal = [
+        'http://[fe80::1]',
+        'http://[fe8f::1]',
+        'http://[fe90::1]',
+        'http://[fe9f::1]',
+        'http://[fea0::1]',
+        'http://[feaf::1]',
+        'http://[feb0::1]',
+        'http://[febf::1]',
+      ];
+
+      ipv6LinkLocal.forEach(ip => {
+        it(`should block IPv6 link-local: ${ip}`, () => {
+          const result = validateBaseUrl('openai-compatible', ip);
+          expect(result.valid).toBe(false);
+          expect(result.error).toBe('Private IP addresses are not allowed');
+        });
+      });
+
+      const ipv6UniqueLocal = [
+        'http://[fc00::1]',
+        'http://[fcff::1]',
+        'http://[fd00::1]',
+        'http://[fdff::1]',
+      ];
+
+      ipv6UniqueLocal.forEach(ip => {
+        it(`should block IPv6 unique local: ${ip}`, () => {
+          const result = validateBaseUrl('openai-compatible', ip);
+          expect(result.valid).toBe(false);
+          expect(result.error).toBe('Private IP addresses are not allowed');
+        });
+      });
+    });
+
+    describe('Allowlist Bypass Prevention', () => {
+      it('should reject suffix domain attacks', () => {
+        process.env.OPENAI_COMPATIBLE_ALLOWLIST = 'api.example.com';
+        const result = validateBaseUrl('openai-compatible', 'https://evilapi.example.com');
+        expect(result.valid).toBe(false);
+      });
+
+      it('should reject userinfo bypass attempts', () => {
+        process.env.OPENAI_COMPATIBLE_ALLOWLIST = 'api.example.com';
+        const result = validateBaseUrl('openai-compatible', 'https://user@evil.com');
+        expect(result.valid).toBe(false);
+      });
+
+      it('should reject subdomain attacks', () => {
+        process.env.OPENAI_COMPATIBLE_ALLOWLIST = 'example.com';
+        const result = validateBaseUrl('openai-compatible', 'https://evil.example.com');
+        expect(result.valid).toBe(false);
+      });
+
+      afterEach(() => {
+        delete process.env.OPENAI_COMPATIBLE_ALLOWLIST;
+      });
+    });
+
+    describe('Gemini Trailing Slash Flexibility', () => {
+      it('should allow Gemini URLs without trailing slash', () => {
+        const result = validateBaseUrl('gemini', 'https://generativelanguage.googleapis.com');
+        expect(result.valid).toBe(true);
+      });
+
+      it('should allow Gemini URLs with trailing slash', () => {
+        const result = validateBaseUrl('gemini', 'https://generativelanguage.googleapis.com/');
+        expect(result.valid).toBe(true);
+      });
+
+      it('should allow Gemini URLs with paths', () => {
+        const result = validateBaseUrl('gemini', 'https://generativelanguage.googleapis.com/v1/models');
+        expect(result.valid).toBe(true);
+      });
+    });
+
+    describe('CRS Escaping Correctness', () => {
+      it('should handle CRS_BASE_URL without double-escaping', () => {
+        process.env.CRS_BASE_URL = 'https://api.crs.example.com';
+        const result = validateBaseUrl('crs', 'https://api.crs.example.com');
+        expect(result.valid).toBe(true);
+      });
+
+      it('should allow CRS URLs with trailing slash', () => {
+        process.env.CRS_BASE_URL = 'https://api.crs.example.com';
+        const result = validateBaseUrl('crs', 'https://api.crs.example.com/');
+        expect(result.valid).toBe(true);
+      });
+
+      it('should allow CRS URLs with paths', () => {
+        process.env.CRS_BASE_URL = 'https://api.crs.example.com';
+        const result = validateBaseUrl('crs', 'https://api.crs.example.com/v1/endpoint');
+        expect(result.valid).toBe(true);
+      });
+
+      afterEach(() => {
+        delete process.env.CRS_BASE_URL;
+      });
     });
   });
 });

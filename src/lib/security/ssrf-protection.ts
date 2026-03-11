@@ -14,20 +14,23 @@ const PRIVATE_IP_RANGES = [
   /^127\./,
   /^169\.254\./,
   /^\[?::1\]?$/,
-  /^\[?fe80:/i,
-  /^\[?fc00:/i,
-  /^\[?fd00:/i,
+  // IPv6 link-local (fe80::/10 = fe80-febf)
+  /^\[?fe[89ab][0-9a-f]:/i,
+  // IPv6 unique local (fc00::/7 = fc00-fdff)
+  /^\[?f[cd][0-9a-f]{2}:/i,
 ];
 
 function getAllowedBaseUrls(provider: string): RegExp[] {
   switch (provider) {
     case 'gemini':
-      return [/^https:\/\/generativelanguage\.googleapis\.com\//];
+      return [/^https:\/\/generativelanguage\.googleapis\.com(\/|$)/];
 
     case 'crs': {
       const patterns: RegExp[] = [];
-      const baseUrl = process.env.CRS_BASE_URL || 'https://api\\.crs\\.example\\.com';
-      patterns.push(new RegExp(`^${baseUrl.replace(/\./g, '\\.')}/?`));
+      const baseUrl = process.env.CRS_BASE_URL || 'https://api.crs.example.com';
+      // Escape dots once (not double-escaped)
+      const escapedUrl = baseUrl.replace(/\./g, '\\.');
+      patterns.push(new RegExp(`^${escapedUrl}(\/|$)`));
       if (process.env.CRS_BASE_URL_PATTERN) {
         patterns.push(new RegExp(process.env.CRS_BASE_URL_PATTERN));
       }
@@ -36,16 +39,17 @@ function getAllowedBaseUrls(provider: string): RegExp[] {
 
     case 'openai-compatible': {
       const patterns: RegExp[] = [
-        /^http:\/\/localhost:\d+/,
-        /^http:\/\/127\.0\.0\.1:\d+/,
-        /^http:\/\/host\.docker\.internal:\d+/,
+        /^http:\/\/localhost:\d+(\/|$)/,
+        /^http:\/\/127\.0\.0\.1:\d+(\/|$)/,
+        /^http:\/\/host\.docker\.internal:\d+(\/|$)/,
       ];
       if (process.env.OPENAI_COMPATIBLE_ALLOWLIST) {
         const hosts = process.env.OPENAI_COMPATIBLE_ALLOWLIST.split(',');
         hosts.forEach(host => {
           const trimmed = host.trim().replace(/\./g, '\\.');
-          // Match URLs with or without authentication
-          patterns.push(new RegExp(`^https://(?:[^@]+@)?${trimmed}`));
+          // Block userinfo (@) to prevent bypass attacks
+          // Use word boundary to prevent suffix domain attacks
+          patterns.push(new RegExp(`^https:\/\/${trimmed}(\/|$)`));
         });
       }
       return patterns;
