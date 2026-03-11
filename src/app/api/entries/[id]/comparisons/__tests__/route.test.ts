@@ -92,13 +92,13 @@ describe('GET /api/entries/[id]/comparisons', () => {
       scoreDiff: 5,
     };
 
-    (prisma.entry.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.entry.findUnique as any).mockResolvedValue({
       id: mockEntryId,
       originalExecutionMode: 'two-step',
     });
-    (prisma.comparisonBatch.count as jest.Mock).mockResolvedValue(1);
-    (prisma.comparisonBatch.findMany as jest.Mock).mockResolvedValue([mockBatch]);
-    (prisma.modeComparison.findMany as jest.Mock).mockResolvedValue([mockComparison]);
+    (prisma.comparisonBatch.count as any).mockResolvedValue(1);
+    (prisma.comparisonBatch.findMany as any).mockResolvedValue([mockBatch]);
+    (prisma.modeComparison.findMany as any).mockResolvedValue([mockComparison]);
 
     const request = createMockRequest();
     const response = await GET(request, { params: Promise.resolve({ id: mockEntryId }) });
@@ -153,13 +153,13 @@ describe('GET /api/entries/[id]/comparisons', () => {
   });
 
   it('should filter by status', async () => {
-    (prisma.entry.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.entry.findUnique as any).mockResolvedValue({
       id: mockEntryId,
       originalExecutionMode: 'two-step',
     });
-    (prisma.comparisonBatch.count as jest.Mock).mockResolvedValue(1);
-    (prisma.comparisonBatch.findMany as jest.Mock).mockResolvedValue([]);
-    (prisma.modeComparison.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.comparisonBatch.count as any).mockResolvedValue(1);
+    (prisma.comparisonBatch.findMany as any).mockResolvedValue([]);
+    (prisma.modeComparison.findMany as any).mockResolvedValue([]);
 
     const request = createMockRequest({ status: 'COMPLETED' });
     await GET(request, { params: Promise.resolve({ id: mockEntryId }) });
@@ -172,13 +172,13 @@ describe('GET /api/entries/[id]/comparisons', () => {
   });
 
   it('should filter by date range', async () => {
-    (prisma.entry.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.entry.findUnique as any).mockResolvedValue({
       id: mockEntryId,
       originalExecutionMode: 'two-step',
     });
-    (prisma.comparisonBatch.count as jest.Mock).mockResolvedValue(0);
-    (prisma.comparisonBatch.findMany as jest.Mock).mockResolvedValue([]);
-    (prisma.modeComparison.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.comparisonBatch.count as any).mockResolvedValue(0);
+    (prisma.comparisonBatch.findMany as any).mockResolvedValue([]);
+    (prisma.modeComparison.findMany as any).mockResolvedValue([]);
 
     const from = '2026-03-01T00:00:00Z';
     const to = '2026-03-10T23:59:59Z';
@@ -196,13 +196,13 @@ describe('GET /api/entries/[id]/comparisons', () => {
   });
 
   it('should apply pagination correctly', async () => {
-    (prisma.entry.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.entry.findUnique as any).mockResolvedValue({
       id: mockEntryId,
       originalExecutionMode: 'two-step',
     });
-    (prisma.comparisonBatch.count as jest.Mock).mockResolvedValue(50);
-    (prisma.comparisonBatch.findMany as jest.Mock).mockResolvedValue([]);
-    (prisma.modeComparison.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.comparisonBatch.count as any).mockResolvedValue(50);
+    (prisma.comparisonBatch.findMany as any).mockResolvedValue([]);
+    (prisma.modeComparison.findMany as any).mockResolvedValue([]);
 
     const request = createMockRequest({ limit: '10', offset: '20' });
     const response = await GET(request, { params: Promise.resolve({ id: mockEntryId }) });
@@ -225,13 +225,13 @@ describe('GET /api/entries/[id]/comparisons', () => {
   });
 
   it('should enforce max limit of 100', async () => {
-    (prisma.entry.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.entry.findUnique as any).mockResolvedValue({
       id: mockEntryId,
       originalExecutionMode: 'two-step',
     });
-    (prisma.comparisonBatch.count as jest.Mock).mockResolvedValue(200);
-    (prisma.comparisonBatch.findMany as jest.Mock).mockResolvedValue([]);
-    (prisma.modeComparison.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.comparisonBatch.count as any).mockResolvedValue(200);
+    (prisma.comparisonBatch.findMany as any).mockResolvedValue([]);
+    (prisma.modeComparison.findMany as any).mockResolvedValue([]);
 
     const request = createMockRequest({ limit: '150' });
     const response = await GET(request, { params: Promise.resolve({ id: mockEntryId }) });
@@ -240,13 +240,13 @@ describe('GET /api/entries/[id]/comparisons', () => {
   });
 
   it('should sort by createdAt desc by default', async () => {
-    (prisma.entry.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.entry.findUnique as any).mockResolvedValue({
       id: mockEntryId,
       originalExecutionMode: 'two-step',
     });
-    (prisma.comparisonBatch.count as jest.Mock).mockResolvedValue(0);
-    (prisma.comparisonBatch.findMany as jest.Mock).mockResolvedValue([]);
-    (prisma.modeComparison.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.comparisonBatch.count as any).mockResolvedValue(0);
+    (prisma.comparisonBatch.findMany as any).mockResolvedValue([]);
+    (prisma.modeComparison.findMany as any).mockResolvedValue([]);
 
     const request = createMockRequest();
     await GET(request, { params: Promise.resolve({ id: mockEntryId }) });
@@ -259,13 +259,13 @@ describe('GET /api/entries/[id]/comparisons', () => {
   });
 
   it('should use default parameters when no query string provided', async () => {
-    (prisma.entry.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.entry.findUnique as any).mockResolvedValue({
       id: mockEntryId,
       originalExecutionMode: 'two-step',
     });
-    (prisma.comparisonBatch.count as jest.Mock).mockResolvedValue(0);
-    (prisma.comparisonBatch.findMany as jest.Mock).mockResolvedValue([]);
-    (prisma.modeComparison.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.comparisonBatch.count as any).mockResolvedValue(0);
+    (prisma.comparisonBatch.findMany as any).mockResolvedValue([]);
+    (prisma.modeComparison.findMany as any).mockResolvedValue([]);
 
     const request = createMockRequest();
     const response = await GET(request, { params: Promise.resolve({ id: mockEntryId }) });
@@ -326,13 +326,13 @@ describe('GET /api/entries/[id]/comparisons', () => {
       scoreDiff: 8,
     };
 
-    (prisma.entry.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.entry.findUnique as any).mockResolvedValue({
       id: mockEntryId,
       originalExecutionMode: 'two-step',
     });
-    (prisma.comparisonBatch.count as jest.Mock).mockResolvedValue(2);
-    (prisma.comparisonBatch.findMany as jest.Mock).mockResolvedValue([mockBatch1, mockBatch2]);
-    (prisma.modeComparison.findMany as jest.Mock).mockResolvedValue([mockComparison1, mockComparison2]);
+    (prisma.comparisonBatch.count as any).mockResolvedValue(2);
+    (prisma.comparisonBatch.findMany as any).mockResolvedValue([mockBatch1, mockBatch2]);
+    (prisma.modeComparison.findMany as any).mockResolvedValue([mockComparison1, mockComparison2]);
 
     const request = createMockRequest({ sort: 'processedAt', order: 'desc' });
     const response = await GET(request, { params: Promise.resolve({ id: mockEntryId }) });
@@ -346,7 +346,7 @@ describe('GET /api/entries/[id]/comparisons', () => {
   });
 
   it('should handle invalid query parameters', async () => {
-    (prisma.entry.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.entry.findUnique as any).mockResolvedValue({
       id: mockEntryId,
       originalExecutionMode: 'two-step',
     });
@@ -358,7 +358,7 @@ describe('GET /api/entries/[id]/comparisons', () => {
   });
 
   it('should handle database errors gracefully', async () => {
-    (prisma.entry.findUnique as jest.Mock).mockRejectedValue(new Error('Database error'));
+    (prisma.entry.findUnique as any).mockRejectedValue(new Error('Database error'));
 
     const request = createMockRequest();
     const response = await GET(request, { params: Promise.resolve({ id: mockEntryId }) });

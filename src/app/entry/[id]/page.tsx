@@ -72,7 +72,7 @@ const tabs: { id: TabType; label: string; icon: React.ComponentType<{ size?: num
   { id: "related", label: "Related", icon: Sparkles },
   { id: "trace", label: "Trace", icon: Activity },
   { id: "quality", label: "Quality", icon: Gauge },
-  { id: "comparison", label: "Comparison", icon: GitCompare },
+  { id: "comparison", label: "Comparison History", icon: GitCompare },
 ];
 
 export default function EntryDetailPage() {

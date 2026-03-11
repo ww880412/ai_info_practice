@@ -14,10 +14,14 @@ export function ComparisonHistoryTab({ entryId }: ComparisonHistoryTabProps) {
   const [sort, setSort] = useState<"createdAt" | "processedAt">("createdAt");
   const [order, setOrder] = useState<"asc" | "desc">("desc");
   const [offset, setOffset] = useState(0);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const limit = 10;
 
   const filters = {
     ...(status !== "ALL" && { status }),
+    ...(fromDate && { from: new Date(fromDate).toISOString() }),
+    ...(toDate && { to: new Date(toDate).toISOString() }),
     sort,
     order,
     limit,
@@ -38,6 +42,12 @@ export function ComparisonHistoryTab({ entryId }: ComparisonHistoryTabProps) {
 
   const handleOrderToggle = () => {
     setOrder(order === "desc" ? "asc" : "desc");
+    setOffset(0);
+  };
+
+  const handleDateRangeChange = (from: string, to: string) => {
+    setFromDate(from);
+    setToDate(to);
     setOffset(0);
   };
 
@@ -95,6 +105,27 @@ export function ComparisonHistoryTab({ entryId }: ComparisonHistoryTabProps) {
           <option value="FAILED">Failed</option>
         </select>
 
+        {/* Date Range Filter */}
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => handleDateRangeChange(e.target.value, toDate)}
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="From date"
+            placeholder="From"
+          />
+          <span className="text-sm text-gray-500">to</span>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => handleDateRangeChange(fromDate, e.target.value)}
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="To date"
+            placeholder="To"
+          />
+        </div>
+
         {/* Sort Field */}
         <select
           value={sort}
@@ -136,7 +167,7 @@ export function ComparisonHistoryTab({ entryId }: ComparisonHistoryTabProps) {
       ) : (
         <div className="space-y-3">
           {comparisons.map((comparison) => (
-            <ComparisonCard key={comparison.batchId} comparison={comparison} />
+            <ComparisonCard key={comparison.batchId} comparison={comparison} entryId={entryId} />
           ))}
         </div>
       )}

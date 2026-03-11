@@ -6,6 +6,7 @@ import { Trophy, Clock, CheckCircle, XCircle, Loader2, ArrowRight } from "lucide
 
 interface ComparisonCardProps {
   comparison: ComparisonHistoryItem;
+  entryId: string;
 }
 
 const statusConfig = {
@@ -20,7 +21,7 @@ const modeLabels: Record<string, string> = {
   "tool-calling": "Tool Calling",
 };
 
-export function ComparisonCard({ comparison }: ComparisonCardProps) {
+export function ComparisonCard({ comparison, entryId }: ComparisonCardProps) {
   const statusInfo = statusConfig[comparison.batchStatus];
   const StatusIcon = statusInfo.icon;
   const hasResult = comparison.resultId && comparison.batchStatus === "COMPLETED";
@@ -118,7 +119,11 @@ export function ComparisonCard({ comparison }: ComparisonCardProps) {
         )}
         <div className="flex-1" />
         <Link
-          href={`/mode-comparison/${comparison.batchId}`}
+          href={
+            hasResult
+              ? `/comparison/${comparison.batchId}/entry/${entryId}`
+              : `/comparison/${comparison.batchId}`
+          }
           className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
         >
           View Details
