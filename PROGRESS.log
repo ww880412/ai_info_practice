@@ -567,3 +567,29 @@ e5f7726 feat(hooks): add useComparisonBatch hook with TanStack Query
 - 可以开始 Phase 2: Entry 详情页对比历史 Tab
 - 或进行 Phase 3 的部署和 QA 测试
 
+
+## 2026-03-11 09:45 - 数据库迁移完成
+
+### 完成内容
+- ✅ 删除重复的空迁移目录
+- ✅ 应用数据库迁移：20260311073500_extend_api_credential
+  - 新增 5 个字段：name, isDefault, isActive, validationError, config
+  - 新增 2 个索引：provider+isActive+isDefault, provider+isDefault+createdAt
+  - 新增唯一约束：provider+name+isActive
+- ✅ 运行回填脚本：0 条现有记录（数据库为空）
+- ✅ 运行种子脚本：成功创建 2 条初始凭证
+  - Gemini Default (isDefault=true, isActive=true)
+  - CRS Default (isDefault=true, isActive=true)
+- ✅ 验证自动修复功能：正常工作
+- ✅ 更新 KEY_ENCRYPTION_SECRET 为强密钥（base64, 32字节）
+
+### 数据库状态
+- ApiCredential 表已扩展，包含所有新字段
+- 2 条种子凭证已创建并加密存储
+- 系统可以正常使用多 Provider 凭证管理功能
+
+### 下一步
+- Phase 3 已完全就绪，可以进行功能测试
+- 建议运行 QA 检查清单验证所有功能
+- 或开始 Phase 2: Entry 详情页对比历史 Tab
+
