@@ -5,18 +5,35 @@
 ## 📍 当前状态（2026-03-11）
 
 ### 进行中
-- 🔄 **Phase 2: Entry 详情页对比历史 Tab**（2026-03-11）
-  - ✅ Task 3: API Route - GET /api/entries/[id]/comparisons（已完成）
-    - ✅ 实现查询逻辑：验证 entry 存在，查询 ComparisonBatch 和 ModeComparison
-    - ✅ 支持查询参数：status, limit, offset, sort, order, from, to
-    - ✅ 返回响应包含 pageInfo（total, hasNext, nextOffset）
-    - ✅ 错误处理：404 for non-existent entry, 400 for invalid params
-    - ✅ 处理 in-progress 批次（nullable scores）
-    - ✅ 完整测试套件：11 个测试用例覆盖 happy path 和 error cases
-  - ⏳ Task 4: UI Components（待开始）
-  - ⏳ Task 5: Entry Page Integration（待开始）
+- 无活跃任务
 
 ### 最近完成
+- ✅ **Phase 2: Entry 详情页对比历史 Tab**（2026-03-11，已合并到 main）
+  - ✅ Task 1-2: Schema Update & Batch Creation（entryIds 字段追踪）
+    - ✅ 添加 entryIds String[] 字段到 ComparisonBatch
+    - ✅ 添加 GIN 索引用于高效数组查询
+    - ✅ 创建 migration 和 backfill 脚本
+    - ✅ 更新批次创建逻辑填充 entryIds
+    - ✅ Codex 评审：7/10 → 修复 4 个问题后通过
+  - ✅ Task 3: API Route - GET /api/entries/[id]/comparisons
+    - ✅ 支持查询参数：status, limit, offset, sort, order, from, to
+    - ✅ 处理 in-progress 批次（nullable scores）
+    - ✅ 从 QualityEvaluation JSON 提取 overallScore
+    - ✅ 11 个测试用例覆盖所有场景
+    - ✅ Codex 评审：6/10 → 修复 3 个问题后通过
+  - ✅ Task 4-5: UI Components & Entry Page Integration
+    - ✅ useComparisonHistory hook（React Query）
+    - ✅ ComparisonCard 组件（状态/分数/winner badge）
+    - ✅ ComparisonHistoryTab 组件（过滤器/分页/日期范围）
+    - ✅ 集成到 Entry 详情页（新增 Comparison History tab）
+    - ✅ 响应式设计 + 无障碍支持
+  - ✅ Codex 最终评审：6/10 → 修复 5 个关键问题 → 8-9/10
+    - ✅ 修复卡片链接路由（batch vs per-entry views）
+    - ✅ 添加日期范围过滤器（from/to date inputs）
+    - ✅ 添加 GIN 索引优化查询性能
+    - ✅ 修复 tab 标签和测试类型
+  - ✅ 代码规模：17 个文件，1392+ 行新增代码
+  - ✅ 生产就绪：所有验收标准达成
 - ✅ **Phase 3: Settings Multi-Provider Credential Management System**（2026-03-11，已合并到 main）
   - ✅ 所有 7 个任务完成并通过 Codex 评审
   - ✅ Task 1: Database Schema Extension（Prisma migration + backfill script）
