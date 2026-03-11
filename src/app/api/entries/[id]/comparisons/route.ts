@@ -35,15 +35,16 @@ export async function GET(
     }
 
     // Parse and validate query parameters
+    // Convert null to undefined so Zod defaults work correctly
     const searchParams = request.nextUrl.searchParams;
     const queryValidation = QuerySchema.safeParse({
-      status: searchParams.get('status'),
-      limit: searchParams.get('limit'),
-      offset: searchParams.get('offset'),
-      sort: searchParams.get('sort'),
-      order: searchParams.get('order'),
-      from: searchParams.get('from'),
-      to: searchParams.get('to'),
+      status: searchParams.get('status') ?? undefined,
+      limit: searchParams.get('limit') ?? undefined,
+      offset: searchParams.get('offset') ?? undefined,
+      sort: searchParams.get('sort') ?? undefined,
+      order: searchParams.get('order') ?? undefined,
+      from: searchParams.get('from') ?? undefined,
+      to: searchParams.get('to') ?? undefined,
     });
 
     if (!queryValidation.success) {
@@ -77,12 +78,16 @@ export async function GET(
     // Get total count
     const total = await prisma.comparisonBatch.count({ where: batchWhere });
 
-    // Query ComparisonBatch with pagination
+    // For processedAt sorting, we need to fetch all batches first, then sort and paginate
+    // For createdAt sorting, we can sort at DB level
+    const shouldSortInMemory = query.sort === 'processedAt';
+
+    // Query ComparisonBatch (with or without pagination depending on sort field)
     const batches = await prisma.comparisonBatch.findMany({
       where: batchWhere,
-      orderBy: { createdAt: query.order },
-      skip: query.offset,
-      take: query.limit,
+      orderBy: query.sort === 'createdAt' ? { createdAt: query.order } : undefined,
+      skip: shouldSortInMemory ? undefined : query.offset,
+      take: shouldSortInMemory ? undefined : query.limit,
       select: {
         id: true,
         createdAt: true,
@@ -119,7 +124,7 @@ export async function GET(
     );
 
     // Merge results
-    const results = batches.map((batch) => {
+    let results = batches.map((batch) => {
       const comparison = comparisonMap.get(batch.id);
 
       // Extract overall scores from QualityEvaluation JSON
@@ -154,13 +159,15 @@ export async function GET(
       };
     });
 
-    // Apply sort by processedAt if requested (post-query sort)
+    // Apply sort by processedAt if requested (before pagination)
     if (query.sort === 'processedAt') {
       results.sort((a, b) => {
         const aTime = a.processedAt ? new Date(a.processedAt).getTime() : 0;
         const bTime = b.processedAt ? new Date(b.processedAt).getTime() : 0;
         return query.order === 'asc' ? aTime - bTime : bTime - aTime;
       });
+      // Apply pagination after sorting
+      results = results.slice(query.offset, query.offset + query.limit);
     }
 
     // Calculate pagination info

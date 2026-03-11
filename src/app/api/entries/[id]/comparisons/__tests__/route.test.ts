@@ -1,19 +1,20 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { GET } from '../route';
 import { prisma } from '@/lib/prisma';
 
 // Mock Prisma
-jest.mock('@/lib/prisma', () => ({
+vi.mock('@/lib/prisma', () => ({
   prisma: {
     entry: {
-      findUnique: jest.fn(),
+      findUnique: vi.fn(),
     },
     comparisonBatch: {
-      count: jest.fn(),
-      findMany: jest.fn(),
+      count: vi.fn(),
+      findMany: vi.fn(),
     },
     modeComparison: {
-      findMany: jest.fn(),
+      findMany: vi.fn(),
     },
   },
 }));
@@ -24,7 +25,7 @@ describe('GET /api/entries/[id]/comparisons', () => {
   const mockBatchId2 = 'batch-2';
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   const createMockRequest = (queryParams: Record<string, string> = {}) => {
@@ -36,7 +37,7 @@ describe('GET /api/entries/[id]/comparisons', () => {
   };
 
   it('should return 404 if entry does not exist', async () => {
-    (prisma.entry.findUnique as jest.Mock).mockResolvedValue(null);
+    (prisma.entry.findUnique as any).mockResolvedValue(null);
 
     const request = createMockRequest();
     const response = await GET(request, { params: Promise.resolve({ id: mockEntryId }) });
@@ -47,13 +48,13 @@ describe('GET /api/entries/[id]/comparisons', () => {
   });
 
   it('should return empty list for entry with no comparisons', async () => {
-    (prisma.entry.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.entry.findUnique as any).mockResolvedValue({
       id: mockEntryId,
       originalExecutionMode: 'two-step',
     });
-    (prisma.comparisonBatch.count as jest.Mock).mockResolvedValue(0);
-    (prisma.comparisonBatch.findMany as jest.Mock).mockResolvedValue([]);
-    (prisma.modeComparison.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.comparisonBatch.count as any).mockResolvedValue(0);
+    (prisma.comparisonBatch.findMany as any).mockResolvedValue([]);
+    (prisma.modeComparison.findMany as any).mockResolvedValue([]);
 
     const request = createMockRequest();
     const response = await GET(request, { params: Promise.resolve({ id: mockEntryId }) });
@@ -127,13 +128,13 @@ describe('GET /api/entries/[id]/comparisons', () => {
       targetMode: 'TOOL_CALLING',
     };
 
-    (prisma.entry.findUnique as jest.Mock).mockResolvedValue({
+    (prisma.entry.findUnique as any).mockResolvedValue({
       id: mockEntryId,
       originalExecutionMode: 'two-step',
     });
-    (prisma.comparisonBatch.count as jest.Mock).mockResolvedValue(1);
-    (prisma.comparisonBatch.findMany as jest.Mock).mockResolvedValue([mockBatch]);
-    (prisma.modeComparison.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.comparisonBatch.count as any).mockResolvedValue(1);
+    (prisma.comparisonBatch.findMany as any).mockResolvedValue([mockBatch]);
+    (prisma.modeComparison.findMany as any).mockResolvedValue([]);
 
     const request = createMockRequest();
     const response = await GET(request, { params: Promise.resolve({ id: mockEntryId }) });
@@ -141,18 +142,14 @@ describe('GET /api/entries/[id]/comparisons', () => {
 
     expect(response.status).toBe(200);
     expect(data.data.comparisons).toHaveLength(1);
-    expect(data.data.comparisons[0]).toMatchObject({
-      batchId: mockBatchId1,
-      batchStatus: 'PROCESSING',
-      originalMode: 'two-step',
-      comparisonMode: undefined,
-      resultId: undefined,
-      processedAt: undefined,
-      winner: undefined,
-      originalOverallScore: undefined,
-      comparisonOverallScore: undefined,
-      scoreDiff: undefined,
-    });
+    const comparison = data.data.comparisons[0];
+    expect(comparison.batchId).toBe(mockBatchId1);
+    expect(comparison.batchStatus).toBe('PROCESSING');
+    expect(comparison.originalMode).toBe('two-step');
+    // These fields should not be present when there's no comparison result
+    expect(comparison).not.toHaveProperty('comparisonMode');
+    expect(comparison).not.toHaveProperty('resultId');
+    expect(comparison).not.toHaveProperty('processedAt');
   });
 
   it('should filter by status', async () => {
@@ -259,6 +256,93 @@ describe('GET /api/entries/[id]/comparisons', () => {
         orderBy: { createdAt: 'desc' },
       })
     );
+  });
+
+  it('should use default parameters when no query string provided', async () => {
+    (prisma.entry.findUnique as jest.Mock).mockResolvedValue({
+      id: mockEntryId,
+      originalExecutionMode: 'two-step',
+    });
+    (prisma.comparisonBatch.count as jest.Mock).mockResolvedValue(0);
+    (prisma.comparisonBatch.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.modeComparison.findMany as jest.Mock).mockResolvedValue([]);
+
+    const request = createMockRequest();
+    const response = await GET(request, { params: Promise.resolve({ id: mockEntryId }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.pageInfo).toMatchObject({
+      limit: 20,
+      offset: 0,
+    });
+    expect(prisma.comparisonBatch.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: { createdAt: 'desc' },
+        skip: 0,
+        take: 20,
+      })
+    );
+  });
+
+  it('should sort by processedAt when specified', async () => {
+    const mockBatch1 = {
+      id: mockBatchId1,
+      createdAt: new Date('2026-03-10T10:00:00Z'),
+      status: 'COMPLETED',
+      sourceMode: 'TWO_STEP',
+      targetMode: 'TOOL_CALLING',
+    };
+
+    const mockBatch2 = {
+      id: mockBatchId2,
+      createdAt: new Date('2026-03-10T11:00:00Z'),
+      status: 'COMPLETED',
+      sourceMode: 'TWO_STEP',
+      targetMode: 'TOOL_CALLING',
+    };
+
+    const mockComparison1 = {
+      id: 'comparison-1',
+      batchId: mockBatchId1,
+      createdAt: new Date('2026-03-10T12:00:00Z'), // Later processedAt
+      originalMode: 'two-step',
+      comparisonMode: 'tool-calling',
+      originalScore: { overallScore: 85 },
+      comparisonScore: { overallScore: 90 },
+      winner: 'comparison',
+      scoreDiff: 5,
+    };
+
+    const mockComparison2 = {
+      id: 'comparison-2',
+      batchId: mockBatchId2,
+      createdAt: new Date('2026-03-10T10:30:00Z'), // Earlier processedAt
+      originalMode: 'two-step',
+      comparisonMode: 'tool-calling',
+      originalScore: { overallScore: 80 },
+      comparisonScore: { overallScore: 88 },
+      winner: 'comparison',
+      scoreDiff: 8,
+    };
+
+    (prisma.entry.findUnique as jest.Mock).mockResolvedValue({
+      id: mockEntryId,
+      originalExecutionMode: 'two-step',
+    });
+    (prisma.comparisonBatch.count as jest.Mock).mockResolvedValue(2);
+    (prisma.comparisonBatch.findMany as jest.Mock).mockResolvedValue([mockBatch1, mockBatch2]);
+    (prisma.modeComparison.findMany as jest.Mock).mockResolvedValue([mockComparison1, mockComparison2]);
+
+    const request = createMockRequest({ sort: 'processedAt', order: 'desc' });
+    const response = await GET(request, { params: Promise.resolve({ id: mockEntryId }) });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.data.comparisons).toHaveLength(2);
+    // Should be sorted by processedAt desc: comparison-1 (12:00) before comparison-2 (10:30)
+    expect(data.data.comparisons[0].resultId).toBe('comparison-1');
+    expect(data.data.comparisons[1].resultId).toBe('comparison-2');
   });
 
   it('should handle invalid query parameters', async () => {
