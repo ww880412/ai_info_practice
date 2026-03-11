@@ -111,11 +111,15 @@ export function CredentialList() {
 
   // Set default mutation
   const setDefaultMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(`/api/settings/credentials/${id}`, {
+    mutationFn: async (credential: ApiCredential) => {
+      const res = await fetch(`/api/settings/credentials/${credential.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isDefault: true }),
+        body: JSON.stringify({
+          provider: credential.provider,
+          name: credential.name,
+          isDefault: true,
+        }),
       });
       if (!res.ok) {
         const error = await res.json();
@@ -147,8 +151,8 @@ export function CredentialList() {
     testMutation.mutate(id);
   };
 
-  const handleSetDefault = (id: string) => {
-    setDefaultMutation.mutate(id);
+  const handleSetDefault = (credential: ApiCredential) => {
+    setDefaultMutation.mutate(credential);
   };
 
   if (isLoading) {
@@ -198,7 +202,7 @@ export function CredentialList() {
               onEdit={() => setEditingCredential(credential)}
               onDelete={() => handleDelete(credential.id)}
               onTest={() => handleTest(credential.id)}
-              onSetDefault={() => handleSetDefault(credential.id)}
+              onSetDefault={() => handleSetDefault(credential)}
             />
           ))}
 

@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { CredentialCard } from "../CredentialCard";
 import type { ApiCredential } from "@prisma/client";
@@ -23,14 +24,14 @@ describe("CredentialCard", () => {
   };
 
   const mockHandlers = {
-    onEdit: jest.fn(),
-    onDelete: jest.fn(),
-    onTest: jest.fn(),
-    onSetDefault: jest.fn(),
+    onEdit: vi.fn(),
+    onDelete: vi.fn(),
+    onTest: vi.fn(),
+    onSetDefault: vi.fn(),
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   it("renders credential information", () => {
@@ -61,10 +62,10 @@ describe("CredentialCard", () => {
     expect(screen.getByText("Invalid API key")).toBeInTheDocument();
   });
 
-  it("shows not validated status for null isValid", () => {
+  it("shows not validated status when lastValidatedAt is null", () => {
     const unvalidatedCredential = {
       ...mockCredential,
-      isValid: null,
+      lastValidatedAt: null,
     };
 
     render(<CredentialCard credential={unvalidatedCredential} {...mockHandlers} />);

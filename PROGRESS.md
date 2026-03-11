@@ -5,6 +5,13 @@
 ## 📍 当前状态（2026-03-11）
 
 ### 最近完成
+- ✅ **Settings Multi-Provider Task 7: Testing & Documentation**（2026-03-11）
+  - ✅ 测试验证：5 个测试套件（credentials API, SSRF, encryption, get-default-credential, components）
+  - ✅ 用户文档：完整的 settings-user-guide.md（添加/编辑/删除/测试/安全最佳实践/故障排除）
+  - ✅ QA 检查清单：10 个测试类别，100+ 测试项（settings-qa-checklist.md）
+  - ✅ 环境变量文档：更新 .env.example（KEY_ENCRYPTION_SECRET, CRS_BASE_URL_PATTERN, OPENAI_COMPATIBLE_ALLOWLIST）
+  - ✅ 文档覆盖：用户指南、环境变量参考、安全最佳实践、故障排除指南、FAQ
+  - ✅ 准备就绪：所有 7 个任务完成，待 Codex 评审
 - ✅ **Settings Multi-Provider Task 5: Frontend Components**（2026-03-11）
   - ✅ CredentialCard 组件：3-state 状态显示（Valid/Invalid/Not validated）
   - ✅ CredentialForm 组件：创建/编辑表单，客户端验证
@@ -83,18 +90,15 @@
 | CRS Provider | CRS API 集成（SSE 流式响应）| ✅ 已完成 |
 
 ### 进行中
-1. **Settings 多 Provider 凭证管理**（Phase 3，进行中）
-   - ✅ Task 4: AI Client Integration（2026-03-11，codex/task4-client-integration）
-     - isActive 检查已添加到 resolveCredential
-     - getDefaultCredential 辅助函数（支持 gemini/crs/openai-compatible）
-     - 12 个单元测试全部通过
-     - 注：依赖 Task 1 数据库迁移完成
-   - ⏳ Task 1: Database Schema Extension（待执行）
-   - ⏳ Task 2: SSRF Protection Module（待执行）
-   - ⏳ Task 3: API Routes（待执行）
-   - ⏳ Task 5: Frontend Components（待执行）
-   - ⏳ Task 6: Seeding & Migration（待执行）
-   - ⏳ Task 7: Testing & Documentation（待执行）
+1. **Settings 多 Provider 凭证管理**（Phase 3，待 Codex 评审）
+   - ✅ Task 1: Database Schema Extension（2026-03-11）
+   - ✅ Task 2: SSRF Protection Module（2026-03-11）
+   - ✅ Task 3: API Routes（2026-03-11）
+   - ✅ Task 4: AI Client Integration（2026-03-11）
+   - ✅ Task 5: Frontend Components（2026-03-11）
+   - ✅ Task 6: Seeding & Migration（2026-03-11）
+   - ✅ Task 7: Testing & Documentation（2026-03-11）
+   - 📋 状态：所有 7 个任务完成，待提交 Codex 评审
 
 ### 当前待办
 2. **Entry 详情页对比历史 Tab**（Phase 2，待规划）

@@ -90,8 +90,9 @@ export function CredentialForm({ mode, credential, onSubmit, onCancel }: Credent
       <div className="space-y-4">
         {/* Provider */}
         <div>
-          <label className="block text-sm font-medium mb-1">Provider</label>
+          <label htmlFor="provider" className="block text-sm font-medium mb-1">Provider</label>
           <select
+            id="provider"
             value={formData.provider}
             onChange={(e) => setFormData({ ...formData, provider: e.target.value })}
             disabled={mode === "edit"}
@@ -105,8 +106,9 @@ export function CredentialForm({ mode, credential, onSubmit, onCancel }: Credent
 
         {/* Name */}
         <div>
-          <label className="block text-sm font-medium mb-1">Name</label>
+          <label htmlFor="name" className="block text-sm font-medium mb-1">Name</label>
           <input
+            id="name"
             type="text"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -125,10 +127,11 @@ export function CredentialForm({ mode, credential, onSubmit, onCancel }: Credent
 
         {/* API Key */}
         <div>
-          <label className="block text-sm font-medium mb-1">
+          <label htmlFor="apiKey" className="block text-sm font-medium mb-1">
             API Key {mode === "edit" && "(leave blank to keep current)"}
           </label>
           <input
+            id="apiKey"
             type="password"
             value={formData.apiKey}
             onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
@@ -148,8 +151,9 @@ export function CredentialForm({ mode, credential, onSubmit, onCancel }: Credent
         {/* Base URL (for non-Gemini providers) */}
         {formData.provider !== "gemini" && (
           <div>
-            <label className="block text-sm font-medium mb-1">Base URL</label>
+            <label htmlFor="baseUrl" className="block text-sm font-medium mb-1">Base URL</label>
             <input
+              id="baseUrl"
               type="url"
               value={formData.baseUrl}
               onChange={(e) => setFormData({ ...formData, baseUrl: e.target.value })}
@@ -169,8 +173,9 @@ export function CredentialForm({ mode, credential, onSubmit, onCancel }: Credent
 
         {/* Model */}
         <div>
-          <label className="block text-sm font-medium mb-1">Model (optional)</label>
+          <label htmlFor="model" className="block text-sm font-medium mb-1">Model (optional)</label>
           <input
+            id="model"
             type="text"
             value={formData.model}
             onChange={(e) => setFormData({ ...formData, model: e.target.value })}
@@ -181,8 +186,9 @@ export function CredentialForm({ mode, credential, onSubmit, onCancel }: Credent
 
         {/* Checkboxes */}
         <div className="space-y-2">
-          <label className="flex items-center gap-2">
+          <label htmlFor="isDefault" className="flex items-center gap-2">
             <input
+              id="isDefault"
               type="checkbox"
               checked={formData.isDefault}
               onChange={(e) => setFormData({ ...formData, isDefault: e.target.checked })}
@@ -191,8 +197,9 @@ export function CredentialForm({ mode, credential, onSubmit, onCancel }: Credent
             <span className="text-sm">Set as default provider</span>
           </label>
 
-          <label className="flex items-center gap-2">
+          <label htmlFor="validate" className="flex items-center gap-2">
             <input
+              id="validate"
               type="checkbox"
               checked={formData.validate}
               onChange={(e) => setFormData({ ...formData, validate: e.target.checked })}

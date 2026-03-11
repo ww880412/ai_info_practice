@@ -19,7 +19,7 @@ export function CredentialCard({
   onSetDefault,
 }: CredentialCardProps) {
   const getStatusIcon = () => {
-    if (credential.isValid === null) {
+    if (!credential.lastValidatedAt) {
       return <AlertTriangle size={16} className="text-yellow-600" />;
     }
     return credential.isValid ? (
@@ -30,14 +30,14 @@ export function CredentialCard({
   };
 
   const getStatusText = () => {
-    if (credential.isValid === null) {
+    if (!credential.lastValidatedAt) {
       return "Not validated";
     }
     return credential.isValid ? "Valid" : "Invalid";
   };
 
   const getStatusColor = () => {
-    if (credential.isValid === null) {
+    if (!credential.lastValidatedAt) {
       return "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800";
     }
     return credential.isValid

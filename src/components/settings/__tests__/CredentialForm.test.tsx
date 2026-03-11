@@ -1,10 +1,11 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { CredentialForm } from "../CredentialForm";
 import type { ApiCredential } from "@prisma/client";
 
 describe("CredentialForm", () => {
-  const mockOnSubmit = jest.fn();
-  const mockOnCancel = jest.fn();
+  const mockOnSubmit = vi.fn();
+  const mockOnCancel = vi.fn();
 
   const mockCredential: ApiCredential = {
     id: "test-id",
@@ -26,7 +27,7 @@ describe("CredentialForm", () => {
   };
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
     mockOnSubmit.mockResolvedValue(undefined);
   });
 
@@ -101,7 +102,7 @@ describe("CredentialForm", () => {
     it("validates base URL format for non-Gemini providers", async () => {
       render(<CredentialForm mode="create" onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
 
-      const providerSelect = screen.getByRole("combobox");
+      const providerSelect = screen.getByLabelText("Provider");
       fireEvent.change(providerSelect, { target: { value: "crs" } });
 
       const nameInput = screen.getByPlaceholderText("e.g., Gemini Production");
@@ -146,7 +147,7 @@ describe("CredentialForm", () => {
     it("shows base URL field for non-Gemini providers", () => {
       render(<CredentialForm mode="create" onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
 
-      const providerSelect = screen.getByRole("combobox");
+      const providerSelect = screen.getByLabelText("Provider");
       fireEvent.change(providerSelect, { target: { value: "crs" } });
 
       expect(screen.getByPlaceholderText("https://api.example.com")).toBeInTheDocument();
@@ -200,7 +201,7 @@ describe("CredentialForm", () => {
         />
       );
 
-      const providerSelect = screen.getByRole("combobox");
+      const providerSelect = screen.getByLabelText("Provider");
       expect(providerSelect).toBeDisabled();
     });
 

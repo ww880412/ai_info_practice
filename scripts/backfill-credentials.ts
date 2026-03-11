@@ -30,6 +30,9 @@ async function backfillCredentials() {
   for (const [provider, creds] of Object.entries(byProvider)) {
     console.log(`\nProcessing ${provider}: ${creds.length} credential(s)`);
 
+    // Check if any credential already has isDefault=true
+    const hasDefault = creds.some(c => c.isDefault === true);
+
     for (let i = 0; i < creds.length; i++) {
       const cred = creds[i];
 
@@ -43,8 +46,8 @@ async function backfillCredentials() {
         }
       }
 
-      // Set isDefault for first credential per provider
-      const isDefault = i === 0;
+      // Set isDefault for first credential per provider (only if no default exists)
+      const isDefault = hasDefault ? (cred.isDefault === true) : (i === 0);
 
       // Update credential
       await prisma.apiCredential.update({
