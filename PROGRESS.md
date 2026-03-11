@@ -5,6 +5,17 @@
 ## 📍 当前状态（2026-03-11）
 
 ### 最近完成
+- ✅ **Phase 3: Settings Multi-Provider Credential Management System**（2026-03-11，已合并到 main）
+  - ✅ 所有 7 个任务完成并通过 Codex 评审
+  - ✅ Task 1: Database Schema Extension（Prisma migration + backfill script）
+  - ✅ Task 2: SSRF Protection Module（57 tests, Codex 10/10）
+  - ✅ Task 3: CRUD API Endpoints（4 endpoints + validation, encryption fixes）
+  - ✅ Task 4: AI Client Integration（isActive check + default credential helper）
+  - ✅ Task 5: Frontend Components（3 components, 31+ tests, Codex fixes applied）
+  - ✅ Task 6: Seeding & Auto-Repair（seed script + auto-repair function）
+  - ✅ Task 7: Testing & Documentation（user guide + QA checklist）
+  - ✅ TypeScript 编译通过，所有类型错误已修复
+  - ✅ 代码规模：37 个文件，6496+ 行代码
 - ✅ **Settings Multi-Provider Task 7: Testing & Documentation**（2026-03-11）
   - ✅ 测试验证：5 个测试套件（credentials API, SSRF, encryption, get-default-credential, components）
   - ✅ 用户文档：完整的 settings-user-guide.md（添加/编辑/删除/测试/安全最佳实践/故障排除）
@@ -56,10 +67,7 @@
 - ✅ Phase 3a: 结果评分 Agent（经 3 轮 Codex 评审，9/10 分）
 
 ### 活跃分支
-- `main`（主线，最新部署）
-- `codex/settings-ui-task5`（Settings Task 5 Frontend Components，待评审）
-- `codex/fix-ssrf-security-issues`（Settings Task 1-3，待合并）
-- `codex/task4-client-integration`（Settings Task 4，待 Task 1-3 合并后继续）
+- `main`（主线，最新部署，包含 Phase 3 Settings 系统）
 
 ### 重构脉络总览
 
