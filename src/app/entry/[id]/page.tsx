@@ -15,6 +15,7 @@ import { InlineEdit } from "@/components/entry/InlineEdit";
 import { TagEditor } from "@/components/entry/TagEditor";
 import { NotePanel } from "@/components/entry/NotePanel";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
+import { ComparisonHistoryTab } from "@/components/entry/ComparisonHistoryTab";
 import {
   ArrowLeft,
   ExternalLink,
@@ -32,6 +33,7 @@ import {
   FileTextIcon,
   Activity,
   Gauge,
+  GitCompare,
 } from "lucide-react";
 
 const sourceIconMap: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
@@ -61,7 +63,7 @@ const techDomainLabels: Record<string, string> = {
 };
 
 // Tab types
-type TabType = "overview" | "summary" | "practice" | "related" | "trace" | "quality";
+type TabType = "overview" | "summary" | "practice" | "related" | "trace" | "quality" | "comparison";
 
 const tabs: { id: TabType; label: string; icon: React.ComponentType<{ size?: number; className?: string }> }[] = [
   { id: "overview", label: "Overview", icon: Info },
@@ -70,6 +72,7 @@ const tabs: { id: TabType; label: string; icon: React.ComponentType<{ size?: num
   { id: "related", label: "Related", icon: Sparkles },
   { id: "trace", label: "Trace", icon: Activity },
   { id: "quality", label: "Quality", icon: Gauge },
+  { id: "comparison", label: "Comparison History", icon: GitCompare },
 ];
 
 export default function EntryDetailPage() {
@@ -583,6 +586,9 @@ export default function EntryDetailPage() {
           )}
 
           {activeTab === "quality" && <QualityPanel entryId={id} />}
+
+          {/* Comparison Tab */}
+          {activeTab === "comparison" && <ComparisonHistoryTab entryId={id} />}
         </div>
       )}
 

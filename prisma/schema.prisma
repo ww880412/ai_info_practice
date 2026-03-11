@@ -505,6 +505,7 @@ model ComparisonBatch {
   targetMode  ComparisonMode  // Comparison mode
 
   entryCount  Int
+  entryIds    String[]  @default([])  // Entry IDs included in this batch (for in-progress visibility)
   status      BatchStatus     @default(PENDING)
   progress    Int             @default(0)  // Percentage: 0-100
   processedCount Int          @default(0)  // Actual processed entries
@@ -516,4 +517,5 @@ model ComparisonBatch {
 
   @@index([status])
   @@index([createdAt, id])  // Composite index for stable sorting
+  @@index([entryIds(ops: raw("gin_trgm_ops"))], type: Gin)  // GIN index for efficient array queries
 }
