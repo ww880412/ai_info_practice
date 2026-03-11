@@ -5,6 +5,17 @@
 ## 📍 当前状态（2026-03-11）
 
 ### 最近完成
+- ✅ **Settings Multi-Provider Task 3: CRUD API Endpoints**（2026-03-11）
+  - ✅ 请求验证模块：provider allowlist, name/apiKey/baseUrl/config 验证
+  - ✅ 加密模块：AES-256-GCM 加密/解密，keyHint 生成
+  - ✅ 凭证验证：支持 gemini/crs/openai-compatible，5s 超时
+  - ✅ GET /api/settings/credentials - 列出活跃凭证
+  - ✅ POST /api/settings/credentials - 创建（含重名检查、SSRF 防护、事务）
+  - ✅ PUT /api/settings/credentials/[id] - 更新（含事务）
+  - ✅ DELETE /api/settings/credentials/[id] - 软删除
+  - ✅ POST /api/settings/credentials/[id]/validate - 验证凭证
+  - ✅ 综合测试套件：validation, encryption, SSRF integration
+  - ✅ 安全特性：encryptedKey 永不返回，软删除，验证超时
 - ✅ **Comparison History 批次列表页**（2026-03-11，已合并）
   - ✅ 数据库迁移：新增 ComparisonMode 和 BatchStatus 枚举
   - ✅ 批次历史列表页 `/comparison` 支持分页和状态过滤
@@ -32,7 +43,8 @@
 
 ### 活跃分支
 - `main`（主线，最新部署）
-- `codex/task4-client-integration`（Settings Task 4，待 Task 1 完成后合并）
+- `codex/fix-ssrf-security-issues`（Settings Task 1-3，待合并）
+- `codex/task4-client-integration`（Settings Task 4，待 Task 1-3 合并后继续）
 
 ### 重构脉络总览
 
