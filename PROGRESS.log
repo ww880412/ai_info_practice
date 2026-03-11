@@ -394,3 +394,152 @@ e5f7726 feat(hooks): add useComparisonBatch hook with TanStack Query
 - 提交数: 1 个（Task 12 完成）
 - 文件变更: 3 个文件（新增 1 个用户指南，更新 PROGRESS.md，优化 sdk-tools.ts）
 
+
+## 2026-03-11 - Task 1: Database Schema Extension Completed
+
+**Branch**: codex/settings-schema-extension
+**Commit**: ac44a31
+
+**Changes Made**:
+- Extended ApiCredential model with 5 new fields:
+  - name (String?) - Human-readable credential name
+  - isDefault (Boolean, default false) - Default credential per provider
+  - isActive (Boolean, default true) - Soft delete flag
+  - validationError (String?) - Last validation error message
+  - config (Json?) - Provider-specific configuration
+  
+- Added 3 new indexes:
+  - @@unique([provider, name, isActive]) - Prevent duplicate names per provider
+  - @@index([provider, isActive, isDefault]) - Fast default lookup
+  - @@index([provider, isDefault, createdAt]) - Ordered credential listing
+
+- Updated provider comment to include 'crs' provider
+
+**Verification**:
+- Schema pushed to database successfully
+- Prisma client regenerated
+- New fields accessible in Prisma client
+- No breaking changes to existing schema
+
+**Next Steps**: Task 2 - SSRF Protection Module
+
+
+## 2026-03-11 07:46 - Task 4: AI Client Integration 完成
+
+### 执行内容
+- 创建分支 `codex/task4-client-integration`
+- 更新 `src/lib/ai/client.ts`:
+  - resolveCredential 函数添加 isActive 检查
+  - 检查条件：!credential || !credential.isValid || !credential.isActive
+- 创建 `src/lib/ai/get-default-credential.ts`:
+  - getDefaultCredential 函数实现
+  - 支持 gemini, crs, openai-compatible 三种 provider
+  - 确定性排序：isDefault desc, createdAt asc
+  - 环境变量 fallback 逻辑
+- 创建 `src/lib/ai/__tests__/get-default-credential.test.ts`:
+  - 12 个单元测试，全部通过
+  - 覆盖三种 provider 的默认凭证查询和 fallback
+  - 测试确定性排序和过滤逻辑
+- 提交 commit: 3e03504
+
+### 测试结果
+```
+✓ src/lib/ai/__tests__/get-default-credential.test.ts (12 tests) 3ms
+  Test Files  1 passed (1)
+       Tests  12 passed (12)
+```
+
+### 依赖关系
+- Task 4 依赖 Task 1（数据库 schema）完成
+- isActive 和 isDefault 字段需要先在 Prisma schema 中添加
+- 当前 TypeScript 编译有错误（预期，等待 Task 1）
+
+### 下一步
+- 执行 Task 1: Database Schema Extension
+- 完成后重新验证 Task 4 的类型检查
+- 按顺序执行 Task 2-7
+
+
+## 2026-03-11 08:00 - Task 3: Credentials CRUD API Implementation
+
+**Branch**: codex/fix-ssrf-security-issues
+**Commit**: af9d91c
+
+**Completed**:
+1. Created validation module (src/lib/settings/validation.ts)
+   - Provider allowlist enforcement
+   - Name format validation (1-50 chars, alphanumeric + spaces/dashes)
+   - API key minimum length (8 chars)
+   - Base URL format validation
+   - Config validation (temperature 0-2, maxTokens > 0)
+
+2. Created encryption module (src/lib/settings/encryption.ts)
+   - AES-256-GCM encryption/decryption
+   - Uses KEY_ENCRYPTION_SECRET environment variable
+   - Key hint generation (last 4 chars)
+
+3. Created credential validation module (src/lib/settings/credential-validation.ts)
+   - Provider-specific validation (gemini, crs, openai-compatible)
+   - 5-second timeout enforcement
+   - Error handling and reporting
+
+4. Implemented API endpoints:
+   - GET /api/settings/credentials - List active credentials
+   - POST /api/settings/credentials - Create with duplicate check, SSRF protection, transaction
+   - PUT /api/settings/credentials/[id] - Update with transaction
+   - DELETE /api/settings/credentials/[id] - Soft delete (isActive flag)
+   - POST /api/settings/credentials/[id]/validate - Test credential
+
+5. Security features:
+   - encryptedKey NEVER returned in responses
+   - Duplicate name check per provider
+   - SSRF protection on all baseUrl inputs
+   - Transaction support for default credential updates
+   - Soft delete implementation
+   - Validation timeout enforcement
+
+6. Created comprehensive test suite (src/app/api/settings/credentials/__tests__/credentials.test.ts)
+   - Validation module tests (9 test cases)
+   - Encryption module tests (4 test cases)
+   - SSRF protection integration tests (4 test cases)
+
+**Files Created**:
+- src/lib/settings/validation.ts (67 lines)
+- src/lib/settings/encryption.ts (62 lines)
+- src/lib/settings/credential-validation.ts (103 lines)
+- src/app/api/settings/credentials/route.ts (143 lines)
+- src/app/api/settings/credentials/[id]/route.ts (186 lines)
+- src/app/api/settings/credentials/[id]/validate/route.ts (47 lines)
+- src/app/api/settings/credentials/__tests__/credentials.test.ts (235 lines)
+- test-credentials.ts (manual test runner, 95 lines)
+
+**Total**: 8 files, 943 lines of code
+
+**Acceptance Criteria Met**:
+✅ All endpoints implemented
+✅ Request validation enforced
+✅ Duplicate name check works
+✅ SSRF protection enforced
+✅ Transaction for default updates
+✅ Soft delete working
+✅ Validation logic implemented (all 3 providers)
+✅ Validation timeout enforced (5s)
+✅ encryptedKey NEVER returned
+✅ lastValidatedAt/lastUsedAt fields ready
+✅ Error codes match design (INVALID_PARAMS, DUPLICATE_NAME, SSRF_BLOCKED, etc.)
+✅ Comprehensive test suite created
+
+**Next Steps**:
+- Submit to Codex for review
+- After approval, merge to main
+- Continue with Task 4 (AI Client Integration)
+
+**Dependencies**:
+- Task 1 (Schema) - Complete (on this branch)
+- Task 2 (SSRF Protection) - Complete (on this branch)
+- Task 3 (API Routes) - Complete (this session)
+
+**Notes**:
+- TypeScript compilation passes with no errors
+- All security requirements implemented
+- Ready for Codex review

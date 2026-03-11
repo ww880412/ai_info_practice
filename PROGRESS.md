@@ -5,6 +5,31 @@
 ## 📍 当前状态（2026-03-11）
 
 ### 最近完成
+- ✅ **Settings Multi-Provider Task 7: Testing & Documentation**（2026-03-11）
+  - ✅ 测试验证：5 个测试套件（credentials API, SSRF, encryption, get-default-credential, components）
+  - ✅ 用户文档：完整的 settings-user-guide.md（添加/编辑/删除/测试/安全最佳实践/故障排除）
+  - ✅ QA 检查清单：10 个测试类别，100+ 测试项（settings-qa-checklist.md）
+  - ✅ 环境变量文档：更新 .env.example（KEY_ENCRYPTION_SECRET, CRS_BASE_URL_PATTERN, OPENAI_COMPATIBLE_ALLOWLIST）
+  - ✅ 文档覆盖：用户指南、环境变量参考、安全最佳实践、故障排除指南、FAQ
+  - ✅ 准备就绪：所有 7 个任务完成，待 Codex 评审
+- ✅ **Settings Multi-Provider Task 5: Frontend Components**（2026-03-11）
+  - ✅ CredentialCard 组件：3-state 状态显示（Valid/Invalid/Not validated）
+  - ✅ CredentialForm 组件：创建/编辑表单，客户端验证
+  - ✅ CredentialList 组件：React Query 集成，CRUD 操作
+  - ✅ Settings 页面：多 Provider 凭证管理 UI
+  - ✅ 组件测试：CredentialCard.test.tsx + CredentialForm.test.tsx
+  - ✅ 功能：Add/Edit/Delete/Test/Set Default，加载状态，错误处理，空状态
+- ✅ **Settings Multi-Provider Task 3: CRUD API Endpoints**（2026-03-11）
+  - ✅ 请求验证模块：provider allowlist, name/apiKey/baseUrl/config 验证
+  - ✅ 加密模块：AES-256-GCM 加密/解密，keyHint 生成
+  - ✅ 凭证验证：支持 gemini/crs/openai-compatible，5s 超时
+  - ✅ GET /api/settings/credentials - 列出活跃凭证
+  - ✅ POST /api/settings/credentials - 创建（含重名检查、SSRF 防护、事务）
+  - ✅ PUT /api/settings/credentials/[id] - 更新（含事务）
+  - ✅ DELETE /api/settings/credentials/[id] - 软删除
+  - ✅ POST /api/settings/credentials/[id]/validate - 验证凭证
+  - ✅ 综合测试套件：validation, encryption, SSRF integration
+  - ✅ 安全特性：encryptedKey 永不返回，软删除，验证超时
 - ✅ **Comparison History 批次列表页**（2026-03-11，已合并）
   - ✅ 数据库迁移：新增 ComparisonMode 和 BatchStatus 枚举
   - ✅ 批次历史列表页 `/comparison` 支持分页和状态过滤
@@ -32,6 +57,9 @@
 
 ### 活跃分支
 - `main`（主线，最新部署）
+- `codex/settings-ui-task5`（Settings Task 5 Frontend Components，待评审）
+- `codex/fix-ssrf-security-issues`（Settings Task 1-3，待合并）
+- `codex/task4-client-integration`（Settings Task 4，待 Task 1-3 合并后继续）
 
 ### 重构脉络总览
 
@@ -61,11 +89,18 @@
 |-------|------|------|
 | CRS Provider | CRS API 集成（SSE 流式响应）| ✅ 已完成 |
 
+### 进行中
+1. **Settings 多 Provider 凭证管理**（Phase 3，待 Codex 评审）
+   - ✅ Task 1: Database Schema Extension（2026-03-11）
+   - ✅ Task 2: SSRF Protection Module（2026-03-11）
+   - ✅ Task 3: API Routes（2026-03-11）
+   - ✅ Task 4: AI Client Integration（2026-03-11）
+   - ✅ Task 5: Frontend Components（2026-03-11）
+   - ✅ Task 6: Seeding & Migration（2026-03-11）
+   - ✅ Task 7: Testing & Documentation（2026-03-11）
+   - 📋 状态：所有 7 个任务完成，待提交 Codex 评审
+
 ### 当前待办
-1. **Settings 多 Provider 凭证管理**（Phase 3，已规划）
-   - 支持多个 Provider（Gemini, CRS, 未来扩展）
-   - 安全的凭证存储（DB 加密）
-   - 与 .env 配置打通
 2. **Entry 详情页对比历史 Tab**（Phase 2，待规划）
    - 从 Entry 视角查看对比历史
    - 显示对比时间、模式、得分

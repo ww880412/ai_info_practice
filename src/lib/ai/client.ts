@@ -367,8 +367,8 @@ export async function resolveCredential(credentialId: string | null): Promise<No
     where: { id: credentialId },
   });
 
-  if (!credential || !credential.isValid) {
-    console.warn(`Credential ${credentialId} not found or invalid, falling back to env`);
+  if (!credential || !credential.isValid || !credential.isActive) {
+    console.warn(`Credential ${credentialId} not found, invalid, or inactive - falling back to env`);
     return getDefaultCredentialConfig();
   }
 
