@@ -5,6 +5,13 @@
 ## 📍 当前状态（2026-03-11）
 
 ### 最近完成
+- ✅ **Settings Multi-Provider Task 5: Frontend Components**（2026-03-11）
+  - ✅ CredentialCard 组件：3-state 状态显示（Valid/Invalid/Not validated）
+  - ✅ CredentialForm 组件：创建/编辑表单，客户端验证
+  - ✅ CredentialList 组件：React Query 集成，CRUD 操作
+  - ✅ Settings 页面：多 Provider 凭证管理 UI
+  - ✅ 组件测试：CredentialCard.test.tsx + CredentialForm.test.tsx
+  - ✅ 功能：Add/Edit/Delete/Test/Set Default，加载状态，错误处理，空状态
 - ✅ **Settings Multi-Provider Task 3: CRUD API Endpoints**（2026-03-11）
   - ✅ 请求验证模块：provider allowlist, name/apiKey/baseUrl/config 验证
   - ✅ 加密模块：AES-256-GCM 加密/解密，keyHint 生成
@@ -43,6 +50,7 @@
 
 ### 活跃分支
 - `main`（主线，最新部署）
+- `codex/settings-ui-task5`（Settings Task 5 Frontend Components，待评审）
 - `codex/fix-ssrf-security-issues`（Settings Task 1-3，待合并）
 - `codex/task4-client-integration`（Settings Task 4，待 Task 1-3 合并后继续）
 

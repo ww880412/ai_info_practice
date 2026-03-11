@@ -5,7 +5,7 @@
  * with timeout enforcement and error handling
  */
 
-import { decryptApiKey } from './encryption';
+import { decryptApiKey } from '@/lib/crypto';
 import prisma from '@/lib/prisma';
 
 const VALIDATION_TIMEOUT = 5000; // 5 seconds

@@ -69,3 +69,47 @@ export function validateCredentialRequest(data: any): ValidationResult {
 
   return { valid: Object.keys(errors).length === 0, errors };
 }
+
+export function validateCredentialUpdate(data: any): ValidationResult {
+  const errors: ValidationErrors = {};
+
+  // Provider validation
+  if (!data.provider || !PROVIDER_ALLOWLIST.includes(data.provider)) {
+    errors.provider = `Provider must be one of: ${PROVIDER_ALLOWLIST.join(', ')}`;
+  }
+
+  // Name validation (1-50 chars, alphanumeric + spaces/dashes)
+  if (data.name && !/^[a-zA-Z0-9\s\-]{1,50}$/.test(data.name)) {
+    errors.name = 'Name must be 1-50 characters (alphanumeric, spaces, dashes only)';
+  }
+
+  // API key validation (optional for updates)
+  if (data.apiKey && data.apiKey.length < 8) {
+    errors.apiKey = 'API key must be at least 8 characters';
+  }
+
+  // Base URL validation (if provided)
+  if (data.baseUrl) {
+    try {
+      new URL(data.baseUrl);
+    } catch {
+      errors.baseUrl = 'Invalid URL format';
+    }
+  }
+
+  // Config validation (if provided)
+  if (data.config) {
+    if (data.config.temperature !== undefined) {
+      if (typeof data.config.temperature !== 'number' || data.config.temperature < 0 || data.config.temperature > 2) {
+        errors.config = 'Temperature must be between 0 and 2';
+      }
+    }
+    if (data.config.maxTokens !== undefined) {
+      if (typeof data.config.maxTokens !== 'number' || data.config.maxTokens < 1) {
+        errors.config = 'Max tokens must be a positive number';
+      }
+    }
+  }
+
+  return { valid: Object.keys(errors).length === 0, errors };
+}

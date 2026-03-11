@@ -7,9 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { validateCredentialRequest } from '@/lib/settings/validation';
+import { validateCredentialUpdate } from '@/lib/settings/validation';
 import { validateBaseUrl } from '@/lib/security/ssrf-protection';
-import { encryptApiKey, getKeyHint } from '@/lib/settings/encryption';
+import { encryptApiKey, getKeyHint } from '@/lib/crypto';
 import { validateCredential } from '@/lib/settings/credential-validation';
 
 export async function PUT(
@@ -33,7 +33,7 @@ export async function PUT(
     }
 
     // Validate input
-    const { valid, errors } = validateCredentialRequest(body);
+    const { valid, errors } = validateCredentialUpdate(body);
     if (!valid) {
       return NextResponse.json(
         {
@@ -125,6 +125,16 @@ export async function PUT(
           lastValidatedAt: new Date(),
         },
       });
+
+      // Re-fetch to get updated validation status
+      const updatedCredential = await prisma.apiCredential.findUnique({
+        where: { id: credential.id },
+      });
+
+      if (updatedCredential) {
+        const { encryptedKey: _, ...safeCredential } = updatedCredential;
+        return NextResponse.json({ data: safeCredential });
+      }
     }
 
     // IMPORTANT: Never return encryptedKey
