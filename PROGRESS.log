@@ -656,3 +656,40 @@ e5f7726 feat(hooks): add useComparisonBatch hook with TanStack Query
 ### 下一步
 - Task 4: UI Components（ComparisonHistoryTab + ComparisonCard）
 - Task 5: Entry Page Integration
+
+## 2026-03-12 会话交接
+
+### 本轮完成
+- ✅ Phase 2 全部 5 个 Task 完成并通过 Codex 评审
+  - Task 1-2 (Phase 2A): Schema + Batch Creation, Codex 7/10 → 修复 4 个问题
+  - Task 3 (Phase 2B): API Route, Codex 6/10 → 修复 3 个问题
+  - Task 4-5 (Phase 2C): UI Components + Entry Page Integration
+  - 最终 Codex 评审: 6/10 → 修复 5 个问题 → 8-9/10
+- ✅ Phase 2 合并到 main（17 个文件，1392+ 行代码）
+- ✅ 修复 Next.js 16 async params 类型错误（Phase 3 遗留问题）
+  - src/app/api/settings/credentials/[id]/route.ts (PUT + DELETE)
+  - src/app/api/settings/credentials/[id]/validate/route.ts
+- ✅ Docker 部署完成
+  - 构建成功，3 个容器运行中（app/postgres/inngest）
+  - 手动应用 3 个缺失的数据库迁移（容器内无 prisma CLI）
+  - 添加 GIN 索引（使用默认 ops，gin_trgm_ops 不可用）
+- ✅ Seed 凭证数据（Gemini Default + CRS Default）
+
+### 发现的问题
+- ⚠️ 数据库 Entry 表为空，原有数据丢失
+  - Volume 创建于 3/4，未被删除重建
+  - 推测在之前某次 prisma db push/migrate reset 时被清空
+  - 非本次操作导致（docker-compose down 不删除 volumes）
+- ⚠️ GIN 索引使用默认 ops 而非 gin_trgm_ops（pg_trgm 扩展未安装）
+  - Schema 中的 `gin_trgm_ops` 与实际不一致，需后续修正
+- ⚠️ 生产容器内无 prisma CLI，迁移需手动 SQL 或改 Dockerfile
+
+### Codex 评审配置
+- CODEX_HOME=/Users/ww/.codex
+- 命令: CODEX_HOME=/Users/ww/.codex codex exec --skip-git-repo-check --sandbox read-only --full-auto "prompt"
+
+### 当前状态
+- main 分支，所有代码已提交
+- Docker 服务运行中，http://localhost:3001 可访问
+- Phase 1-3 全部完成
+- 数据库需要重新 ingest 内容
