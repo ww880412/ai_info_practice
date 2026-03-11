@@ -43,13 +43,17 @@ async function main() {
 
     const entryIds = comparisons.map(c => c.entryId);
 
-    // Update the batch
+    // Update the batch with entryIds and fix entryCount if mismatched
     await prisma.comparisonBatch.update({
       where: { id: batch.id },
-      data: { entryIds },
+      data: {
+        entryIds,
+        entryCount: entryIds.length,
+      },
     });
 
-    console.log(`Batch ${batch.id}: Updated with ${entryIds.length} entryIds (expected: ${batch.entryCount})`);
+    const countMismatch = batch.entryCount !== entryIds.length ? ' (count fixed)' : '';
+    console.log(`Batch ${batch.id}: Updated with ${entryIds.length} entryIds${countMismatch}`);
     updatedCount++;
   }
 

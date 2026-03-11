@@ -23,6 +23,16 @@ export async function POST(request: NextRequest) {
 
     const { entryIds, targetMode } = validation.data;
 
+    // Detect and deduplicate entry IDs
+    const uniqueEntryIds = Array.from(new Set(entryIds));
+    if (uniqueEntryIds.length !== entryIds.length) {
+      const duplicateCount = entryIds.length - uniqueEntryIds.length;
+      return NextResponse.json(
+        { error: `Found ${duplicateCount} duplicate entry ID${duplicateCount === 1 ? '' : 's'}. Please remove duplicates.` },
+        { status: 400 }
+      );
+    }
+
     // Verify all entries exist and have originalExecutionMode
     const entries = await prisma.entry.findMany({
       where: { id: { in: entryIds } },

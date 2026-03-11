@@ -21,6 +21,7 @@ describe('queryBatches', () => {
         sourceMode: 'TWO_STEP',
         targetMode: 'TOOL_CALLING',
         entryCount: 5,
+        entryIds: [],
         status: 'COMPLETED',
       },
     });
@@ -30,6 +31,7 @@ describe('queryBatches', () => {
         sourceMode: 'TOOL_CALLING',
         targetMode: 'TWO_STEP',
         entryCount: 10,
+        entryIds: [],
         status: 'PENDING',
       },
     });
@@ -46,6 +48,7 @@ describe('queryBatches', () => {
         sourceMode: 'TWO_STEP',
         targetMode: 'TOOL_CALLING',
         entryCount: 5,
+        entryIds: [],
         status: 'COMPLETED',
       },
     });
@@ -55,6 +58,7 @@ describe('queryBatches', () => {
         sourceMode: 'TWO_STEP',
         targetMode: 'TOOL_CALLING',
         entryCount: 10,
+        entryIds: [],
         status: 'PENDING',
       },
     });
@@ -78,6 +82,7 @@ describe('queryBatches', () => {
           sourceMode: 'TWO_STEP',
           targetMode: 'TOOL_CALLING',
           entryCount: i,
+          entryIds: [],
           status: 'COMPLETED',
         },
       });
@@ -104,6 +109,7 @@ describe('queryBatches', () => {
         sourceMode: 'TWO_STEP',
         targetMode: 'TOOL_CALLING',
         entryCount: 1,
+        entryIds: [],
         status: 'COMPLETED',
         createdAt: fixedDate,
       },
@@ -114,6 +120,7 @@ describe('queryBatches', () => {
         sourceMode: 'TWO_STEP',
         targetMode: 'TOOL_CALLING',
         entryCount: 2,
+        entryIds: [],
         status: 'COMPLETED',
         createdAt: fixedDate,
       },
@@ -124,6 +131,7 @@ describe('queryBatches', () => {
         sourceMode: 'TWO_STEP',
         targetMode: 'TOOL_CALLING',
         entryCount: 3,
+        entryIds: [],
         status: 'COMPLETED',
         createdAt: fixedDate,
       },

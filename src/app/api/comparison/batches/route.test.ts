@@ -24,6 +24,7 @@ describe('GET /api/comparison/batches', () => {
         sourceMode: 'TWO_STEP',
         targetMode: 'TOOL_CALLING',
         entryCount: 5,
+        entryIds: [],
         status: 'COMPLETED',
       },
     });
@@ -92,6 +93,7 @@ describe('GET /api/comparison/batches', () => {
         sourceMode: 'TWO_STEP',
         targetMode: 'TOOL_CALLING',
         entryCount: 5,
+        entryIds: [],
         status: 'COMPLETED',
       },
     });
@@ -101,6 +103,7 @@ describe('GET /api/comparison/batches', () => {
         sourceMode: 'TWO_STEP',
         targetMode: 'TOOL_CALLING',
         entryCount: 10,
+        entryIds: [],
         status: 'PENDING',
       },
     });
