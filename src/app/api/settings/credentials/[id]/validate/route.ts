@@ -10,10 +10,10 @@ import { validateCredential } from '@/lib/settings/credential-validation';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
     // Check if credential exists
     const existing = await prisma.apiCredential.findUnique({
