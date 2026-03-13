@@ -96,7 +96,7 @@ export function validateBaseUrl(provider: string, baseUrl: string): ValidationRe
       : undefined;
 
     return { valid: false, warning, error: 'URL does not match allowlist patterns' };
-  } catch (error) {
+  } catch (_error) {
     return { valid: false, error: 'Invalid URL format' };
   }
 }

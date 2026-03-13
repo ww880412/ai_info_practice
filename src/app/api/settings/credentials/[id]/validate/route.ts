@@ -41,7 +41,7 @@ export async function POST(
     });
 
     // IMPORTANT: Never return encryptedKey
-    const { encryptedKey: _, ...safeCredential } = updated;
+    const { encryptedKey: _enc, ...safeCredential } = updated;
     return NextResponse.json({ data: safeCredential });
   } catch (error) {
     console.error('Failed to validate credential:', error);

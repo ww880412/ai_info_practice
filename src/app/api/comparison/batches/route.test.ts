@@ -1,9 +1,13 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { GET } from './route';
 import { prisma } from '@/lib/prisma';
 
 describe('GET /api/comparison/batches', () => {
   beforeEach(async () => {
+    await prisma.comparisonBatch.deleteMany();
+  });
+
+  afterEach(async () => {
     await prisma.comparisonBatch.deleteMany();
   });
 

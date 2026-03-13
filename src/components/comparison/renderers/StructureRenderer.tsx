@@ -2,7 +2,6 @@
 
 import { NormalizedDecision } from '@/lib/comparison/normalize';
 import { TwoStepTimelineRenderer } from './TwoStepTimelineRenderer';
-import { ToolingTimelineRenderer } from './ToolingTimelineRenderer';
 import { GenericStructureRenderer } from './GenericStructureRenderer';
 
 interface StructureRendererProps {

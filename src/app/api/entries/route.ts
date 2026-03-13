@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Determine orderBy
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     let orderBy: any = { createdAt: "desc" };
 
     // Support legacy 'sort' parameter for backward compatibility

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { validateCredentialRequest, validateCredentialUpdate } from '@/lib/settings/validation';
+import { validateCredentialRequest } from '@/lib/settings/validation';
 import { encryptApiKey, decryptApiKey, getKeyHint } from '@/lib/crypto';
 import { validateBaseUrl } from '@/lib/security/ssrf-protection';
 
@@ -129,7 +129,7 @@ describe('Validation Module', () => {
 describe('Encryption Module', () => {
   // Set up test environment variable
   beforeEach(() => {
-    process.env.KEY_ENCRYPTION_SECRET = 'test-secret-key-for-encryption';
+    process.env.KEY_ENCRYPTION_SECRET = 'test-secret-key-for-encryption-32ch';
   });
 
   afterEach(() => {
@@ -162,7 +162,7 @@ describe('Encryption Module', () => {
     });
 
     it('should throw error for invalid encrypted format', () => {
-      expect(() => decryptApiKey('invalid-format')).toThrow('Invalid encrypted key format');
+      expect(() => decryptApiKey('invalid-format')).toThrow('Invalid encrypted data format');
     });
   });
 
@@ -172,14 +172,14 @@ describe('Encryption Module', () => {
       expect(hint).toBe('...2345');
     });
 
-    it('should return *** for short keys', () => {
+    it('should return **** for short keys', () => {
       const hint = getKeyHint('abc');
-      expect(hint).toBe('***');
+      expect(hint).toBe('****');
     });
 
     it('should handle exactly 4 character keys', () => {
       const hint = getKeyHint('abcd');
-      expect(hint).toBe('***');
+      expect(hint).toBe('****');
     });
   });
 });

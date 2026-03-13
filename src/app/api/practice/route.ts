@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get("status");
     const difficulty = searchParams.get("difficulty");
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const where: Record<string, any> = {};
     if (status) where.status = status;
     if (difficulty) where.difficulty = difficulty;

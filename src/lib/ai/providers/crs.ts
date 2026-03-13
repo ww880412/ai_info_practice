@@ -532,7 +532,7 @@ export async function callCRSResponses(
                 responseModel = data.response.model || responseModel;
                 createdAt = data.response.created_at || createdAt;
               }
-            } catch (e) {
+            } catch (_e) {
               console.warn('[CRS] Failed to parse SSE data:', dataStr.substring(0, 100));
             }
           }

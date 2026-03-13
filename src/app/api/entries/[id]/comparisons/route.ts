@@ -137,7 +137,7 @@ export async function GET(
           const comparisonScore = comparison.comparisonScore as any;
           originalOverallScore = originalScore?.overallScore;
           comparisonOverallScore = comparisonScore?.overallScore;
-        } catch (e) {
+        } catch (_e) {
           // Ignore JSON parsing errors
         }
       }

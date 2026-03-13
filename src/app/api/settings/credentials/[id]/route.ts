@@ -132,13 +132,13 @@ export async function PUT(
       });
 
       if (updatedCredential) {
-        const { encryptedKey: _, ...safeCredential } = updatedCredential;
+        const { encryptedKey: _enc, ...safeCredential } = updatedCredential;
         return NextResponse.json({ data: safeCredential });
       }
     }
 
     // IMPORTANT: Never return encryptedKey
-    const { encryptedKey: _, ...safeCredential } = credential;
+    const { encryptedKey: _enc2, ...safeCredential } = credential;
     return NextResponse.json({ data: safeCredential });
   } catch (error) {
     console.error('Failed to update credential:', error);

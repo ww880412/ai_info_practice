@@ -21,7 +21,7 @@ export function CredentialList() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingCredential, setEditingCredential] = useState<ApiCredential | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+
 
   // Fetch credentials
   const { data, isLoading, error } = useQuery({
@@ -88,7 +88,7 @@ export function CredentialList() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["credentials"] });
-      setDeletingId(null);
+
     },
   });
 

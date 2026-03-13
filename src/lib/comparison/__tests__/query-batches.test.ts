@@ -1,10 +1,13 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { queryBatches } from '../query-batches';
 import { prisma } from '@/lib/prisma';
 
 describe('queryBatches', () => {
   beforeEach(async () => {
-    // Clean up
+    await prisma.comparisonBatch.deleteMany();
+  });
+
+  afterEach(async () => {
     await prisma.comparisonBatch.deleteMany();
   });
 
@@ -16,7 +19,7 @@ describe('queryBatches', () => {
 
   it('should return batches sorted by createdAt desc', async () => {
     // Create test batches
-    const batch1 = await prisma.comparisonBatch.create({
+    await prisma.comparisonBatch.create({
       data: {
         sourceMode: 'TWO_STEP',
         targetMode: 'TOOL_CALLING',

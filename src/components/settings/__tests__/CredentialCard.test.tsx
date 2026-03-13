@@ -1,5 +1,9 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
 import { CredentialCard } from "../CredentialCard";
 import type { ApiCredential } from "@prisma/client";
 

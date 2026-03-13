@@ -1,4 +1,3 @@
-import { generateJSON } from '@/lib/ai/generate';
 import type { NormalizedAgentIngestDecision } from './ingest-contract';
 import { z } from 'zod';
 

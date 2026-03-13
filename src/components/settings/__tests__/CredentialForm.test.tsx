@@ -1,5 +1,9 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
 import { CredentialForm } from "../CredentialForm";
 import type { ApiCredential } from "@prisma/client";
 
@@ -100,19 +104,15 @@ describe("CredentialForm", () => {
     });
 
     it("validates base URL format for non-Gemini providers", async () => {
-      render(<CredentialForm mode="create" onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
+      const crsCredential = { ...mockCredential, provider: "crs", name: "Valid Name", baseUrl: "invalid-url" } as unknown as import("@prisma/client").ApiCredential;
+      render(<CredentialForm mode="create" credential={crsCredential} onSubmit={mockOnSubmit} onCancel={mockOnCancel} />);
 
-      const providerSelect = screen.getByLabelText("Provider");
-      fireEvent.change(providerSelect, { target: { value: "crs" } });
-
-      const nameInput = screen.getByPlaceholderText("e.g., Gemini Production");
       const apiKeyInput = screen.getByPlaceholderText("Enter API key");
-      const baseUrlInput = screen.getByPlaceholderText("https://api.example.com");
-
-      fireEvent.change(nameInput, { target: { value: "Valid Name" } });
       fireEvent.change(apiKeyInput, { target: { value: "validkey123" } });
-      fireEvent.change(baseUrlInput, { target: { value: "invalid-url" } });
-      fireEvent.click(screen.getByText("Save"));
+
+      // Debug: check if onSubmit was called (meaning validation passed)
+      const form = screen.getByText("Save").closest("form")!;
+      fireEvent.submit(form);
 
       await waitFor(() => {
         expect(screen.getByText("Invalid URL format")).toBeInTheDocument();

@@ -2,12 +2,19 @@
 
 > 里程碑级状态索引。会话级交接细节记录在 `PROGRESS.log`。
 
-## 📍 当前状态（2026-03-11）
+## 📍 当前状态（2026-03-13）
 
 ### 进行中
 - 无活跃任务
 
 ### 最近完成
+- ✅ **Trace / Summary / Tool-Calling 可观测性修复**（2026-03-07，已合并到 main）
+  - ✅ tool-calling fallback metadata 修复（engine.ts）
+  - ✅ ReasoningTraceView 升级（展示 intent/mode/fallback 信息）
+  - ✅ DynamicSummary + TimelineEvolution 兼容新 shape
+  - ✅ summary-structure 后端校验/normalize
+  - ✅ sdk-tools + decision-schema 测试覆盖
+  - ✅ 代码规模：18 个文件，771 行新增代码
 - ✅ **Phase 2: Entry 详情页对比历史 Tab**（2026-03-11，已合并到 main）
   - ✅ Task 1-2: Schema Update & Batch Creation（entryIds 字段追踪）
     - ✅ 添加 entryIds String[] 字段到 ComparisonBatch
@@ -178,22 +185,16 @@
 
 ## 📊 测试覆盖
 
-| 模块 | 测试数 | 状态 |
-|------|--------|------|
-| parser | 8 | ✅ 通过 |
-| ai/agent | 18 | ⚠️ 4 个失败 |
-| gemini | 5 | ✅ 通过 |
-| ingest | 7 | ✅ 通过 |
-| entries | 2 | ✅ 通过 |
-| sanitize | 10 | ✅ 通过 |
-| deduplication | 7 | ✅ 通过 |
-| comparison | 22 | ⚠️ 9 个失败 |
-| **总计** | **171** | **158 通过, 13 失败** |
+| 指标 | 状态 |
+|------|------|
+| **测试文件** | 42 passed (42) |
+| **测试用例** | 306 passed (306) |
+| **通过率** | 100% |
 
-**最近测试**: 2026-03-10
+**最近测试**: 2026-03-13
 - ✅ Type Check: 通过
-- ❌ Lint: 55 errors, 16 warnings
-- ⚠️ Unit Tests: 92.4% 通过率 (158/171)
+- ✅ Lint: 0 errors, 0 warnings
+- ✅ Unit Tests: 100% 通过率 (306/306)
 
 详细报告: [TEST_REPORT.md](./TEST_REPORT.md)
 
@@ -202,9 +203,7 @@
 ## 🔜 项目待办
 
 ### 当前冲刺
-1. **trace-summary 修复**: 修复 entry 详情页 tool-calling 结果不可见（已规划）
-2. **sdk-tools 单元测试**: 覆盖工具上下文传递（1-2h）
-3. **mode-comparison 回归测试**: process-entry 不可变基线测试（P2，非阻塞）
+- 无活跃任务（上一轮冲刺已全部完成）
 
 ### Backlog（条件触发）
 | 任务 | 触发条件 |
@@ -230,10 +229,10 @@
 - [Phase 2 渐进式实施](docs/archive/2026-Q1/completed-plans/2026-03-02-react-agent-phase2-progressive.md) - Phase 2a-2d 规划
 - [15 轮迭代复盘](docs/retrospectives/2026-03-02-react-agent-upgrade-15-iterations.md) - 经验总结
 
-### 活跃规划
-- [mode-comparison 设计](docs/plans/2026-03-06-mode-comparison-design.md) - 模式对比功能设计
-- [mode-comparison 实施](docs/plans/2026-03-06-mode-comparison-implementation.md) - 实施计划（后端已完成）
-- [trace-summary 修复](docs/plans/2026-03-07-trace-summary-tool-calling.md) - 详情页可观测性提升
+### 已完成规划
+- [mode-comparison 设计](docs/plans/2026-03-06-mode-comparison-design.md) - 模式对比功能设计 ✅
+- [mode-comparison 实施](docs/plans/2026-03-06-mode-comparison-implementation.md) - 实施计划 ✅
+- [trace-summary 修复](docs/plans/2026-03-07-trace-summary-tool-calling.md) - 详情页可观测性提升 ✅
 
 ### 归档
 - [react-agent-iterations/](docs/archive/react-agent-iterations/) - v1-v2.12 迭代历史
@@ -243,4 +242,4 @@
 
 ---
 
-*最后更新: 2026-03-11*
+*最后更新: 2026-03-13*

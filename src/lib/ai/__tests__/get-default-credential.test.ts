@@ -4,7 +4,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getDefaultCredential } from '../get-default-credential';
 import { prisma } from '@/lib/prisma';
-import { encryptApiKey } from '@/lib/crypto';
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {

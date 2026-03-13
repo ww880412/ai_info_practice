@@ -24,7 +24,7 @@ describe("CRS provider tool calling", () => {
   });
 
   it("passes tools to the Responses API request", async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
       return new Response(createSSEBody([
         {
           type: "response.created",

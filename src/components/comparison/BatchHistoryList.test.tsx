@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { BatchHistoryList, type SerializedBatch } from './BatchHistoryList';
 
@@ -105,7 +105,7 @@ describe('BatchHistoryList', () => {
       }),
     } as Response);
 
-    const { container } = render(<BatchHistoryList initialBatches={mockBatches} initialTotal={3} />);
+    render(<BatchHistoryList initialBatches={mockBatches} initialTotal={3} />);
 
     const loadMoreButton = screen.getByRole('button', { name: /load more/i });
     fireEvent.click(loadMoreButton);
@@ -113,40 +113,39 @@ describe('BatchHistoryList', () => {
     // Fast-forward through all timers
     await vi.runAllTimersAsync();
 
-    expect(screen.getByText('Showing 3 of 3 batches')).toBeInTheDocument();
+    // After loading all batches (3 of 3), hasMore is false so Load More section is hidden
+    expect(screen.queryByText('Load More')).not.toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith(
       '/api/comparison/batches?limit=10&offset=2'
     );
   });
 
   it('should show loading state while fetching', async () => {
+    // Use a fetch that won't resolve until we let it, to observe loading state
+    let resolveFetch!: (value: Response) => void;
     vi.mocked(fetch).mockImplementationOnce(
-      () =>
-        new Promise((resolve) =>
-          setTimeout(
-            () =>
-              resolve({
-                ok: true,
-                json: async () => ({ data: { batches: [], total: 2 } }),
-              } as Response),
-            100
-          )
-        )
+      () => new Promise<Response>((resolve) => { resolveFetch = resolve; })
     );
 
-    render(<BatchHistoryList initialBatches={mockBatches} initialTotal={3} />);
+    render(<BatchHistoryList initialBatches={mockBatches} initialTotal={5} />);
 
     const loadMoreButton = screen.getByRole('button', { name: /load more/i });
     fireEvent.click(loadMoreButton);
 
-    // Fast-forward through initial delay
+    // Fast-forward through the backoff delay so fetch() gets called
     await vi.advanceTimersByTimeAsync(1000);
 
+    // Now the component is waiting for fetch - should show loading state
     expect(screen.getByText('Loading...')).toBeInTheDocument();
     expect(loadMoreButton).toBeDisabled();
 
-    // Fast-forward through remaining timers
-    await vi.runAllTimersAsync();
+    // Resolve the fetch
+    await act(async () => {
+      resolveFetch({
+        ok: true,
+        json: async () => ({ data: { batches: [], total: 5 } }),
+      } as Response);
+    });
 
     expect(screen.getByRole('button', { name: /load more/i })).not.toBeDisabled();
   });
@@ -180,10 +179,11 @@ describe('BatchHistoryList', () => {
     render(<BatchHistoryList initialBatches={mockBatches} initialTotal={3} />);
 
     const loadMoreButton = screen.getByRole('button', { name: /load more/i });
-    fireEvent.click(loadMoreButton);
 
-    // Fast-forward through first delay
-    await vi.runAllTimersAsync();
+    await act(async () => {
+      fireEvent.click(loadMoreButton);
+      await vi.runAllTimersAsync();
+    });
 
     expect(screen.getByText(/Retry 1/)).toBeInTheDocument();
 
@@ -193,10 +193,10 @@ describe('BatchHistoryList', () => {
       statusText: 'Server Error',
     } as Response);
 
-    fireEvent.click(loadMoreButton);
-
-    // Fast-forward through second delay
-    await vi.runAllTimersAsync();
+    await act(async () => {
+      fireEvent.click(loadMoreButton);
+      await vi.runAllTimersAsync();
+    });
 
     expect(screen.getByText(/Retry 2/)).toBeInTheDocument();
   });
@@ -268,7 +268,7 @@ describe('BatchHistoryList', () => {
     await vi.runAllTimersAsync();
 
     expect(
-      screen.getByText('Database connection failed')
+      screen.getByText(/Database connection failed/)
     ).toBeInTheDocument();
   });
 });

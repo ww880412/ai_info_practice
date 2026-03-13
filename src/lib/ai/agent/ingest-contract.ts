@@ -121,18 +121,6 @@ const DIFFICULTIES: Difficulty[] = ["EASY", "MEDIUM", "HARD"];
 const CONTENT_FORMS: ContentForm[] = ["TEXTUAL", "CODE_HEAVY", "VISUAL", "MULTIMODAL"];
 const TIMELINESS_VALUES: Timeliness[] = ["RECENT", "OUTDATED", "CLASSIC"];
 const TRUST_LEVELS: TrustLevel[] = ["HIGH", "MEDIUM", "LOW"];
-const SUMMARY_STRUCTURE_TYPES: SummaryStructureType[] = [
-  "problem-solution-steps",
-  "concept-mechanism-flow",
-  "tool-feature-comparison",
-  "background-result-insight",
-  "argument-evidence-condition",
-  "generic",
-  "api-reference",
-  "comparison-matrix",
-  "timeline-evolution",
-];
-
 function toStringValue(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -513,15 +501,6 @@ function normalizePracticeTask(value: unknown): NormalizedPracticeTask | null {
     prerequisites: normalizeStringList(record.prerequisites),
     steps,
   };
-}
-
-function normalizeSummaryStructureType(value: unknown): SummaryStructureType | null {
-  const normalized = toStringValue(value).toLowerCase().trim();
-  if (!normalized) return null;
-  if (SUMMARY_STRUCTURE_TYPES.includes(normalized as SummaryStructureType)) {
-    return normalized as SummaryStructureType;
-  }
-  return null;
 }
 
 function normalizeOptionalDifficulty(value: unknown): Difficulty | null {

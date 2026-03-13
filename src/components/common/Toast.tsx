@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useReducer, useState } from "react";
+import { createContext, useCallback, useContext, useReducer, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 
 type ToastType = "success" | "error" | "info";
@@ -70,11 +70,11 @@ function ToastContainer({
   toasts: Toast[];
   onRemove: (id: string) => void;
 }) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   if (!mounted) return null;
 

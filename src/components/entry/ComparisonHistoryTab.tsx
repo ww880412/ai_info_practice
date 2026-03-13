@@ -161,7 +161,7 @@ export function ComparisonHistoryTab({ entryId }: ComparisonHistoryTabProps) {
           </div>
           <p className="text-gray-600 font-medium">No comparisons found</p>
           <p className="text-sm text-gray-500 mt-1">
-            This entry hasn't been included in any comparison batches yet.
+            This entry hasn&apos;t been included in any comparison batches yet.
           </p>
         </div>
       ) : (
