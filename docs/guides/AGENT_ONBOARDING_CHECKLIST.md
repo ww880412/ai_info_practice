@@ -12,7 +12,7 @@
 
 ```bash
 # 1.1 读取工作进度记录（最重要！）
-cat PROGRESS.md
+cat docs/PROGRESS.md
 ```
 
 **目的**：
@@ -86,7 +86,7 @@ ls -la .env*
 
 ## 🎯 开始工作前的检查清单
 
-- [ ] ✅ 读取了 `PROGRESS.md`，了解项目当前状态
+- [ ] ✅ 读取了 `docs/PROGRESS.md`，了解项目当前状态
 - [ ] ✅ 检查了 Git 状态，确认工作区干净
 - [ ] ✅ 了解了项目的目录结构
 - [ ] ✅ 阅读了 `docs/guides/AGENT_COLLABORATION_GUIDE.md`（首次接手时）
@@ -104,7 +104,7 @@ ls -la .env*
    git checkout -b codex/your-task-name
    ```
 
-2. **更新 PROGRESS.md**
+2. **更新 docs/PROGRESS.md**
    ```markdown
    ## 🚧 进行中的工作
 
@@ -124,7 +124,7 @@ ls -la .env*
    git commit -m "type: description"
    ```
 
-2. **更新 PROGRESS.md**
+2. **更新 docs/PROGRESS.md**
 
 3. **验证工作区状态**
    ```bash
@@ -139,7 +139,7 @@ ls -la .env*
 
 ```bash
 # 1. 读取项目状态
-cat PROGRESS.md
+cat docs/PROGRESS.md
 
 # 2. 检查 Git 状态
 git status
@@ -157,7 +157,7 @@ cat docs/guides/AGENT_COLLABORATION_GUIDE.md
 
 ```bash
 # 1. 读取项目状态（重点关注"进行中的工作"）
-cat PROGRESS.md
+cat docs/PROGRESS.md
 
 # 2. 检查 Git 状态
 git status
@@ -171,7 +171,7 @@ git log --oneline -5
 
 ```bash
 # 1. 快速读取项目状态
-cat PROGRESS.md | head -50
+cat docs/PROGRESS.md | head -50
 
 # 2. 检查当前分支
 git status
@@ -188,7 +188,7 @@ git checkout -b codex/hotfix-urgent-fix
 ### 优先级原则
 
 **必读**（每次都要读）：
-1. `PROGRESS.md` - 了解项目状态
+1. `docs/PROGRESS.md` - 了解项目状态
 2. `git status` - 检查工作区状态
 3. `git log` - 查看最近提交
 

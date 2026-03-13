@@ -68,7 +68,7 @@ async function validateCrsCredential(apiKey: string, baseUrl: string | null): Pr
   const timeoutId = setTimeout(() => controller.abort(), VALIDATION_TIMEOUT);
 
   try {
-    const response = await fetch(`${url}/health`, {
+    const response = await fetch(`${url}/v1/models`, {
       headers: { Authorization: `Bearer ${apiKey}` },
       signal: controller.signal,
     });

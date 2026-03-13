@@ -33,11 +33,11 @@ ai_info_practice/
 │   ├── architecture/        # 架构设计文档
 │   ├── guides/              # 使用指南和教程
 │   ├── plans/               # 实施计划
-│   ├── operations/          # 运维文档
+│   ├── reviews/             # 评审报告
+│   ├── PROGRESS.md          # 📝 工作进度记录
+│   ├── PROGRESS.log         # 📝 会话级交接日志
 │   └── archive/             # 历史归档
 ├── scripts/                 # 脚本工具
-├── PROGRESS.md              # 📝 工作进度记录
-├── PROGRESS.log             # 📝 会话级交接日志
 └── .claude/                 # Claude 配置
 ```
 
@@ -48,7 +48,7 @@ ai_info_practice/
 1. **读取状态文件**
    ```bash
    # 检查是否存在 PROGRESS.md
-   cat PROGRESS.md
+   cat docs/PROGRESS.md
    ```
 
 2. **检查 Git 状态**
@@ -58,7 +58,7 @@ ai_info_practice/
    ```
 
 3. **理解当前上下文**
-   - 阅读 PROGRESS.md 了解已完成的工作
+   - 阅读 docs/PROGRESS.md 了解已完成的工作
    - 检查未完成的任务
    - 识别当前分支和工作状态
 
@@ -91,7 +91,7 @@ ai_info_practice/
 
 ### 阶段 3: 交接工作
 
-1. **更新 PROGRESS.md**
+1. **更新 docs/PROGRESS.md**
    ```markdown
    ## ✅ 已完成的工作
 
@@ -109,7 +109,7 @@ ai_info_practice/
    - 下一步计划
    ```
 
-2. **更新 PROGRESS.log**
+2. **更新 docs/PROGRESS.log**
    ```markdown
    ## YYYY-MM-DD
 
@@ -137,7 +137,7 @@ ai_info_practice/
 | `docs/architecture/` | 架构设计、技术选型 | 系统架构图 |
 | `docs/guides/` | 使用指南、教程 | 开发指南、部署教程 |
 | `docs/plans/` | 实施计划 | 功能规划 |
-| `docs/operations/` | 运维相关 | 部署指南 |
+| `docs/reviews/` | 评审报告 | 架构/代码/UX 评审 |
 | `docs/archive/` | 历史归档 | 过期文档 |
 
 ### 文档命名规范
