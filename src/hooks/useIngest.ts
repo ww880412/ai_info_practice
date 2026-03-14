@@ -5,14 +5,17 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 interface IngestLinkParams {
   url: string;
+  analysisMode?: 'auto' | 'two-step' | 'tool-calling';
 }
 
 interface IngestFileParams {
   file: File;
+  analysisMode?: 'auto' | 'two-step' | 'tool-calling';
 }
 
 interface IngestTextParams {
   text: string;
+  analysisMode?: 'auto' | 'two-step' | 'tool-calling';
 }
 
 interface IngestResponse {
@@ -48,12 +51,12 @@ export function useIngest() {
   const [similarEntries, setSimilarEntries] = useState<IngestResponse["similarEntries"]>([]);
 
   const ingestLink = useMutation({
-    mutationFn: async ({ url }: IngestLinkParams): Promise<IngestResponse> => {
+    mutationFn: async ({ url, analysisMode }: IngestLinkParams): Promise<IngestResponse> => {
       const config = getConfig();
       const res = await fetch("/api/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inputType: "LINK", url, config }),
+        body: JSON.stringify({ inputType: "LINK", url, config, analysisMode }),
       });
       if (!res.ok) throw new Error("Failed to ingest link");
       return res.json();
@@ -68,7 +71,7 @@ export function useIngest() {
   });
 
   const ingestFile = useMutation({
-    mutationFn: async ({ file }: IngestFileParams): Promise<IngestResponse> => {
+    mutationFn: async ({ file, analysisMode }: IngestFileParams): Promise<IngestResponse> => {
       // Step 1: Upload file to R2 storage
       const formData = new FormData();
       formData.append("file", file);
@@ -87,7 +90,7 @@ export function useIngest() {
       const res = await fetch("/api/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inputType: "PDF", fileUrl, config }),
+        body: JSON.stringify({ inputType: "PDF", fileUrl, config, analysisMode }),
       });
       if (!res.ok) throw new Error("Failed to ingest file");
       return res.json();
@@ -102,12 +105,12 @@ export function useIngest() {
   });
 
   const ingestText = useMutation({
-    mutationFn: async ({ text }: IngestTextParams): Promise<IngestResponse> => {
+    mutationFn: async ({ text, analysisMode }: IngestTextParams): Promise<IngestResponse> => {
       const config = getConfig();
       const res = await fetch("/api/ingest", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inputType: "TEXT", text, config }),
+        body: JSON.stringify({ inputType: "TEXT", text, config, analysisMode }),
       });
       if (!res.ok) throw new Error("Failed to ingest text");
       return res.json();

@@ -53,3 +53,6 @@ next-env.d.ts
 /src/app/api/debug/
 /日志/
 /日记/
+
+# database backups
+/backups/

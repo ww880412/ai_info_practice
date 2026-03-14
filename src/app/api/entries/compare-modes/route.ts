@@ -59,10 +59,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Determine sourceMode from the majority of entries' originalExecutionMode
+    const modeCounts = entries.reduce((acc, e) => {
+      const mode = e.originalExecutionMode === 'tool-calling' ? 'TOOL_CALLING' : 'TWO_STEP';
+      acc[mode] = (acc[mode] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    const sourceMode = (modeCounts['TOOL_CALLING'] || 0) >= (modeCounts['TWO_STEP'] || 0)
+      ? 'TOOL_CALLING'
+      : 'TWO_STEP';
+
     // Create comparison batch
     const batch = await prisma.comparisonBatch.create({
       data: {
-        sourceMode: 'TWO_STEP', // Default baseline mode (will be determined per entry)
+        sourceMode,
         targetMode: targetMode === 'two-step' ? 'TWO_STEP' : 'TOOL_CALLING',
         entryIds: entryIds,
         entryCount: entryIds.length,

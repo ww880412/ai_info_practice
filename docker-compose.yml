@@ -70,5 +70,24 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  backup:
+    image: postgres:15-alpine
+    container_name: ai-practice-backup
+    environment:
+      PGUSER: ai_practice
+      PGPASSWORD: ${POSTGRES_PASSWORD:-practice123}
+      PGDATABASE: ai_practice
+      DB_HOST: postgres
+    volumes:
+      - ./scripts/db-backup.sh:/backup.sh:ro
+      - ./backups:/backups
+    entrypoint: /bin/sh
+    command: >
+      -c "chmod +x /backup.sh && echo '0 3 * * * /backup.sh' | crontab - && crond -f -l 2"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres_data:

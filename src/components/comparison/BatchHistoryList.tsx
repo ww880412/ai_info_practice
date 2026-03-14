@@ -15,6 +15,12 @@ export interface SerializedBatch {
   winRate: number | null;
   avgScoreDiff: number | null;
   stats: any;
+  entryPreviews?: Array<{ title: string | null }>;
+  winnerDistribution?: {
+    source: number;
+    target: number;
+    tie: number;
+  } | null;
 }
 
 interface BatchHistoryListProps {
@@ -58,7 +64,7 @@ export function BatchHistoryList({ initialBatches, initialTotal }: BatchHistoryL
       }
 
       setBatches((prev) => [...prev, ...data.data.batches]);
-      setTotal(data.data.total);
+      setTotal(data.data.pageInfo.total);
       setRetryCount(0); // Reset retry count on success
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';

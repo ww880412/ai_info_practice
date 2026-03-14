@@ -143,7 +143,7 @@ describe('BatchHistoryList', () => {
     await act(async () => {
       resolveFetch({
         ok: true,
-        json: async () => ({ data: { batches: [], total: 5 } }),
+        json: async () => ({ data: { batches: [], pageInfo: { total: 5, limit: 10, offset: 0, hasNext: false, nextOffset: null } } }),
       } as Response);
     });
 

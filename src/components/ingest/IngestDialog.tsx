@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useToast } from "@/components/common/Toast";
 
 type Tab = "link" | "file" | "text";
+type AnalysisModeOption = 'auto' | 'two-step' | 'tool-calling';
 
 interface IngestDialogProps {
   open: boolean;
@@ -19,6 +20,7 @@ export function IngestDialog({ open, onClose }: IngestDialogProps) {
   const [url, setUrl] = useState("");
   const [text, setText] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [analysisMode, setAnalysisMode] = useState<AnalysisModeOption>('auto');
   const [dismissedSimilarWarning, setDismissedSimilarWarning] = useState(false);
   const [batchUrls, setBatchUrls] = useState<{ url: string; status: "pending" | "processing" | "success" | "error"; error?: string }[]>([]);
   const { showToast } = useToast();
@@ -73,14 +75,14 @@ export function IngestDialog({ open, onClose }: IngestDialogProps) {
         }
       } else {
         // Single URL mode
-        ingestLink.mutate({ url: urls[0] });
+        ingestLink.mutate({ url: urls[0], analysisMode });
       }
     } else if (tab === "file" && file) {
-      ingestFile.mutate({ file });
+      ingestFile.mutate({ file, analysisMode });
     } else if (tab === "text" && text.trim()) {
-      ingestText.mutate({ text: text.trim() });
+      ingestText.mutate({ text: text.trim(), analysisMode });
     }
-  }, [tab, url, file, text, ingestLink, ingestFile, ingestText, showToast]);
+  }, [tab, url, file, text, analysisMode, ingestLink, ingestFile, ingestText, showToast]);
 
   const handleCloseWarning = useCallback(() => {
     setDismissedSimilarWarning(true);
@@ -90,6 +92,7 @@ export function IngestDialog({ open, onClose }: IngestDialogProps) {
     setUrl("");
     setText("");
     setFile(null);
+    setAnalysisMode('auto');
     setDismissedSimilarWarning(false);
     setBatchUrls([]);
     clearProcessingId();
@@ -330,7 +333,26 @@ export function IngestDialog({ open, onClose }: IngestDialogProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 px-5 py-4 border-t border-border">
+        <div className="flex flex-col gap-3 px-5 py-4 border-t border-border">
+          {/* Analysis mode selector */}
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-secondary">分析模式：</span>
+            {(['auto', 'two-step', 'tool-calling'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setAnalysisMode(mode)}
+                className={`px-2 py-0.5 rounded border text-xs transition-colors ${
+                  analysisMode === mode
+                    ? 'border-primary text-primary bg-primary/10'
+                    : 'border-border text-secondary hover:border-foreground'
+                }`}
+              >
+                {mode === 'auto' ? 'Auto' : mode === 'two-step' ? 'Two-step' : 'Tool-calling'}
+              </button>
+            ))}
+          </div>
+          <div className="flex justify-end gap-3">
           <button
             onClick={handleClose}
             className="px-4 py-2 text-sm font-medium text-secondary hover:text-foreground rounded-lg hover:bg-accent transition-colors"
@@ -360,6 +382,7 @@ export function IngestDialog({ open, onClose }: IngestDialogProps) {
               Try Again
             </button>
           )}
+          </div>
         </div>
       </div>
     </div>

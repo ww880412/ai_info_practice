@@ -8,6 +8,14 @@ interface BatchCardProps {
   batch: SerializedBatch;
 }
 
+const modeLabel = (mode: string) => {
+  switch (mode) {
+    case 'TWO_STEP': return 'Two-Step';
+    case 'TOOL_CALLING': return 'Tool-Calling';
+    default: return mode;
+  }
+};
+
 export function BatchCard({ batch }: BatchCardProps) {
   const createdAt = new Date(batch.createdAt);
   const isCompleted = batch.status === 'COMPLETED';
@@ -62,7 +70,7 @@ export function BatchCard({ batch }: BatchCardProps) {
       <div className="flex items-start justify-between mb-4">
         <div>
           <h3 className="text-lg font-semibold">
-            {batch.sourceMode} vs {batch.targetMode}
+            {modeLabel(batch.sourceMode)} vs {modeLabel(batch.targetMode)}
           </h3>
           <div className="flex items-center gap-2 mt-1 text-sm text-secondary">
             <Clock size={14} />
@@ -128,6 +136,38 @@ export function BatchCard({ batch }: BatchCardProps) {
           </>
         )}
       </div>
+
+      {/* Entry previews + winner distribution — COMPLETED only */}
+      {isCompleted && (batch.entryPreviews?.length ?? 0) > 0 && (
+        <div className="mt-3 pt-3 border-t border-border space-y-2">
+          <ul className="space-y-0.5">
+            {batch.entryPreviews!.map((e, i) => (
+              <li key={i} className="text-xs text-muted-foreground truncate">
+                · {e.title ?? 'Untitled'}
+              </li>
+            ))}
+            {batch.entryCount > (batch.entryPreviews?.length ?? 0) && (
+              <li className="text-xs text-muted-foreground">
+                · +{batch.entryCount - (batch.entryPreviews?.length ?? 0)} more
+              </li>
+            )}
+          </ul>
+
+          {batch.winnerDistribution && (
+            <div className="flex gap-3 text-xs">
+              <span className="text-green-600">
+                Original wins {batch.winnerDistribution.source}
+              </span>
+              <span className="text-red-600">
+                Comparison wins {batch.winnerDistribution.target}
+              </span>
+              <span className="text-gray-500">
+                Ties {batch.winnerDistribution.tie}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
     </Link>
   );
 }

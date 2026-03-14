@@ -58,7 +58,7 @@ export default function ComparisonBatchPage() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => router.push("/library")}
+            onClick={() => router.push("/comparison")}
             aria-label="返回"
           >
             <ArrowLeft className="h-4 w-4" />

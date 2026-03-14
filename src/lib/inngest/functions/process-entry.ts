@@ -7,7 +7,6 @@ import { prisma } from '@/lib/prisma';
 import { parseWithLogging, type ParseInput, type ParseResult } from '@/lib/parser';
 import { classifyAndExtract, type ClassifyAndExtractResult } from '@/lib/ai/classifier';
 import { convertToPractice } from '@/lib/ai/practiceConverter';
-import { createAgentEngine } from '@/lib/ai/agent/factory';
 import {
   type NormalizedAgentIngestDecision,
   type NormalizedPracticeTask,
@@ -263,7 +262,24 @@ export const processEntry = inngest.createFunction(
       let agentFailureReason = '';
 
       try {
-        const agent = await createAgentEngine();
+        // Re-query entry to get analysisMode (not available in parsed step return value)
+        const entryForMode = await prisma.entry.findUnique({
+          where: { id: entryId },
+          select: { analysisMode: true },
+        });
+
+        const agentConfig = await (await import('@/lib/ai/agent/get-config')).getAgentConfig();
+
+        // User-selected mode takes priority over env default
+        if (entryForMode?.analysisMode === 'tool-calling') {
+          agentConfig.useToolCalling = true;
+        } else if (entryForMode?.analysisMode === 'two-step') {
+          agentConfig.useToolCalling = false;
+        }
+        // null = keep env default (already set by getAgentConfig)
+
+        const { ReActAgent } = await import('@/lib/ai/agent/engine');
+        const agent = new ReActAgent(agentConfig);
         const decision = await agent.process(entryId, parsed);
         const { decision: repairedDecision } = await validateAndRepairDecision(decision, {
           contentLength: parsed.content.length,

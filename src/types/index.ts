@@ -1,3 +1,7 @@
+// Shared type for user-selected AI analysis mode
+// null means auto (use env/default config)
+export type AnalysisMode = 'two-step' | 'tool-calling' | null;
+
 // Re-export Prisma types for convenience
 export type {
   Entry,

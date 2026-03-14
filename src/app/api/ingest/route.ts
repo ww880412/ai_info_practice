@@ -9,7 +9,16 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { inputType, url, fileUrl, text, config } = body;
+    const { inputType, url, fileUrl, text, config, analysisMode: rawAnalysisMode } = body;
+
+    // Validate analysisMode whitelist; 'auto' maps to null (use env default)
+    const VALID_MODES = ['two-step', 'tool-calling'];
+    const analysisMode: string | null =
+      rawAnalysisMode === 'auto' || rawAnalysisMode == null
+        ? null
+        : VALID_MODES.includes(rawAnalysisMode)
+          ? rawAnalysisMode
+          : null;
 
     // Validate credentialId if provided
     if (config?.credentialId) {
@@ -101,6 +110,7 @@ export async function POST(request: NextRequest) {
         rawText: inputType === "TEXT" ? text : null,
         sourceType,
         credentialId: config?.credentialId || null,
+        analysisMode: analysisMode,
         processStatus: "PENDING",
         processError: "任务已提交，等待处理...",
       },

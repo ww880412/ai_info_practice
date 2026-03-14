@@ -20,6 +20,7 @@ export interface QueryBatchesResult {
     winRate: number | null;
     avgScoreDiff: number | null;
     stats: any;
+    entryPreviews: Array<{ title: string | null }>;
   }>;
   total: number;
 }
@@ -57,5 +58,31 @@ export async function queryBatches(
     prisma.comparisonBatch.count({ where }),
   ]);
 
-  return { batches, total };
+  // Batch-fetch entry previews (avoid N+1)
+  const batchIds = batches.map((b) => b.id);
+  const comparisons = batchIds.length > 0
+    ? await prisma.modeComparison.findMany({
+        where: { batchId: { in: batchIds } },
+        select: { batchId: true, entry: { select: { title: true } } },
+        orderBy: [{ batchId: 'asc' }, { createdAt: 'asc' }],
+      })
+    : [];
+
+  // Group previews by batchId, keep first 3 per batch
+  const previewsByBatch = new Map<string, Array<{ title: string | null }>>();
+  for (const c of comparisons) {
+    const list = previewsByBatch.get(c.batchId) ?? [];
+    if (list.length < 3) {
+      list.push(c.entry);
+      previewsByBatch.set(c.batchId, list);
+    }
+  }
+
+  return {
+    batches: batches.map((batch) => ({
+      ...batch,
+      entryPreviews: previewsByBatch.get(batch.id) ?? [],
+    })),
+    total,
+  };
 }

@@ -79,6 +79,9 @@ model Entry {
   // Original execution mode (for mode comparison baseline)
   originalExecutionMode String? // 'two-step' or 'tool-calling'
 
+  // User-selected analysis mode (null = auto/env default)
+  analysisMode String? // 'two-step' | 'tool-calling' | null
+
   // Quality revision history (1:many)
   qualityHistories QualityRevision[] @relation("EntryQualityHistory")
 
@@ -517,5 +520,5 @@ model ComparisonBatch {
 
   @@index([status])
   @@index([createdAt, id])  // Composite index for stable sorting
-  @@index([entryIds(ops: raw("gin_trgm_ops"))], type: Gin)  // GIN index for efficient array queries
+  @@index([entryIds], type: Gin)  // GIN index for efficient array queries
 }

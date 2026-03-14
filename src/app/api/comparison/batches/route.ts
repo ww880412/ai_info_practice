@@ -57,10 +57,23 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       data: {
-        batches: batches.map((batch) => ({
-          ...batch,
-          createdAt: batch.createdAt.toISOString(),
-        })),
+        batches: batches.map((batch) => {
+          const stats = batch.stats as Record<string, any> | null;
+          const winnerDistribution = stats
+            ? {
+                source: stats.originalWins ?? 0,
+                target: stats.comparisonWins ?? 0,
+                tie: stats.ties ?? 0,
+              }
+            : null;
+
+          return {
+            ...batch,
+            createdAt: batch.createdAt.toISOString(),
+            winnerDistribution,
+            entryPreviews: batch.entryPreviews,
+          };
+        }),
         pageInfo: {
           total,
           limit,
