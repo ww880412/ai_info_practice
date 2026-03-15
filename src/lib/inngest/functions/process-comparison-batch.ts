@@ -24,13 +24,8 @@ export const processComparisonBatch = inngest.createFunction(
       });
     });
 
-    // Initialize agent
+    // Initialize agent config (aiConfig will be set per-entry below)
     const config = await getAgentConfig();
-    const agent = new ReActAgent(config);
-
-    // Store default config for credential reset
-    const { getServerConfig, setServerConfig } = await import('@/lib/ai/client');
-    const defaultConfig = getServerConfig();
 
     // Process each entry
     const results = [];
@@ -57,14 +52,18 @@ export const processComparisonBatch = inngest.createFunction(
             throw new Error(`Entry ${entryId} not found`);
           }
 
-          // P1-1 Fix: Resolve and set credential if entry has one
+          // Resolve credential via parameter injection (no global mutable state)
+          let entryAiConfig = config.aiConfig;
           if (entry.credentialId) {
             const { resolveCredential } = await import('@/lib/ai/client');
             const credConfig = await resolveCredential(entry.credentialId);
             if (credConfig.apiKey) {
-              setServerConfig({ apiKey: credConfig.apiKey, model: credConfig.model });
+              entryAiConfig = credConfig;
             }
           }
+
+          // Create agent with per-entry credential config
+          const agent = new ReActAgent({ ...config, aiConfig: entryAiConfig });
 
           // P1-3 Fix: Read originalMode from Entry field (immutable baseline)
           // Fail closed: reject entries without baseline instead of fabricating mode
@@ -130,8 +129,7 @@ export const processComparisonBatch = inngest.createFunction(
             targetMode
           );
 
-          // P1-1 Fix: Reset server config to default after processing
-          setServerConfig(defaultConfig);
+          // No global state reset needed — credential config is passed via parameters
 
           // Compare decisions
           const comparison = await compareDecisions(
@@ -180,8 +178,7 @@ export const processComparisonBatch = inngest.createFunction(
         });
       } catch (error) {
         console.error(`Failed to process entry ${entryId}:`, error);
-        // P1-1 Fix: Reset config even on error
-        setServerConfig(defaultConfig);
+        // No global state reset needed — credential config is passed via parameters
         // Continue with next entry (progress not incremented for failures)
       }
     }

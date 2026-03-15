@@ -2,7 +2,7 @@ import type { AgentConfig, ReasoningStep, ReasoningTrace, ReasoningTraceMetadata
 import type { ParseResult } from "../../parser/index";
 import { generateJSON } from "../generate";
 import { generateText as aiGenerateText, Output, stepCountIs } from 'ai';
-import { getModel } from '../client';
+import { getModel, type NormalizedAIConfig } from '../client';
 import { prisma } from "../../prisma";
 import { stringifyObservation } from "../../trace/observation";
 import { normalizeAgentIngestDecision, type NormalizedAgentIngestDecision } from './ingest-contract';
@@ -309,15 +309,17 @@ export class ReActAgent implements IAgentEngine {
   async processWithMode(
     entryId: string,
     input: ParseResult,
-    mode: 'two-step' | 'tool-calling'
+    mode: 'two-step' | 'tool-calling',
+    aiConfig?: NormalizedAIConfig
   ): Promise<NormalizedAgentIngestDecision> {
     // Save original config
     const originalConfig = this.config;
 
-    // Temporarily override config
+    // Temporarily override config (preserve aiConfig from constructor or use explicit override)
     this.config = {
       ...originalConfig,
       useToolCalling: mode === 'tool-calling',
+      aiConfig: aiConfig ?? originalConfig.aiConfig,
     };
 
     try {
@@ -412,7 +414,7 @@ ${buildSemanticSnapshot(input.content, STEP2_INPUT_LIMIT)}`;
 
     try {
       const result = await aiGenerateText({
-        model: getModel(),
+        model: getModel(this.config.aiConfig),
         system: systemPrompt,
         prompt: userPrompt,
         tools,
@@ -664,7 +666,7 @@ ${buildSemanticSnapshot(input.content, STEP2_INPUT_LIMIT)}`;
     prompt: string,
     stage: "step-1" | "step-2"
   ): Promise<Record<string, unknown>> {
-    const json = await generateJSON<Record<string, unknown>>(prompt);
+    const json = await generateJSON<Record<string, unknown>>(prompt, undefined, this.config.aiConfig);
     const normalized = toObject(json);
     if (!normalized) {
       throw new Error(`Agent ${stage} returned non-object JSON`);

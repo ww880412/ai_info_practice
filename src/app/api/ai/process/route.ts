@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { classifyAndExtract, type ClassifyAndExtractResult } from "@/lib/ai/classifier";
+import { classifyAndExtract } from "@/lib/ai/classifier";
 import { convertToPractice } from "@/lib/ai/practiceConverter";
 import { createAgentEngine } from "@/lib/ai/agent/factory";
 import {
@@ -14,7 +14,6 @@ import {
 } from "@/lib/ai/agent/decision-repair";
 import { isDynamicSummaryEnabled } from "@/config/flags";
 import { buildConfidenceScore } from "@/lib/ai/agent/confidence";
-import { isLegacyClassifierFallbackEnabled } from "@/lib/ai/fallback-policy";
 import {
   isRetriableAgentError,
   runWithProgressRetry,
@@ -26,81 +25,11 @@ import {
   BoundariesSchema,
 } from "@/lib/ai/agent/schemas";
 import { normalizeSummaryStructureForPersistence } from "@/lib/ai/agent/summary-structure";
-
-function shouldAllowLegacyClassifierFallback(): boolean {
-  return isLegacyClassifierFallbackEnabled(process.env.ALLOW_CLASSIFIER_FALLBACK);
-}
-
-function buildDecisionFromClassifier(
-  result: ClassifyAndExtractResult
-): NormalizedAgentIngestDecision {
-  return {
-    contentType: result.contentType,
-    techDomain: result.techDomain,
-    aiTags: result.aiTags,
-    coreSummary: result.coreSummary,
-    keyPoints: result.keyPoints,
-    summaryStructure: {
-      type: "generic",
-      reasoning: "Fallback from classifier output",
-      fields: {
-        summary: result.coreSummary,
-        keyPoints: result.keyPoints,
-      },
-    },
-    keyPointsNew: {
-      core: result.keyPoints,
-      extended: [],
-    },
-    boundaries: {
-      applicable: [],
-      notApplicable: [],
-    },
-    confidence: null,
-    difficulty: null,
-    sourceTrust: null,
-    timeliness: null,
-    contentForm: null,
-    practiceValue: result.practiceValue,
-    practiceReason: result.practiceReason,
-    practiceTask: null,
-  };
-}
-
-function normalizePracticeTaskFromLegacyResult(
-  practiceResult: Awaited<ReturnType<typeof convertToPractice>>,
-  summaryFallback: string
-): NormalizedPracticeTask | null {
-  const steps = Array.isArray(practiceResult.steps)
-    ? practiceResult.steps
-        .filter(
-          (step) =>
-            step &&
-            typeof step.order === "number" &&
-            typeof step.title === "string"
-        )
-        .map((step) => ({
-          order: step.order,
-          title: step.title,
-          description: step.description || "",
-        }))
-    : [];
-
-  if (steps.length === 0) {
-    return null;
-  }
-
-  return {
-    title: practiceResult.title || "Practice Task",
-    summary: practiceResult.summary || summaryFallback,
-    difficulty: practiceResult.difficulty || "MEDIUM",
-    estimatedTime: practiceResult.estimatedTime || "30-60 min",
-    prerequisites: Array.isArray(practiceResult.prerequisites)
-      ? practiceResult.prerequisites
-      : [],
-    steps,
-  };
-}
+import {
+  buildDecisionFromClassifier,
+  normalizePracticeTaskFromLegacyResult,
+  shouldAllowLegacyClassifierFallback,
+} from "@/lib/ai/agent/shared-processing";
 
 async function updateProcessStatus(
   entryId: string,

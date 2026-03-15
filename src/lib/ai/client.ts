@@ -287,9 +287,35 @@ function getGoogleProvider() {
 
 /**
  * Get a Vercel AI SDK compatible language model
- * Route order: CRS -> Local Proxy -> Gemini
+ * Route order: explicit config -> CRS -> Local Proxy -> Gemini
+ *
+ * @param configOverride - Optional config to use instead of global state.
+ *   Pass this to avoid relying on the global mutable `serverConfig`.
  */
-export function getModel(): LanguageModel {
+export function getModel(configOverride?: NormalizedAIConfig): LanguageModel {
+  // If explicit config is provided, build model from it directly (no global state)
+  if (configOverride?.apiKey) {
+    const provider = normalizeProviderType(configOverride.provider);
+
+    if (provider === 'crs') {
+      return createCRSModel(buildCRSConfig(configOverride));
+    }
+
+    if (provider === 'local-proxy' || provider === 'openai-compatible') {
+      return createLocalProxyModel({
+        apiKey: configOverride.apiKey,
+        baseUrl: configOverride.baseUrl || process.env.LOCAL_PROXY_URL || 'http://127.0.0.1:8045/v1',
+        model: configOverride.model || getDefaultModelForProvider(provider),
+        providerName: provider,
+      });
+    }
+
+    // Gemini with explicit config
+    const google = createGoogleGenerativeAI({ apiKey: configOverride.apiKey });
+    return google(configOverride.model || getModelName());
+  }
+
+  // Fallback to environment / global state (backward compat)
   if (isCRSMode()) {
     const crsConfig = getCRSConfig();
     if (!crsConfig) {

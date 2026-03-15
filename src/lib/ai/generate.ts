@@ -4,7 +4,7 @@
  */
 import { generateObject, generateText as aiGenerateText } from 'ai';
 import { z } from 'zod';
-import { getModel } from './client';
+import { getModel, type NormalizedAIConfig } from './client';
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -48,13 +48,18 @@ async function runWithRetry<T>(
 /**
  * Generate structured JSON output from text prompt.
  * Uses Zod schema for type-safe parsing when provided.
+ *
+ * @param prompt - The text prompt
+ * @param schema - Optional Zod schema for structured output
+ * @param aiConfig - Optional AI config to avoid global mutable state
  */
 export async function generateJSON<T>(
   prompt: string,
-  schema?: z.ZodSchema<T>
+  schema?: z.ZodSchema<T>,
+  aiConfig?: NormalizedAIConfig
 ): Promise<T> {
   return runWithRetry(async () => {
-    const model = getModel();
+    const model = getModel(aiConfig);
 
     if (schema) {
       try {
@@ -101,14 +106,20 @@ export async function generateJSON<T>(
 
 /**
  * Generate structured JSON output from file (PDF/image) + text prompt.
+ *
+ * @param prompt - The text prompt
+ * @param fileData - File data with base64 content and MIME type
+ * @param schema - Optional Zod schema for structured output
+ * @param aiConfig - Optional AI config to avoid global mutable state
  */
 export async function generateFromFile<T>(
   prompt: string,
   fileData: { base64: string; mimeType: string },
-  schema?: z.ZodSchema<T>
+  schema?: z.ZodSchema<T>,
+  aiConfig?: NormalizedAIConfig
 ): Promise<T> {
   return runWithRetry(async () => {
-    const model = getModel();
+    const model = getModel(aiConfig);
     const dataUrl = `data:${fileData.mimeType};base64,${fileData.base64}`;
 
     if (schema) {
@@ -154,10 +165,13 @@ export async function generateFromFile<T>(
 
 /**
  * Generate plain text output.
+ *
+ * @param prompt - The text prompt
+ * @param aiConfig - Optional AI config to avoid global mutable state
  */
-export async function generateText(prompt: string): Promise<string> {
+export async function generateText(prompt: string, aiConfig?: NormalizedAIConfig): Promise<string> {
   return runWithRetry(async () => {
-    const model = getModel();
+    const model = getModel(aiConfig);
     const { text } = await aiGenerateText({
       model,
       prompt,

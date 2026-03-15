@@ -50,8 +50,11 @@ async function validateGeminiCredential(apiKey: string): Promise<void> {
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
-      { signal: controller.signal }
+      `https://generativelanguage.googleapis.com/v1beta/models`,
+      {
+        headers: { 'x-goog-api-key': apiKey },
+        signal: controller.signal,
+      }
     );
 
     if (!response.ok) {

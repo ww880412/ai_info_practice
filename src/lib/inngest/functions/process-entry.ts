@@ -5,7 +5,7 @@
 import { inngest } from '../client';
 import { prisma } from '@/lib/prisma';
 import { parseWithLogging, type ParseInput, type ParseResult } from '@/lib/parser';
-import { classifyAndExtract, type ClassifyAndExtractResult } from '@/lib/ai/classifier';
+import { classifyAndExtract } from '@/lib/ai/classifier';
 import { convertToPractice } from '@/lib/ai/practiceConverter';
 import {
   type NormalizedAgentIngestDecision,
@@ -18,12 +18,16 @@ import {
 } from '@/lib/ai/agent/decision-repair';
 import { isDynamicSummaryEnabled } from '@/config/flags';
 import { buildConfidenceScore } from '@/lib/ai/agent/confidence';
-import { isLegacyClassifierFallbackEnabled } from '@/lib/ai/fallback-policy';
 import {
   KeyPointsSchema,
   BoundariesSchema,
 } from '@/lib/ai/agent/schemas';
 import { normalizeSummaryStructureForPersistence } from '@/lib/ai/agent/summary-structure';
+import {
+  buildDecisionFromClassifier,
+  normalizePracticeTaskFromLegacyResult,
+  shouldAllowLegacyClassifierFallback,
+} from '@/lib/ai/agent/shared-processing';
 import { downloadFromUrl } from '@/lib/storage';
 import type { Prisma, ProcessStatus, SourceType } from '@prisma/client';
 
@@ -39,81 +43,6 @@ async function updateEntryProcessStatus(
       processError: message ?? null,
     },
   });
-}
-
-function buildDecisionFromClassifier(
-  result: ClassifyAndExtractResult
-): NormalizedAgentIngestDecision {
-  return {
-    contentType: result.contentType,
-    techDomain: result.techDomain,
-    aiTags: result.aiTags,
-    coreSummary: result.coreSummary,
-    keyPoints: result.keyPoints,
-    summaryStructure: {
-      type: "generic",
-      reasoning: "Fallback from classifier output",
-      fields: {
-        summary: result.coreSummary,
-        keyPoints: result.keyPoints,
-      },
-    },
-    keyPointsNew: {
-      core: result.keyPoints,
-      extended: [],
-    },
-    boundaries: {
-      applicable: [],
-      notApplicable: [],
-    },
-    confidence: null,
-    difficulty: null,
-    sourceTrust: null,
-    timeliness: null,
-    contentForm: null,
-    practiceValue: result.practiceValue,
-    practiceReason: result.practiceReason,
-    practiceTask: null,
-  };
-}
-
-function normalizePracticeTaskFromLegacyResult(
-  practiceResult: Awaited<ReturnType<typeof convertToPractice>>,
-  summaryFallback: string
-): NormalizedPracticeTask | null {
-  const steps = Array.isArray(practiceResult.steps)
-    ? practiceResult.steps
-        .filter(
-          (step) =>
-            step &&
-            typeof step.order === "number" &&
-            typeof step.title === "string"
-        )
-        .map((step) => ({
-          order: step.order,
-          title: step.title,
-          description: step.description || "",
-        }))
-    : [];
-
-  if (steps.length === 0) {
-    return null;
-  }
-
-  return {
-    title: practiceResult.title || "Practice Task",
-    summary: practiceResult.summary || summaryFallback,
-    difficulty: practiceResult.difficulty || "MEDIUM",
-    estimatedTime: practiceResult.estimatedTime || "30-60 min",
-    prerequisites: Array.isArray(practiceResult.prerequisites)
-      ? practiceResult.prerequisites
-      : [],
-    steps,
-  };
-}
-
-function shouldAllowLegacyClassifierFallback(): boolean {
-  return isLegacyClassifierFallbackEnabled(process.env.ALLOW_CLASSIFIER_FALLBACK);
 }
 
 export const processEntry = inngest.createFunction(
@@ -145,12 +74,13 @@ export const processEntry = inngest.createFunction(
       const entry = await prisma.entry.findUnique({ where: { id: entryId } });
       if (!entry) throw new Error('Entry not found');
 
-      // Resolve credential and set server config for this processing run
+      // Resolve credential config for this processing run (passed via return value, not global state)
+      let credentialConfig: import('@/lib/ai/client').NormalizedAIConfig | null = null;
       if (entry.credentialId) {
-        const { resolveCredential, setServerConfig } = await import('@/lib/ai/client');
+        const { resolveCredential } = await import('@/lib/ai/client');
         const config = await resolveCredential(entry.credentialId);
         if (config.apiKey) {
-          setServerConfig({ apiKey: config.apiKey, model: config.model });
+          credentialConfig = config;
         }
       }
 
@@ -251,7 +181,8 @@ export const processEntry = inngest.createFunction(
         title: title || entry.title || '',
         content,
         sourceType: entry.sourceType,
-      } as ParseResult;
+        credentialConfig,
+      } as ParseResult & { credentialConfig: typeof credentialConfig };
     });
 
     // Step 2: AI processing
@@ -277,6 +208,11 @@ export const processEntry = inngest.createFunction(
           agentConfig.useToolCalling = false;
         }
         // null = keep env default (already set by getAgentConfig)
+
+        // Inject credential config via parameter instead of global mutable state
+        if (parsed.credentialConfig) {
+          agentConfig.aiConfig = parsed.credentialConfig;
+        }
 
         const { ReActAgent } = await import('@/lib/ai/agent/engine');
         const agent = new ReActAgent(agentConfig);
@@ -519,7 +455,7 @@ export const processEntry = inngest.createFunction(
       });
     }
 
-    // Step 5: Mark as done and cleanup
+    // Step 5: Mark as done
     await step.run('finalize', async () => {
       await prisma.entry.update({
         where: { id: entryId },
@@ -529,10 +465,7 @@ export const processEntry = inngest.createFunction(
           knowledgeStatus: 'TO_REVIEW',
         },
       });
-
-      // Reset global config to prevent credential leakage to subsequent jobs
-      const { setServerConfig } = await import('@/lib/ai/client');
-      setServerConfig({});
+      // No global state cleanup needed — credential config is passed via parameters
     });
 
     return { success: true, entryId };

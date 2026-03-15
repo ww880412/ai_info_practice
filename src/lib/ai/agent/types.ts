@@ -1,5 +1,6 @@
 import type { ParseResult } from '../../parser/index';
 import type { NormalizedAgentIngestDecision } from './ingest-contract';
+import type { NormalizedAIConfig } from '../client';
 
 /**
  * Agent 处理选项
@@ -33,6 +34,8 @@ export interface AgentConfig {
   maxIterations: number;
   /** Phase 2a: 是否启用 AI SDK 工具调用模式 */
   useToolCalling: boolean;
+  /** Optional AI credential config — pass explicitly to avoid global mutable state */
+  aiConfig?: NormalizedAIConfig;
 }
 
 export interface ReasoningStep {
