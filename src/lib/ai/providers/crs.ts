@@ -27,7 +27,6 @@ export interface CRSConfig {
   apiKey: string;
   model: string;
   reasoningEffort?: ReasoningEffort;
-  disableStorage?: boolean;
 }
 
 export interface CRSMessage {
@@ -364,7 +363,7 @@ export function getCRSConfig(): CRSConfig | null {
     apiKey: process.env.CRS_API_KEY || '',
     model: process.env.CRS_MODEL || DEFAULT_CRS_MODEL,
     reasoningEffort: normalizeReasoningEffort(process.env.CRS_REASONING_EFFORT),
-    disableStorage: process.env.CRS_DISABLE_STORAGE === 'true',
+
   };
 }
 
@@ -784,7 +783,7 @@ class CRSLanguageModel implements LanguageModelV3 {
       model: this.config.model,
       input: convertPromptToCRSInput(options.prompt),
       stream: true,
-      store: this.config.disableStorage === undefined ? undefined : !this.config.disableStorage,
+      store: false,
       ...(tools ? { tools } : {}),
       ...(toolChoice ? { tool_choice: toolChoice } : {}),
       ...(

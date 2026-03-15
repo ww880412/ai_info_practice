@@ -32,7 +32,6 @@ export async function POST(request: NextRequest) {
         apiKey,
         model: model || process.env.CRS_MODEL || "gpt-5.3-codex",
         reasoningEffort: "low",
-        disableStorage: true,
       };
 
       await generateText({

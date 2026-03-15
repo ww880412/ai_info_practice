@@ -190,7 +190,6 @@ function buildCRSConfig(config: Pick<NormalizedAIConfig, 'apiKey' | 'model' | 'b
     apiKey: config.apiKey || process.env.CRS_API_KEY || '',
     model: config.model || process.env.CRS_MODEL || 'gpt-5.3-codex',
     reasoningEffort: (process.env.CRS_REASONING_EFFORT as CRSConfig['reasoningEffort']) || 'xhigh',
-    disableStorage: process.env.CRS_DISABLE_STORAGE === 'true',
   };
 }
 
